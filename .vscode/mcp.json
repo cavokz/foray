@@ -1,0 +1,8 @@
+{
+  "servers": {
+    "hunch": {
+      "command": "hunch",
+      "args": ["serve", "--workspace", "${workspaceFolder}"]
+    }
+  }
+}

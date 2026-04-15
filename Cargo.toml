@@ -1,0 +1,20 @@
+[package]
+name = "hunch"
+version = "0.1.0"
+edition = "2021"
+description = "Investigation journals via MCP — start with a hunch, fork it when it branches, keep the trail."
+license = "Apache-2.0"
+
+[dependencies]
+rmcp = { version = "1.4.0", features = ["server", "transport-io"] }
+tokio = { version = "1", features = ["full"] }
+serde = { version = "1", features = ["derive"] }
+serde_json = "1"
+uuid = { version = "1", features = ["v4"] }
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "6"
+anyhow = "1"
+clap = { version = "4", features = ["derive"] }
+
+[dev-dependencies]
+tempfile = "3"
