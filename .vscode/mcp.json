@@ -1,7 +1,7 @@
 {
   "servers": {
     "hunch": {
-      "command": "hunch",
+      "command": "/Users/cavok/bin/hunch",
       "args": ["serve", "--workspace", "${workspaceFolder}"]
     }
   }

@@ -48,13 +48,13 @@ pub trait Store: Send + Sync {
 }
 
 pub struct JsonFileStore {
-    project_dir: PathBuf,
+    dir: PathBuf,
 }
 
 impl JsonFileStore {
-    pub fn new(base_dir: &Path, project: &str) -> Self {
+    pub fn new(base_dir: &Path) -> Self {
         Self {
-            project_dir: base_dir.join(project),
+            dir: base_dir.to_path_buf(),
         }
     }
 
@@ -65,24 +65,22 @@ impl JsonFileStore {
     }
 
     fn ensure_dir(&self) -> Result<(), StoreError> {
-        fs::create_dir_all(&self.project_dir)?;
+        fs::create_dir_all(&self.dir)?;
         Ok(())
     }
 
     fn context_path(&self, name: &str) -> PathBuf {
-        self.project_dir.join(format!("{}.json", name))
+        self.dir.join(format!("{}.json", name))
     }
 
     fn active_path(&self) -> PathBuf {
-        self.project_dir.join(".active")
+        self.dir.join(".active")
     }
 
     /// Atomic write: write to temp file, fsync, rename.
     fn atomic_write(&self, path: &Path, data: &[u8]) -> Result<(), StoreError> {
         self.ensure_dir()?;
-        let tmp_path = self
-            .project_dir
-            .join(format!(".tmp_{}", uuid::Uuid::new_v4()));
+        let tmp_path = self.dir.join(format!(".tmp_{}", uuid::Uuid::new_v4()));
         let mut file = fs::File::create(&tmp_path)?;
         file.write_all(data)?;
         file.sync_all()?;
@@ -136,12 +134,12 @@ impl Store for JsonFileStore {
     }
 
     fn list(&self) -> Result<Vec<ContextSummary>, StoreError> {
-        if !self.project_dir.exists() {
+        if !self.dir.exists() {
             return Ok(Vec::new());
         }
         let active = self.get_active()?;
         let mut summaries = Vec::new();
-        for entry in fs::read_dir(&self.project_dir)? {
+        for entry in fs::read_dir(&self.dir)? {
             let entry = entry?;
             let path = entry.path();
             if let Some(ext) = path.extension() {
@@ -274,7 +272,7 @@ mod tests {
 
     fn test_store() -> (TempDir, JsonFileStore) {
         let tmp = TempDir::new().unwrap();
-        let store = JsonFileStore::new(tmp.path(), "test-project");
+        let store = JsonFileStore::new(tmp.path());
         (tmp, store)
     }
 

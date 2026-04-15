@@ -12,10 +12,9 @@ use hunch::store::{self, JsonFileStore, Store, StoreError};
 use hunch::tree;
 use hunch::types::{ContextItem, ItemType};
 
-fn make_store(workspace: &Path) -> Arc<dyn Store> {
-    let project = git::detect_project(workspace);
+fn make_store() -> Arc<dyn Store> {
     let base = JsonFileStore::default_base_dir();
-    Arc::new(JsonFileStore::new(&base, &project))
+    Arc::new(JsonFileStore::new(&base))
 }
 
 fn get_project(workspace: &Path) -> String {
@@ -45,7 +44,7 @@ async fn main() -> anyhow::Result<()> {
                 .unwrap_or_else(|| std::env::current_dir().unwrap());
             let project = git::detect_project(&ws);
             let base = JsonFileStore::default_base_dir();
-            let store: Arc<dyn Store> = Arc::new(JsonFileStore::new(&base, &project));
+            let store: Arc<dyn Store> = Arc::new(JsonFileStore::new(&base));
             let server = HunchServer::new(store, project, ws);
 
             // Log to stderr so stdout is clean for MCP stdio
@@ -56,7 +55,7 @@ async fn main() -> anyhow::Result<()> {
 
         Commands::Status { json } => {
             let ws = std::env::current_dir()?;
-            let store = make_store(&ws);
+            let store = make_store();
             let project = get_project(&ws);
             let active = store.get_active().unwrap_or(None);
             let branch = git::detect_branch(&ws);
@@ -90,8 +89,7 @@ async fn main() -> anyhow::Result<()> {
         }
 
         Commands::Show { name, json } => {
-            let ws = std::env::current_dir()?;
-            let store = make_store(&ws);
+            let store = make_store();
             let ctx_name = match name {
                 Some(n) => n,
                 None => match require_active(&*store) {
@@ -137,8 +135,7 @@ async fn main() -> anyhow::Result<()> {
             r#ref,
             tags,
         } => {
-            let ws = std::env::current_dir()?;
-            let store = make_store(&ws);
+            let store = make_store();
             let ctx_name = match require_active(&*store) {
                 Ok(n) => n,
                 Err(e) => {
@@ -180,8 +177,7 @@ async fn main() -> anyhow::Result<()> {
         }
 
         Commands::Fork { new_name, from } => {
-            let ws = std::env::current_dir()?;
-            let store = make_store(&ws);
+            let store = make_store();
             let source = match from {
                 Some(n) => n,
                 None => match require_active(&*store) {
@@ -211,7 +207,7 @@ async fn main() -> anyhow::Result<()> {
 
         Commands::Switch { name } => {
             let ws = std::env::current_dir()?;
-            let store = make_store(&ws);
+            let store = make_store();
             let project = get_project(&ws);
             match store::switch_context(&*store, &name, &project) {
                 Ok((ctx, created)) => {
@@ -229,8 +225,7 @@ async fn main() -> anyhow::Result<()> {
         }
 
         Commands::List { json } => {
-            let ws = std::env::current_dir()?;
-            let store = make_store(&ws);
+            let store = make_store();
             match store.list() {
                 Ok(summaries) => {
                     if json {
@@ -248,8 +243,7 @@ async fn main() -> anyhow::Result<()> {
         }
 
         Commands::Remove { item_id } => {
-            let ws = std::env::current_dir()?;
-            let store = make_store(&ws);
+            let store = make_store();
             let ctx_name = match require_active(&*store) {
                 Ok(n) => n,
                 Err(e) => {
