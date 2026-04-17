@@ -71,10 +71,21 @@ jobs:
       - uses: actions/download-artifact@v4
         with:
           path: artifacts
+      - name: Rename binaries for release
+        run: |
+          mv artifacts/foray-x86_64-unknown-linux-gnu/foray    artifacts/foray-linux-x86_64
+          mv artifacts/foray-aarch64-unknown-linux-gnu/foray   artifacts/foray-linux-aarch64
+          mv artifacts/foray-x86_64-pc-windows-msvc/foray.exe  artifacts/foray-windows-x86_64.exe
+          mv artifacts/foray-aarch64-pc-windows-msvc/foray.exe artifacts/foray-windows-aarch64.exe
+          mv artifacts/foray-universal-apple-darwin/foray       artifacts/foray-macos-universal
       - uses: softprops/action-gh-release@v2
         with:
           files: |
-            artifacts/**/*
+            artifacts/foray-linux-x86_64
+            artifacts/foray-linux-aarch64
+            artifacts/foray-windows-x86_64.exe
+            artifacts/foray-windows-aarch64.exe
+            artifacts/foray-macos-universal
             skills/foray/SKILL.md
 
   publish:
