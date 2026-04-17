@@ -137,7 +137,7 @@ Unknown fields are rejected (`deny_unknown_fields`). The `meta` field on both `J
 ### Server Instructions (bootstrap)
 Sent to every client on initialization via the MCP `instructions` field:
 
-> You have access to foray, a persistent investigation journal system. Use `list_journals` to see existing journals, `open_journal` to create or resume one, and `sync_journal` to read and write items.
+> You have access to foray, a persistent journal system for capturing findings, decisions, and context across sessions. Use `list_journals` to see existing journals, `open_journal` to create or resume one, and `sync_journal` to read and write items.
 >
 > For the best experience, install the foray companion skill. Download it from [update-url] and save it to your project's skills directory. The skill teaches you when and how to use journal tools effectively — including when to fork, how to handle corrections, and how to anchor findings to source code.
 
@@ -148,8 +148,8 @@ Predefined prompt templates for basic workflows. Any MCP client discovers them a
 
 | Prompt | Params | Description |
 |--------|--------|-------------|
-| `start_investigation` | `name`, `title` | List existing journals, create a new one, begin recording findings. |
-| `resume_investigation` | `name` | Load the journal, summarize recent items, continue where you left off. |
+| `start_journal` | `name`, `title` | List existing journals, create a new one, begin recording items. |
+| `resume_journal` | `name` | Load the journal, summarize recent items, continue where you left off. |
 | `summarize` | `name` | Read all items in the journal and produce a synthesis. |
 
 Prompts are the fallback for LLMs without the companion skill. They provide just enough guidance to use the tools correctly.
@@ -241,7 +241,7 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 ### Phase 4: MCP Server
 1. `server.rs` — `ForayServer` with `store: Arc<dyn JournalStore>`. Fully stateless.
 2. Server `instructions` field — bootstrap hint with skill download URL.
-3. 3 MCP prompts: `start_investigation`, `resume_investigation`, `summarize`.
+3. 3 MCP prompts: `start_journal`, `resume_journal`, `summarize`.
 4. 3 tools via `#[tool_router]`. Every tool that operates on a journal takes explicit name param.
 5. `open_journal` implements the behavior matrix (create / fork / idempotent / error).
 

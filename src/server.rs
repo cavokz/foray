@@ -126,7 +126,7 @@ struct ListJournalsResponse {
 pub struct StartInvestigationParams {
     /// Name for the new journal
     pub name: String,
-    /// Title describing the investigation
+    /// Title describing the journal
     pub title: String,
 }
 
@@ -185,7 +185,8 @@ fn validate_tags(tags: &Option<Vec<String>>) -> Result<(), ErrorData> {
 }
 
 const SERVER_INSTRUCTIONS: &str = "\
-You have access to foray, a persistent investigation journal system. \
+You have access to foray, a persistent journal system for capturing findings, decisions, \
+and context across sessions. \
 Use `list_journals` to see existing journals, `open_journal` to create or resume one, \
 and `sync_journal` to read and write items.\n\n\
 For the best experience, install the foray companion skill. \
@@ -445,45 +446,44 @@ impl ForayServer {
 #[prompt_router]
 impl ForayServer {
     #[prompt(
-        name = "start_investigation",
-        description = "List existing journals, create a new one, begin recording findings."
+        name = "start_journal",
+        description = "List existing journals, create a new one, and begin recording items."
     )]
-    async fn start_investigation(
+    async fn start_journal(
         &self,
         Parameters(args): Parameters<StartInvestigationParams>,
     ) -> Result<GetPromptResult, ErrorData> {
         Ok(GetPromptResult::new(vec![PromptMessage::new_text(
             PromptMessageRole::User,
             format!(
-                "I want to start investigating something. \
+                "I want to start a new journal. \
                 First, check if there are existing journals with `list_journals`. \
                 Then create a new journal named \"{}\" with title \"{}\" using \
-                `open_journal`. As you discover findings, record them with `sync_journal`.",
+                `open_journal`. Record items as you work with `sync_journal`.",
                 args.name, args.title
             ),
         )])
-        .with_description("Start a new investigation"))
+        .with_description("Start a new journal"))
     }
 
     #[prompt(
-        name = "resume_investigation",
+        name = "resume_journal",
         description = "Load the journal, summarize recent items, continue where you left off."
     )]
-    async fn resume_investigation(
+    async fn resume_journal(
         &self,
         Parameters(args): Parameters<ResumeInvestigationParams>,
     ) -> Result<GetPromptResult, ErrorData> {
         Ok(GetPromptResult::new(vec![PromptMessage::new_text(
             PromptMessageRole::User,
             format!(
-                "I want to resume my investigation. \
-                Load journal \"{}\" with `sync_journal` and summarize what we've found \
-                so far. Then continue the investigation, recording new findings with \
-                `sync_journal`.",
+                "I want to resume work on a journal. \
+                Load journal \"{}\" with `sync_journal` and summarize what has been \
+                recorded so far. Then continue, recording new items with `sync_journal`.",
                 args.name
             ),
         )])
-        .with_description("Resume an existing investigation"))
+        .with_description("Resume an existing journal"))
     }
 
     #[prompt(
@@ -503,7 +503,7 @@ impl ForayServer {
                 args.name
             ),
         )])
-        .with_description("Summarize an investigation journal"))
+        .with_description("Summarize a journal"))
     }
 }
 

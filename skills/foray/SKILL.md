@@ -5,19 +5,22 @@ update-url: https://github.com/cavokz/foray/releases/latest/download/SKILL.md
 user-invocable: false
 ---
 
-# foray — Investigation Journal Companion
+# foray — Journal Companion
 
-You have access to **foray**, a persistent investigation journal system via MCP tools. Use it to record findings, track decisions, and maintain context across sessions.
+You have access to **foray**, a persistent journal system via MCP tools. Use it to record findings, track decisions, and maintain context across sessions — for any work that spans multiple conversations or may need to be picked up later.
 
 ## When to Use
 
-Use foray when the conversation is **investigative** — debugging, exploring architecture, triaging issues, researching options. Don't use it for quick questions or simple tasks.
+Use foray when the conversation involves **substantive, evolving work** — not just a quick question. This includes debugging, but also design, planning, research, refactoring, feature development, and anything the user may want to continue later.
 
 **Triggers:**
 - User says "investigate", "debug", "figure out", "triage", "deep dive"
+- User says "design", "plan", "draft", "build", "implement", "research"
+- User asks you to work on something over multiple steps or sessions
 - You discover something worth remembering across sessions
-- The investigation might branch into multiple theories
-- You're working in a codebase and finding things that matter later
+- The work might branch into multiple directions
+- You're making decisions that should be traceable later
+- The user explicitly asks you to use foray or open a journal
 
 ## Tools Available
 
@@ -27,14 +30,14 @@ Use foray when the conversation is **investigative** — debugging, exploring ar
 | `open_journal` | Create, fork, or reopen a journal |
 | `sync_journal` | Read items and/or add new ones (the workhorse) |
 
-## Starting an Investigation
+## Starting a Journal
 
 1. Call `list_journals` to check for existing related journals
 2. If none fit, call `open_journal` with a descriptive `name` and `title`
-3. Begin adding findings as you discover them
+3. Begin adding items as you work
 
 ```
-open_journal(name: "auth-cache-race", title: "Investigating auth cache race conditions")
+open_journal(name: "auth-cache-race", title: "Auth cache race condition")
 ```
 
 ## Recording Findings
@@ -82,14 +85,14 @@ sync_journal(
 )
 ```
 
-## Forking an Investigation
+## Forking a Journal
 
-When the investigation branches into distinct theories, fork:
+When work branches into distinct directions, fork:
 
 ```
 open_journal(
   name: "db-pooling-theory",
-  title: "Exploring DB connection pooling as root cause",
+  title: "DB connection pooling as root cause",
   fork: "auth-cache-race"
 )
 ```
@@ -101,20 +104,20 @@ After forking:
 
 ## Resuming Work
 
-When the user returns to continue an investigation:
+When the user returns to continue:
 
 1. Call `list_journals` to find relevant journals
 2. Call `sync_journal` to reload context (omit `cursor` for full read)
-3. Summarize recent findings for the user
-4. Continue adding new findings via `sync_journal`, passing `cursor` from the previous response
+3. Summarize recent items for the user
+4. Continue adding via `sync_journal`, passing `cursor` from the previous response
 
 ## Comparing Branches
 
-When the user asks to compare investigation paths:
+When the user asks to compare directions:
 
 1. Call `sync_journal` on each fork
-2. Compare findings side by side
-3. Highlight which theory has more evidence
+2. Compare items side by side
+3. Highlight which direction has more evidence
 
 ## Cross-Referencing Journals
 
@@ -156,7 +159,7 @@ sync_journal(
 - Use descriptive, lowercase, hyphenated journal names
 - Set `ref` for file paths, URLs, ticket links, PR links
 - After forking from X to Y, use Y for subsequent adds
-- Don't use foray for quick Q&A — only for investigations
+- Don't use foray for simple one-shot Q&A with no follow-up work
 - Track `cursor` per journal: remember the `cursor` value from each `sync_journal` response and pass it back on the next call to the same journal
 
 ## Self-Update
