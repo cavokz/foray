@@ -59,7 +59,7 @@ sync_journal(
   items: [{
     content: "Race condition: two goroutines access session cache without lock",
     item_type: "finding",
-    file_ref: "src/auth/session.go:142",
+    ref: "src/auth/session.go:142",
     tags: ["race-condition", "auth"]
   }]
 )
@@ -75,7 +75,7 @@ sync_journal(
   items: [{
     content: "Lock added around cache access",
     item_type: "decision",
-    file_ref: "src/auth/session.go:142",
+    ref: "src/auth/session.go:142",
     meta: {
       "vcs-repo": "https://github.com/org/repo",
       "vcs-branch": "main",
@@ -144,7 +144,7 @@ sync_journal(
   items: [{
     content: "This contradicts the earlier finding about cache timing",
     item_type: "note",
-    file_ref: "foray:auth-cache-race#tshj-lkbw-rmvn-dpcf"
+    ref: "foray:auth-cache-race#tshj-lkbw-rmvn-dpcf"
   }]
 )
 ```
@@ -176,7 +176,7 @@ sync_journal(
   items: [{
     content: "CORRECTION: session.go:142 is thread-safe — the race is in cache.go:89 instead",
     item_type: "finding",
-    file_ref: "src/auth/cache.go:89"
+    ref: "src/auth/cache.go:89"
   }]
 )
 ```

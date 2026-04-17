@@ -159,7 +159,7 @@ Prompts are the fallback for LLMs without the companion skill. They provide just
 | Tool | Params | Description |
 |------|--------|-------------|
 | `open_journal` | `name`, `title?`, `fork?`, `meta?` | Create, fork, or reopen a journal. `title` is required when creating or forking (error if missing), ignored when reopening. `fork` specifies source journal name. Idempotent if exists without `fork`. `meta` sets journal-level metadata. |
-| `sync_journal` | `name`, `cursor?`, `limit?`, `items?` | Read and write journal items in one call. Returns items since cursor position. `cursor` is the position from the previous sync (omit for full read). `items` is an array of `{ content, item_type?, file_ref?, tags?, meta? }`. `limit` caps returned items (does not affect additions). Returns `cursor` for the next call and `added_ids` for items added by this call. |
+| `sync_journal` | `name`, `cursor?`, `limit?`, `items?` | Read and write journal items in one call. Returns items since cursor position. `cursor` is the position from the previous sync (omit for full read). `items` is an array of `{ content, item_type?, ref?, tags?, meta? }`. `limit` caps returned items (does not affect additions). Returns `cursor` for the next call and `added_ids` for items added by this call. |
 | `list_journals` | `limit?`, `offset?` | List active journals. Paginated: defaults to all. |
 
 All tools return JSON. No in-memory state. Every tool that operates on a journal takes an explicit name parameter.

@@ -35,6 +35,7 @@ fn deserialize_tags<'de, D: Deserializer<'de>>(
 // ── Tool parameter types ────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct OpenJournalParams {
     /// Journal name ([a-z0-9_-], max 64 chars)
     pub name: String,
@@ -50,6 +51,7 @@ pub struct OpenJournalParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SyncItemInput {
     /// Content of the item
     pub content: String,
@@ -57,7 +59,7 @@ pub struct SyncItemInput {
     #[serde(default)]
     pub item_type: Option<String>,
     /// File reference (path, URL, ticket link, etc.)
-    #[serde(default)]
+    #[serde(default, rename = "ref")]
     pub file_ref: Option<String>,
     /// Tags for categorization (array or comma-separated string)
     #[serde(default, deserialize_with = "deserialize_tags")]
@@ -68,6 +70,7 @@ pub struct SyncItemInput {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SyncJournalParams {
     /// Journal name
     pub name: String,
@@ -83,6 +86,7 @@ pub struct SyncJournalParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ListJournalsParams {
     /// Maximum number of journals to return
     #[serde(default)]
@@ -519,5 +523,80 @@ impl rmcp::ServerHandler for ForayServer {
         )
         .with_instructions(SERVER_INSTRUCTIONS.to_string())
         .with_server_info(Implementation::new("foray", env!("CARGO_PKG_VERSION")))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── SyncItemInput deserialization ───────────────────────────────
+
+    #[test]
+    fn sync_item_ref_field_accepted() {
+        let v: SyncItemInput =
+            serde_json::from_str(r#"{"content":"x","ref":"src/auth/session.go:142"}"#).unwrap();
+        assert_eq!(v.file_ref.as_deref(), Some("src/auth/session.go:142"));
+    }
+
+    #[test]
+    fn sync_item_file_ref_field_rejected() {
+        // old field name must be rejected (deny_unknown_fields)
+        let result: Result<SyncItemInput, _> =
+            serde_json::from_str(r#"{"content":"x","file_ref":"src/auth/session.go:142"}"#);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn sync_item_tags_as_array() {
+        let v: SyncItemInput =
+            serde_json::from_str(r#"{"content":"x","tags":["auth","race"]}"#).unwrap();
+        assert_eq!(
+            v.tags.as_deref(),
+            Some(&["auth".to_string(), "race".to_string()][..])
+        );
+    }
+
+    #[test]
+    fn sync_item_tags_as_comma_string() {
+        let v: SyncItemInput =
+            serde_json::from_str(r#"{"content":"x","tags":"auth, race"}"#).unwrap();
+        assert_eq!(
+            v.tags.as_deref(),
+            Some(&["auth".to_string(), "race".to_string()][..])
+        );
+    }
+
+    #[test]
+    fn sync_item_item_type_defaults_to_none() {
+        let v: SyncItemInput = serde_json::from_str(r#"{"content":"x"}"#).unwrap();
+        assert_eq!(v.item_type, None);
+    }
+
+    #[test]
+    fn sync_item_meta_roundtrip() {
+        let v: SyncItemInput =
+            serde_json::from_str(r#"{"content":"x","meta":{"vcs-branch":"main","pr":42}}"#)
+                .unwrap();
+        let meta = v.meta.unwrap();
+        assert_eq!(meta["vcs-branch"], serde_json::json!("main"));
+        assert_eq!(meta["pr"], serde_json::json!(42));
+    }
+
+    // ── SyncJournalResponse serialization ──────────────────────────
+
+    #[test]
+    fn sync_response_cursor_and_added_ids_present() {
+        let resp = SyncJournalResponse {
+            name: "my-journal".into(),
+            title: Some("My Journal".into()),
+            items: vec![],
+            added_ids: vec!["abc-123".into()],
+            cursor: 7,
+            total: 7,
+        };
+        let json: serde_json::Value = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["cursor"], 7);
+        assert_eq!(json["added_ids"], serde_json::json!(["abc-123"]));
     }
 }
