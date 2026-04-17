@@ -20,11 +20,11 @@ Or download a pre-built binary from [GitHub Releases](https://github.com/cavokz/
 
 | Platform | Binary |
 |----------|--------|
-| macOS (universal) | `foray-universal-apple-darwin/foray` |
-| Linux x86_64 | `foray-x86_64-unknown-linux-gnu/foray` |
-| Linux arm64 | `foray-aarch64-unknown-linux-gnu/foray` |
-| Windows x86_64 | `foray-x86_64-pc-windows-msvc/foray.exe` |
-| Windows arm64 | `foray-aarch64-pc-windows-msvc/foray.exe` |
+| macOS (universal) | `foray-macos-universal` |
+| Linux x86_64 | `foray-linux-x86_64` |
+| Linux arm64 | `foray-linux-aarch64` |
+| Windows x86_64 | `foray-windows-x86_64.exe` |
+| Windows arm64 | `foray-windows-aarch64.exe` |
 
 Place the binary somewhere on your `PATH` (e.g. `/usr/local/bin`, `~/.local/bin`).
 
