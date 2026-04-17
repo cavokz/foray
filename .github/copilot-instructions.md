@@ -1,0 +1,3 @@
+# Copilot Instructions
+
+After any code change, review `doc/blueprint.md` and update it to reflect the current state. The blueprint is the living spec — code and doc must stay in sync. Covers: tool signatures, response formats, CLI flags, type definitions, storage layout, behavioral rules.
