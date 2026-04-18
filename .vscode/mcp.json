@@ -1,9 +1,0 @@
-{
-  "servers": {
-    "foray": {
-      "type": "stdio",
-      "command": "foray",
-      "args": ["serve"]
-    }
-  }
-}
