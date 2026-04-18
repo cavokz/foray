@@ -39,8 +39,8 @@ Then follow the [Setup Guide](SETUP.md) to configure your MCP client.
 
 | Prompt | Description |
 |--------|-------------|
-| `start_investigation` | Create a journal and begin recording |
-| `resume_investigation` | Load a journal and continue |
+| `start_journal` | Create a journal and begin recording |
+| `resume_journal` | Load a journal and continue |
 | `summarize` | Read all items and produce a synthesis |
 
 ## CLI Usage

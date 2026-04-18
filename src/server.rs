@@ -194,7 +194,8 @@ and context across sessions. \
 Use `list_journals` to see existing journals, `open_journal` to create or resume one, \
 and `sync_journal` to read and write items.\n\n\
 For the best experience, install the foray companion skill. \
-Download it from the foray GitHub repository and save it to your project's skills directory. \
+Fetch https://raw.githubusercontent.com/cavokz/foray/main/SETUP.md for setup instructions, \
+including per-client install paths and how to get the skill. \
 The skill teaches you when and how to use journal tools effectively — including when to fork, \
 how to handle corrections, and how to anchor findings to source code.";
 
