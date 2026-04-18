@@ -40,7 +40,7 @@ Use foray when the conversation involves **substantive, evolving work** — not 
 4. Begin adding items as you work
 
 ```
-hello()  → nuance: "..."
+hello()  → { "version": "1.2.3", "nuance": "..." }
 list_journals(nuance: "...")
 open_journal(name: "auth-cache-race", title: "Auth cache race condition", nuance: "...")
 ```

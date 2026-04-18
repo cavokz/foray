@@ -112,6 +112,7 @@ pub struct ListJournalsParams {
 
 #[derive(Serialize)]
 struct HelloResponse {
+    version: &'static str,
     nuance: &'static str,
 }
 
@@ -271,10 +272,11 @@ impl ForayServer {
 impl ForayServer {
     #[tool(
         name = "hello",
-        description = "Establish a session handshake. Returns the nuance token. Always call this before any other tool, then pass the returned nuance on every subsequent call."
+        description = "Establish a session handshake. Returns the server version and nuance token. Always call this before any other tool, then pass the returned nuance on every subsequent call."
     )]
     async fn hello(&self) -> Result<CallToolResult, ErrorData> {
         let resp = HelloResponse {
+            version: env!("CARGO_PKG_VERSION"),
             nuance: CURRENT_NUANCE,
         };
         Ok(CallToolResult::success(vec![Content::text(
@@ -679,12 +681,14 @@ mod tests {
     // ── HelloResponse serialization ────────────────────────────────
 
     #[test]
-    fn hello_response_serializes_nuance() {
+    fn hello_response_serializes_version_and_nuance() {
         let resp = HelloResponse {
+            version: env!("CARGO_PKG_VERSION"),
             nuance: CURRENT_NUANCE,
         };
         let json: serde_json::Value = serde_json::to_value(&resp).unwrap();
         assert_eq!(json["nuance"], CURRENT_NUANCE);
+        assert_eq!(json["version"], env!("CARGO_PKG_VERSION"));
     }
 
     // ── SyncJournalResponse serialization ──────────────────────────

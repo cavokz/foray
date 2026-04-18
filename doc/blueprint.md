@@ -158,7 +158,7 @@ Prompts are the fallback for LLMs without the companion skill. They provide just
 
 | Tool | Params | Description |
 |------|--------|-------------|
-| `hello` | *(none)* | Establish handshake. Returns `{ nuance }`. Always call first — every session — then pass `nuance` on every subsequent call. |
+| `hello` | *(none)* | Establish handshake. Returns `{ version, nuance }`. Always call first — every session — then pass `nuance` on every subsequent call. |
 | `open_journal` | `name`, `title?`, `fork?`, `meta?`, `nuance` | Create, fork, or reopen a journal. `title` is required when creating or forking (error if missing), ignored when reopening. `fork` specifies source journal name. Idempotent if exists without `fork`. `meta` sets journal-level metadata. |
 | `sync_journal` | `name`, `cursor?`, `limit?`, `items?`, `nuance` | Read and write journal items in one call. Returns items since cursor position. `cursor` is the position from the previous sync (omit for full read). `items` is an array of `{ content, item_type?, ref?, tags?, meta? }`. `limit` caps returned items (does not affect additions). Returns `cursor` for the next call and `added_ids` for items added by this call. |
 | `list_journals` | `limit?`, `offset?`, `nuance` | List active journals. Paginated: defaults to all. |
@@ -193,7 +193,7 @@ Errors may include a `data` field with a `hint` key to guide callers:
 | Other store errors | `internal_error` | *(none)* |
 
 ### Tool response formats
-- `hello` → `{ nuance }` (e.g. `{ "nuance": "..." }`)
+- `hello` → `{ version, nuance }` (e.g. `{ "version": "1.2.3", "nuance": "..." }`)
 - `open_journal` → `{ name, title, item_count, created }` (`created: bool` — true if new)
 - `sync_journal` → `{ name, title, items: [...], added_ids: [...], cursor, total }` (`cursor` is the position for the next call, `added_ids` lists IDs assigned to items added by this call in order)
 - `list_journals` → `{ journals: [{ name, title, item_count, meta }], total, limit, offset }`
