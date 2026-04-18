@@ -139,7 +139,7 @@ Sent to every client on initialization via the MCP `instructions` field:
 
 > You have access to foray, a persistent journal system for capturing findings, decisions, and context across sessions. Use `list_journals` to see existing journals, `open_journal` to create or resume one, and `sync_journal` to read and write items.
 >
-> For the best experience, install the foray companion skill. Download it from [update-url] and save it to your project's skills directory. The skill teaches you when and how to use journal tools effectively — including when to fork, how to handle corrections, and how to anchor findings to source code.
+> For the best experience, install the foray companion skill. Fetch https://raw.githubusercontent.com/cavokz/foray/main/SETUP.md for setup instructions, including per-client install paths and how to get the skill. The skill teaches you when and how to use journal tools effectively — including when to fork, how to handle corrections, and how to anchor findings to source code.
 
 An LLM *with* the skill already knows what to do. An LLM *without* it gets a self-bootstrap nudge.
 
@@ -240,7 +240,7 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 
 ### Phase 4: MCP Server
 1. `server.rs` — `ForayServer` with `store: Arc<dyn JournalStore>`. Fully stateless.
-2. Server `instructions` field — bootstrap hint with skill download URL.
+2. Server `instructions` field — bootstrap hint pointing to SETUP.md (raw URL) for per-client skill install paths and setup guidance.
 3. 3 MCP prompts: `start_journal`, `resume_journal`, `summarize`.
 4. 3 tools via `#[tool_router]`. Every tool that operates on a journal takes explicit name param.
 5. `open_journal` implements the behavior matrix (create / fork / idempotent / error).
@@ -256,15 +256,12 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 
 **Architecture**: The binary is the stable platform (4 MCP tools, pluggable journal store). The companion skill is the evolving product (behavioral rules, use case patterns). The setup guide bootstraps everything.
 
-1. `SETUP.md` — LLM-oriented setup guide (not a skill, a one-time instruction document). User downloads it from GitHub, tells the LLM to read it and proceed. Contents:
-    - **Binary installation**: check if `foray` is on PATH (`foray --version`). If not:
-      - Download a prebuilt binary from GitHub releases
-      - Or `cargo install foray`
-      - Add to PATH
-    - **Companion skill download**: instruct the LLM to download `SKILL.md` from the latest GitHub release and save it to the appropriate location (project-level or global, per user preference and client)
-    - **MCP server configuration**: instruct the LLM to configure `foray serve` as an MCP server for its specific client (VS Code, Claude Desktop, Cursor, etc.)
-    - **Project setup**: create `.forayrc` with `root = true` in the project root, optionally add to `.gitignore`
-    - **Verification**: call `list_journals` to confirm everything works
+1. `SETUP.md` — LLM-oriented setup guide (not a skill, a one-time instruction document). User downloads it from GitHub and directs each AI assistant to read it and follow the steps for itself. The guide is split into two sections:
+    - **Step 1 (one-time)**: binary installation — check if `foray` is on PATH (`foray --version`). If not: download a prebuilt binary from GitHub releases or `cargo install foray`. The AI confirms with the user before attempting.
+    - **Steps 2–4 (per-assistant)**: each AI assistant follows these for itself:
+      - **MCP server configuration**: configure `foray serve` as an MCP server for its specific client (Claude CLI, Claude Desktop, Cursor, VS Code / GitHub Copilot), with per-client config file paths and JSON snippets inline
+      - **Companion skill installation**: download `SKILL.md` from `https://github.com/cavokz/foray/releases/latest/download/SKILL.md` and save to the global skills path for the client (Claude Desktop uses project instructions instead)
+      - **Verification**: invoke `list_journals` to confirm the MCP server is responding
     - User never needs to clone the foray repo
 
 2. `skills/foray/SKILL.md` — companion agent skill following agentskills.io standard.
