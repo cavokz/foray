@@ -1,4 +1,4 @@
-use crate::store::{JournalStore, StoreError, fork_journal};
+use crate::store::{Store, StoreError, fork_journal};
 use crate::types::{ItemType, JournalFile, JournalItem, Pagination, item_id, validate_name};
 use chrono::Utc;
 use rmcp::handler::server::wrapper::Parameters;
@@ -222,11 +222,11 @@ how to handle corrections, and how to anchor findings to source code.";
 
 #[derive(Clone)]
 pub struct ForayServer {
-    store: Arc<dyn JournalStore>,
+    store: Arc<dyn Store>,
 }
 
 impl ForayServer {
-    pub fn new(store: Arc<dyn JournalStore>) -> Self {
+    pub fn new(store: Arc<dyn Store>) -> Self {
         Self { store }
     }
 

@@ -24,7 +24,7 @@ pub enum StoreError {
 }
 
 /// Backend-agnostic journal storage.
-pub trait JournalStore: Send + Sync {
+pub trait Store: Send + Sync {
     fn load(&self, name: &str, pagination: &Pagination)
     -> Result<(JournalFile, usize), StoreError>;
     fn create(&self, journal: JournalFile) -> Result<(), StoreError>;
@@ -138,7 +138,7 @@ impl JsonFileStore {
     }
 }
 
-impl JournalStore for JsonFileStore {
+impl Store for JsonFileStore {
     fn load(
         &self,
         name: &str,
@@ -238,7 +238,7 @@ impl JournalStore for JsonFileStore {
 
 /// Fork a journal: snapshot-copy items from source to a new journal.
 pub fn fork_journal(
-    store: &dyn JournalStore,
+    store: &dyn Store,
     source: &str,
     new_name: &str,
     title: String,

@@ -241,7 +241,7 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
    - Both `JournalFile` and `JournalItem` get `#[serde(deny_unknown_fields)]` and `meta: Option<HashMap<String, serde_json::Value>>` for client-specific extensibility
    - `validate_name()` for journal name validation
 2. `store.rs`:
-   - `trait JournalStore: Send + Sync` with: `load(name, pagination) -> (JournalFile, total)`, `create`, `add_items(name, Vec<JournalItem>)`, `list(pagination, archived) -> (Vec<JournalSummary>, total)`, `delete`, `exists`, `archive`, `unarchive`
+   - `trait Store: Send + Sync` with: `load(name, pagination) -> (JournalFile, total)`, `create`, `add_items(name, Vec<JournalItem>)`, `list(pagination, archived) -> (Vec<JournalSummary>, total)`, `delete`, `exists`, `archive`, `unarchive`
    - `load` reads both active and archived journals (always readable).
    - `add_items` errors if the journal is archived.
    - `archive(name)` marks a journal as archived; `unarchive(name)` restores it.
@@ -257,7 +257,7 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 1. `tree.rs` — `build_tree(journals) -> String` — ASCII tree for CLI `--tree` flag. Scans items for `type: fork` with `foray:` refs to determine lineage.
 
 ### Phase 4: MCP Server
-1. `server.rs` — `ForayServer` with `store: Arc<dyn JournalStore>`. Fully stateless.
+1. `server.rs` — `ForayServer` with `store: Arc<dyn Store>`. Fully stateless.
 2. Server `instructions` field — bootstrap hint pointing to SETUP.md (raw URL) for per-client skill install paths and setup guidance.
 3. 3 MCP prompts: `start_journal`, `resume_journal`, `summarize`.
 4. 4 tools via `#[tool_router]`. Every tool that operates on a journal takes explicit name + nuance params.
@@ -383,4 +383,4 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 - **Serde**: strict deserialization (`deny_unknown_fields`), `meta` field for extensibility, `_note` first in struct for JSON ordering, `Option` fields skipped when None.
 - **CLI output**: plain text by default, `--json` flag on read commands, `--tree` flag on `list` for fork lineage.
 - **MCP responses**: JSON-serialized structs. LLM formats for the user.
-- **`rmcp` pattern**: `#[derive(Clone)]` server, `Arc<dyn JournalStore + Send + Sync>`, `Parameters<T>` for tool args, `CallToolResult::success(Content::text(...))` for returns. `serve_server()` returns a `RunningService` — must call `.waiting()` to keep the process alive. `use rmcp::schemars;` is required at module level for `#[derive(JsonSchema)]` to resolve.
+- **`rmcp` pattern**: `#[derive(Clone)]` server, `Arc<dyn Store + Send + Sync>`, `Parameters<T>` for tool args, `CallToolResult::success(Content::text(...))` for returns. `serve_server()` returns a `RunningService` — must call `.waiting()` to keep the process alive. `use rmcp::schemars;` is required at module level for `#[derive(JsonSchema)]` to resolve.
