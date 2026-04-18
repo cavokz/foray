@@ -1,6 +1,6 @@
 [package]
 name = "foray"
-version = "0.2.0"
+version = "0.3.0-dev"
 edition = "2024"
 description = "Persistent, forkable investigation journals via MCP"
 license = "Apache-2.0"

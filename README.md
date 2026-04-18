@@ -4,19 +4,19 @@
 
 *Start with a foray. Fork it when it branches. Keep the trail.*
 
-An MCP server + CLI that gives AI assistants persistent, forkable investigation journals.
+An MCP server + CLI that gives AI assistants persistent, forkable journals. Use it for debugging, planning, design, feature work — any conversation worth continuing later.
 
 ## Problem
 
-AI assistants lose their investigation trail between sessions. When a conversation ends, findings, dead ends, and decisions vanish. When an investigation branches ("is it the DB or the cache?"), there's no way to fork the reasoning and compare paths.
+AI assistants lose context between sessions. When a conversation ends, findings, decisions, and in-progress work vanish. When work branches into multiple directions, there's no way to explore one without losing the other. And when multiple assistants work across different clients, their context stays siloed.
 
 ## Why It Matters
 
-Engineers who debug complex issues across multiple sessions waste time re-discovering context. foray solves this by giving AI assistants a persistent journal they can write to, fork, and resume — across sessions, windows, and even different MCP clients.
+foray gives AI assistants a persistent, forkable journal backed by plain JSON files. Start a journal, record items as you work, fork when it branches, pick it back up in any session or client.
 
-- **Persistent trail** — findings survive across sessions
-- **Forking with lineage** — branch an investigation without losing the original thread
-- **Cross-client** — VS Code, Cursor, Claude Desktop can share the same journals
+- **Persistent context** — findings, decisions, and work-in-progress survive across sessions
+- **Forking with lineage** — branch without losing the original thread; compare paths side-by-side
+- **Cross-client** — VS Code, Cursor, Claude Desktop share the same journals simultaneously
 - **Human-editable** — plain JSON files you can `cat`, `jq`, `grep`, hand-edit
 
 ## How to Install
@@ -27,12 +27,13 @@ cargo install foray
 
 Or download a pre-built binary from [GitHub Releases](https://github.com/cavokz/foray/releases/latest) and place it on your `PATH`.
 
-Then follow the [Setup Guide](SETUP.md) to configure your MCP client.
+Then direct your AI assistant to fetch the [Setup Guide](https://raw.githubusercontent.com/cavokz/foray/main/SETUP.md) and follow the steps for itself.
 
 ## MCP Tools
 
 | Tool | Description |
 |------|-------------|
+| `hello` | Handshake — call first every session, returns `{version, nuance}` |
 | `open_journal` | Create, fork, or reopen a journal |
 | `sync_journal` | Read and/or write items (cursor-based) |
 | `list_journals` | List active journals |
