@@ -35,6 +35,7 @@ fn deserialize_tags<'de, D: Deserializer<'de>>(
 // ── Tool parameter types ────────────────────────────────────────────
 
 #[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct OpenJournalParams {
     /// Journal name ([a-z0-9_-], max 64 chars)
     pub name: String,
@@ -50,6 +51,7 @@ pub struct OpenJournalParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SyncItemInput {
     /// Content of the item
     pub content: String,
@@ -57,7 +59,7 @@ pub struct SyncItemInput {
     #[serde(default)]
     pub item_type: Option<String>,
     /// File reference (path, URL, ticket link, etc.)
-    #[serde(default)]
+    #[serde(default, rename = "ref")]
     pub file_ref: Option<String>,
     /// Tags for categorization (array or comma-separated string)
     #[serde(default, deserialize_with = "deserialize_tags")]
@@ -68,6 +70,7 @@ pub struct SyncItemInput {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct SyncJournalParams {
     /// Journal name
     pub name: String,
@@ -83,6 +86,7 @@ pub struct SyncJournalParams {
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct ListJournalsParams {
     /// Maximum number of journals to return
     #[serde(default)]
@@ -126,7 +130,7 @@ struct ListJournalsResponse {
 pub struct StartInvestigationParams {
     /// Name for the new journal
     pub name: String,
-    /// Title describing the investigation
+    /// Title describing the journal
     pub title: String,
 }
 
@@ -185,7 +189,8 @@ fn validate_tags(tags: &Option<Vec<String>>) -> Result<(), ErrorData> {
 }
 
 const SERVER_INSTRUCTIONS: &str = "\
-You have access to foray, a persistent investigation journal system. \
+You have access to foray, a persistent journal system for capturing findings, decisions, \
+and context across sessions. \
 Use `list_journals` to see existing journals, `open_journal` to create or resume one, \
 and `sync_journal` to read and write items.\n\n\
 For the best experience, install the foray companion skill. \
@@ -445,45 +450,44 @@ impl ForayServer {
 #[prompt_router]
 impl ForayServer {
     #[prompt(
-        name = "start_investigation",
-        description = "List existing journals, create a new one, begin recording findings."
+        name = "start_journal",
+        description = "List existing journals, create a new one, and begin recording items."
     )]
-    async fn start_investigation(
+    async fn start_journal(
         &self,
         Parameters(args): Parameters<StartInvestigationParams>,
     ) -> Result<GetPromptResult, ErrorData> {
         Ok(GetPromptResult::new(vec![PromptMessage::new_text(
             PromptMessageRole::User,
             format!(
-                "I want to start investigating something. \
+                "I want to start a new journal. \
                 First, check if there are existing journals with `list_journals`. \
                 Then create a new journal named \"{}\" with title \"{}\" using \
-                `open_journal`. As you discover findings, record them with `sync_journal`.",
+                `open_journal`. Record items as you work with `sync_journal`.",
                 args.name, args.title
             ),
         )])
-        .with_description("Start a new investigation"))
+        .with_description("Start a new journal"))
     }
 
     #[prompt(
-        name = "resume_investigation",
+        name = "resume_journal",
         description = "Load the journal, summarize recent items, continue where you left off."
     )]
-    async fn resume_investigation(
+    async fn resume_journal(
         &self,
         Parameters(args): Parameters<ResumeInvestigationParams>,
     ) -> Result<GetPromptResult, ErrorData> {
         Ok(GetPromptResult::new(vec![PromptMessage::new_text(
             PromptMessageRole::User,
             format!(
-                "I want to resume my investigation. \
-                Load journal \"{}\" with `sync_journal` and summarize what we've found \
-                so far. Then continue the investigation, recording new findings with \
-                `sync_journal`.",
+                "I want to resume work on a journal. \
+                Load journal \"{}\" with `sync_journal` and summarize what has been \
+                recorded so far. Then continue, recording new items with `sync_journal`.",
                 args.name
             ),
         )])
-        .with_description("Resume an existing investigation"))
+        .with_description("Resume an existing journal"))
     }
 
     #[prompt(
@@ -503,7 +507,7 @@ impl ForayServer {
                 args.name
             ),
         )])
-        .with_description("Summarize an investigation journal"))
+        .with_description("Summarize a journal"))
     }
 }
 
@@ -519,5 +523,80 @@ impl rmcp::ServerHandler for ForayServer {
         )
         .with_instructions(SERVER_INSTRUCTIONS.to_string())
         .with_server_info(Implementation::new("foray", env!("CARGO_PKG_VERSION")))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // ── SyncItemInput deserialization ───────────────────────────────
+
+    #[test]
+    fn sync_item_ref_field_accepted() {
+        let v: SyncItemInput =
+            serde_json::from_str(r#"{"content":"x","ref":"src/auth/session.go:142"}"#).unwrap();
+        assert_eq!(v.file_ref.as_deref(), Some("src/auth/session.go:142"));
+    }
+
+    #[test]
+    fn sync_item_file_ref_field_rejected() {
+        // old field name must be rejected (deny_unknown_fields)
+        let result: Result<SyncItemInput, _> =
+            serde_json::from_str(r#"{"content":"x","file_ref":"src/auth/session.go:142"}"#);
+        assert!(result.is_err());
+    }
+
+    #[test]
+    fn sync_item_tags_as_array() {
+        let v: SyncItemInput =
+            serde_json::from_str(r#"{"content":"x","tags":["auth","race"]}"#).unwrap();
+        assert_eq!(
+            v.tags.as_deref(),
+            Some(&["auth".to_string(), "race".to_string()][..])
+        );
+    }
+
+    #[test]
+    fn sync_item_tags_as_comma_string() {
+        let v: SyncItemInput =
+            serde_json::from_str(r#"{"content":"x","tags":"auth, race"}"#).unwrap();
+        assert_eq!(
+            v.tags.as_deref(),
+            Some(&["auth".to_string(), "race".to_string()][..])
+        );
+    }
+
+    #[test]
+    fn sync_item_item_type_defaults_to_none() {
+        let v: SyncItemInput = serde_json::from_str(r#"{"content":"x"}"#).unwrap();
+        assert_eq!(v.item_type, None);
+    }
+
+    #[test]
+    fn sync_item_meta_roundtrip() {
+        let v: SyncItemInput =
+            serde_json::from_str(r#"{"content":"x","meta":{"vcs-branch":"main","pr":42}}"#)
+                .unwrap();
+        let meta = v.meta.unwrap();
+        assert_eq!(meta["vcs-branch"], serde_json::json!("main"));
+        assert_eq!(meta["pr"], serde_json::json!(42));
+    }
+
+    // ── SyncJournalResponse serialization ──────────────────────────
+
+    #[test]
+    fn sync_response_cursor_and_added_ids_present() {
+        let resp = SyncJournalResponse {
+            name: "my-journal".into(),
+            title: Some("My Journal".into()),
+            items: vec![],
+            added_ids: vec!["abc-123".into()],
+            cursor: 7,
+            total: 7,
+        };
+        let json: serde_json::Value = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["cursor"], 7);
+        assert_eq!(json["added_ids"], serde_json::json!(["abc-123"]));
     }
 }

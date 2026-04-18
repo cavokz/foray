@@ -1,25 +1,27 @@
-# Blueprint: foray — Investigation Journals via MCP (v2)
+# Blueprint: foray — Persistent Journals via MCP
 
 ## TL;DR
-A **Rust MCP server + CLI** that gives any AI assistant persistent, forkable investigation journals. Fully stateless server — every tool takes an explicit journal name. Pluggable journal store (ships with `JsonFileStore` at `~/.foray/journals/*.json`). CLI resolves journal via `--journal` flag > `FORAY_JOURNAL` env > `.forayrc` walk-up.
+A **Rust MCP server + CLI** that gives any AI assistant persistent, forkable journals. Fully stateless server — every tool takes an explicit journal name. Pluggable journal store (ships with `JsonFileStore` at `~/.foray/journals/*.json`). CLI resolves journal via `--journal` flag > `FORAY_JOURNAL` env > `.forayrc` walk-up.
 
 **Tagline:** *"Start with a foray. Fork it when it branches. Keep the trail."*
 
 ## Positioning
 
-**Problem**: AI assistants lose their investigation trail between sessions. When a conversation ends, findings, dead ends, and decisions vanish. When an investigation branches ("is it the DB or the cache?"), there's no way to fork the reasoning and compare paths. And when multiple assistants work across different environments — backend in one client, frontend in another — their discoveries stay siloed.
+**Problem**: AI assistants lose context between sessions. When a conversation ends, findings, decisions, and in-progress work vanish. When work branches into multiple directions, there's no way to explore one without losing the other. And when multiple assistants work across different environments — backend in one client, frontend in another — their context stays siloed.
 
-**Solution**: foray gives AI assistants a persistent, forkable investigation journal backed by a pluggable store. Start a journal, record findings as you go, fork when the investigation branches, pick it back up in any session or client. Because the default store uses plain JSON files, multiple assistants across different clients and environments can read and write to the same journal simultaneously — a backend investigation in Cursor and a frontend investigation in VS Code Copilot feed into one shared trail. This is cross-client context fusion.
+**Solution**: foray gives AI assistants a persistent, forkable journal backed by a pluggable store. Start a journal, record items as you work, fork when it branches, pick it back up in any session or client. Because the default store uses plain JSON files, multiple assistants across different clients and environments can read and write to the same journal simultaneously. This is cross-client context fusion.
+
+**Use cases**: debugging and investigation, architecture design and planning, feature development across sessions, team stand-ups (shared journal per team, each assistant contributes updates), research, and any work that spans multiple conversations or needs to be handed off.
 
 **Two-layer architecture**:
-- **The binary** (infrastructure) — a minimal Rust MCP server + CLI. 4 tools, pluggable journal store, stateless. Rarely changes. Ships via `cargo install` or prebuilt binaries.
+- **The binary** (infrastructure) — a minimal Rust MCP server + CLI. 3 tools, pluggable journal store, stateless. Rarely changes. Ships via `cargo install` or prebuilt binaries.
 - **The companion skill** (product) — an agent skill that teaches the AI *when* and *how* to use journals. Evolves independently as prompting patterns improve. Self-updates from GitHub.
 
 **Why this matters**:
-- **Persistent trail** — findings survive across sessions, windows, and clients
-- **Forking with lineage** — branch an investigation without losing the original thread; compare paths side-by-side
+- **Persistent context** — findings, decisions, and work-in-progress survive across sessions, windows, and clients
+- **Forking with lineage** — branch work without losing the original thread; compare paths side-by-side
 - **Human-editable** — default store uses pretty-printed JSON you can `cat`, `jq`, `grep`, hand-edit
-- **Radically simple** — 4 tools, single binary, no database, no daemon
+- **Radically simple** — 3 tools, single binary, no database, no daemon
 - **Forward-compatible** — strict schema with `meta` fields for client-specific data; the skill evolves without binary changes
 
 ## Architecture
@@ -52,7 +54,7 @@ CLI journal resolution:
 
 | Concept | Description |
 |---------|-------------|
-| **Journal** | A named, forkable collection of items. An investigation journal. |
+| **Journal** | A named, forkable collection of items. Captures any ongoing work: debugging, design, planning, stand-ups, research, etc. |
 | **Item** | A finding, decision, snippet, note, or fork-marker inside a journal. |
 | **Fork** | Snapshot-copy a journal under a new name. Lineage tracked via a `fork` item with a `foray:name#id` ref. |
 
@@ -135,7 +137,7 @@ Unknown fields are rejected (`deny_unknown_fields`). The `meta` field on both `J
 ### Server Instructions (bootstrap)
 Sent to every client on initialization via the MCP `instructions` field:
 
-> You have access to foray, a persistent investigation journal system. Use `list_journals` to see existing journals, `open_journal` to create or resume one, and `sync_journal` to read and write items.
+> You have access to foray, a persistent journal system for capturing findings, decisions, and context across sessions. Use `list_journals` to see existing journals, `open_journal` to create or resume one, and `sync_journal` to read and write items.
 >
 > For the best experience, install the foray companion skill. Download it from [update-url] and save it to your project's skills directory. The skill teaches you when and how to use journal tools effectively — including when to fork, how to handle corrections, and how to anchor findings to source code.
 
@@ -146,8 +148,8 @@ Predefined prompt templates for basic workflows. Any MCP client discovers them a
 
 | Prompt | Params | Description |
 |--------|--------|-------------|
-| `start_investigation` | `name`, `title` | List existing journals, create a new one, begin recording findings. |
-| `resume_investigation` | `name` | Load the journal, summarize recent items, continue where you left off. |
+| `start_journal` | `name`, `title` | List existing journals, create a new one, begin recording items. |
+| `resume_journal` | `name` | Load the journal, summarize recent items, continue where you left off. |
 | `summarize` | `name` | Read all items in the journal and produce a synthesis. |
 
 Prompts are the fallback for LLMs without the companion skill. They provide just enough guidance to use the tools correctly.
@@ -157,12 +159,12 @@ Prompts are the fallback for LLMs without the companion skill. They provide just
 | Tool | Params | Description |
 |------|--------|-------------|
 | `open_journal` | `name`, `title?`, `fork?`, `meta?` | Create, fork, or reopen a journal. `title` is required when creating or forking (error if missing), ignored when reopening. `fork` specifies source journal name. Idempotent if exists without `fork`. `meta` sets journal-level metadata. |
-| `sync_journal` | `name`, `cursor?`, `limit?`, `items?` | Read and write journal items in one call. Returns items since cursor position. `cursor` is the position from the previous sync (omit for full read). `items` is an array of `{ content, item_type?, file_ref?, tags?, meta? }`. `limit` caps returned items (does not affect additions). Returns `cursor` for the next call and `added_ids` for items added by this call. |
+| `sync_journal` | `name`, `cursor?`, `limit?`, `items?` | Read and write journal items in one call. Returns items since cursor position. `cursor` is the position from the previous sync (omit for full read). `items` is an array of `{ content, item_type?, ref?, tags?, meta? }`. `limit` caps returned items (does not affect additions). Returns `cursor` for the next call and `added_ids` for items added by this call. |
 | `list_journals` | `limit?`, `offset?` | List active journals. Paginated: defaults to all. |
 
 All tools return JSON. No in-memory state. Every tool that operates on a journal takes an explicit name parameter.
 
-**Append-only design**: journals are append-only. Wrong findings are corrected by adding a new item explaining the correction, not by deleting. This preserves the investigation trail, prevents re-exploring dead ends, and avoids conflicts in cross-client scenarios.
+**Append-only design**: journals are append-only. Wrong findings are corrected by adding a new item explaining the correction, not by deleting. This preserves the full trail, prevents re-exploring dead ends, and avoids conflicts in cross-client scenarios.
 
 ### `open_journal` behavior matrix
 | `name` exists? | `fork` set? | `name == fork`? | Result |
@@ -239,7 +241,7 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 ### Phase 4: MCP Server
 1. `server.rs` — `ForayServer` with `store: Arc<dyn JournalStore>`. Fully stateless.
 2. Server `instructions` field — bootstrap hint with skill download URL.
-3. 3 MCP prompts: `start_investigation`, `resume_investigation`, `summarize`.
+3. 3 MCP prompts: `start_journal`, `resume_journal`, `summarize`.
 4. 3 tools via `#[tool_router]`. Every tool that operates on a journal takes explicit name param.
 5. `open_journal` implements the behavior matrix (create / fork / idempotent / error).
 
@@ -338,7 +340,7 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 - Store trait is pure CRUD — no session/active state
 - Journal creation requires explicit `open_journal` — `sync_journal` with items to non-existent journal is an error
 - Companion skill encodes behavioral rules (suggest existing journals, stop writing to source after fork)
-- **Binary = stable platform, skill = evolving product**: binary rarely changes (4 tools, storage), skill evolves with better prompting and use case patterns. Distributed independently.
+- **Binary = stable platform, skill = evolving product**: binary rarely changes (3 tools, storage), skill evolves with better prompting and use case patterns. Distributed independently.
 - **No `foray skill` command**: companion skill is downloaded from GitHub, not embedded in binary
 - **Skill versioning**: no version field in the skill file — the content *is* the version. LLM fetches `update-url`, diffs against local, summarizes changes, offers to update. `requires` in frontmatter ensures binary compatibility.
 - **Setup guide (`SETUP.md`)**: one-time LLM-oriented instructions. User never clones the repo.
@@ -347,8 +349,8 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 - **Append-only journals**: wrong findings are corrected by adding a new item, not deleting. Preserves the trail, prevents re-exploring dead ends, avoids cross-client conflicts.
 - **Archive**: CLI-only (no MCP tool). Archived journals are readable but not writable (`sync_journal` with items/`open` with create/fork error). `unarchive` to resume. `JsonFileStore` implements this by moving files to an `archive/` subdirectory.
 - **Companion skill**: `user-invocable: false` so it's auto-triggered by the agent, not a slash command — the whole point is zero-friction adoption
-- **Name**: "foray" — short, memorable, investigation-evocative. Tagline: "Start with a foray. Fork it when it branches. Keep the trail."
-- **Positioning**: Not "another memory tool" (100+ exist). The only MCP server where you can fork an investigation.
+- **Name**: "foray" — short, memorable, evocative of venturing into new territory. Tagline: "Start with a foray. Fork it when it branches. Keep the trail."
+- **Positioning**: Not "another memory tool" (100+ exist). The only MCP server where you can fork a journal and compare paths.
 - **CLI + MCP**: Single binary, `clap` subcommands. `foray serve` = MCP stdio server, all other subcommands = direct store access. Both are thin wrappers over the library.
 - **Lib-first architecture**: All logic in `lib.rs` modules (`types`, `store`, `tree`). CLI and MCP server are I/O shells — parse input, call lib, format output. Library is fully unit-testable without MCP or terminal.
 - **Snapshot fork**: Fork = full copy of items at fork time + a `fork` item tracking lineage. Files are self-contained.
