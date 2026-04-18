@@ -27,23 +27,35 @@ Use foray when the conversation involves **substantive, evolving work** — not 
 
 | Tool | Use |
 |------|-----|
-| `hello` | Establish handshake and get `nuance` — call this first, every session |
+| `hello` | Establish handshake and get `nuance` + available `stores` — call this first, every session |
 | `list_journals` | Check existing journals before creating |
 | `open_journal` | Create, fork, or reopen a journal |
 | `sync_journal` | Read items and/or add new ones (the workhorse) |
 
 ## Starting a Journal
 
-1. Call `hello` to get the `nuance` token — capture it, you'll pass it on every subsequent call
-2. Call `list_journals` to check for existing related journals
+1. Call `hello` to get the `nuance` token and available `stores` — capture both, you'll use them on every subsequent call
+2. Call `list_journals` to check for existing related journals (pass `nuance` and `store`)
 3. If none fit, call `open_journal` with a descriptive `name` and `title`
 4. Begin adding items as you work
 
 ```
-hello()  → { "version": "1.2.3", "nuance": "..." }
-list_journals(nuance: "...")
-open_journal(name: "auth-cache-race", title: "Auth cache race condition", nuance: "...")
+hello()  → { "version": "1.2.3", "nuance": "abc123", "stores": [{"name": "local", "description": "Default local journal store"}, {"name": "work", "description": "Work projects"}] }
+list_journals(store: "local", nuance: "abc123")
+open_journal(name: "auth-cache-race", title: "Auth cache race condition", store: "local", nuance: "abc123")
 ```
+
+### Using Multiple Stores
+
+`store` is required on every tool call that targets a journal. Pass the store name exactly as returned by `hello`.
+
+```
+open_journal(name: "auth-cache-race", title: "Auth cache race", store: "work", nuance: "abc123")
+sync_journal(name: "auth-cache-race", store: "work", nuance: "abc123", items: [...])
+list_journals(store: "work", nuance: "abc123")
+```
+
+Stick to one store per journal within a session — a journal's store must be specified consistently.
 
 ## Recording Findings
 
@@ -103,6 +115,7 @@ open_journal(
   name: "db-pooling-theory",
   title: "DB connection pooling as root cause",
   fork: "auth-cache-race",
+  store: "local",
   nuance: "..."
 )
 ```
