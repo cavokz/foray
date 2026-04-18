@@ -1,4 +1,4 @@
-use crate::store::{JournalStore, fork_journal};
+use crate::store::{Store, fork_journal};
 use crate::tree::{build_tree, extract_fork_infos};
 use crate::types::{ItemType, JournalFile, JournalItem, Pagination, item_id, validate_name};
 use chrono::Utc;
@@ -224,7 +224,7 @@ fn print_item(item: &JournalItem) {
 }
 
 /// Execute a CLI command against the store.
-pub fn run(cli: &Cli, store: &dyn JournalStore) -> anyhow::Result<()> {
+pub fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
     match &cli.command {
         Commands::Serve => {
             unreachable!("serve is handled in main")
