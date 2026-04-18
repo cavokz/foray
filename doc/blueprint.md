@@ -14,14 +14,14 @@ A **Rust MCP server + CLI** that gives any AI assistant persistent, forkable jou
 **Use cases**: debugging and investigation, architecture design and planning, feature development across sessions, team stand-ups (shared journal per team, each assistant contributes updates), research, and any work that spans multiple conversations or needs to be handed off.
 
 **Two-layer architecture**:
-- **The binary** (infrastructure) — a minimal Rust MCP server + CLI. 3 tools, pluggable journal store, stateless. Rarely changes. Ships via `cargo install` or prebuilt binaries.
+- **The binary** (infrastructure) — a minimal Rust MCP server + CLI. 4 tools, pluggable journal store, stateless. Rarely changes. Ships via `cargo install` or prebuilt binaries.
 - **The companion skill** (product) — an agent skill that teaches the AI *when* and *how* to use journals. Evolves independently as prompting patterns improve. Self-updates from GitHub.
 
 **Why this matters**:
 - **Persistent context** — findings, decisions, and work-in-progress survive across sessions, windows, and clients
 - **Forking with lineage** — branch work without losing the original thread; compare paths side-by-side
 - **Human-editable** — default store uses pretty-printed JSON you can `cat`, `jq`, `grep`, hand-edit
-- **Radically simple** — 3 tools, single binary, no database, no daemon
+- **Radically simple** — 4 tools, single binary, no database, no daemon
 - **Forward-compatible** — strict schema with `meta` fields for client-specific data; the skill evolves without binary changes
 
 ## Architecture
@@ -137,7 +137,7 @@ Unknown fields are rejected (`deny_unknown_fields`). The `meta` field on both `J
 ### Server Instructions (bootstrap)
 Sent to every client on initialization via the MCP `instructions` field:
 
-> You have access to foray, a persistent journal system for capturing findings, decisions, and context across sessions. Use `list_journals` to see existing journals, `open_journal` to create or resume one, and `sync_journal` to read and write items.
+> You have access to foray, a persistent journal system for capturing findings, decisions, and context across sessions. Always call `hello` first to obtain the nuance token, then pass it on every subsequent tool call. Use `list_journals` to see existing journals, `open_journal` to create or resume one, and `sync_journal` to read and write items.
 >
 > For the best experience, install the foray companion skill. Fetch https://raw.githubusercontent.com/cavokz/foray/main/SETUP.md for setup instructions, including per-client install paths and how to get the skill. The skill teaches you when and how to use journal tools effectively — including when to fork, how to handle corrections, and how to anchor findings to source code.
 
@@ -154,13 +154,14 @@ Predefined prompt templates for basic workflows. Any MCP client discovers them a
 
 Prompts are the fallback for LLMs without the companion skill. They provide just enough guidance to use the tools correctly.
 
-### MCP Tools (3 tools)
+### MCP Tools (4 tools)
 
 | Tool | Params | Description |
 |------|--------|-------------|
-| `open_journal` | `name`, `title?`, `fork?`, `meta?` | Create, fork, or reopen a journal. `title` is required when creating or forking (error if missing), ignored when reopening. `fork` specifies source journal name. Idempotent if exists without `fork`. `meta` sets journal-level metadata. |
-| `sync_journal` | `name`, `cursor?`, `limit?`, `items?` | Read and write journal items in one call. Returns items since cursor position. `cursor` is the position from the previous sync (omit for full read). `items` is an array of `{ content, item_type?, ref?, tags?, meta? }`. `limit` caps returned items (does not affect additions). Returns `cursor` for the next call and `added_ids` for items added by this call. |
-| `list_journals` | `limit?`, `offset?` | List active journals. Paginated: defaults to all. |
+| `hello` | *(none)* | Establish handshake. Returns `{ version, nuance }`. Always call first — every session — then pass `nuance` on every subsequent call. |
+| `open_journal` | `name`, `title?`, `fork?`, `meta?`, `nuance` | Create, fork, or reopen a journal. `title` is required when creating or forking (error if missing), ignored when reopening. `fork` specifies source journal name. Idempotent if exists without `fork`. `meta` sets journal-level metadata. |
+| `sync_journal` | `name`, `cursor?`, `limit?`, `items?`, `nuance` | Read and write journal items in one call. Returns items since cursor position. `cursor` is the position from the previous sync (omit for full read). `items` is an array of `{ content, item_type?, ref?, tags?, meta? }`. `limit` caps returned items (does not affect additions). Returns `cursor` for the next call and `added_ids` for items added by this call. |
+| `list_journals` | `limit?`, `offset?`, `nuance` | List active journals. Paginated: defaults to all. |
 
 All tools return JSON. No in-memory state. Every tool that operates on a journal takes an explicit name parameter.
 
@@ -175,7 +176,24 @@ All tools return JSON. No in-memory state. Every tool that operates on a journal
 | Yes | Yes | Yes | Return existing (idempotent, `title` ignored) |
 | Yes | Yes | No | Error: journal already exists |
 
+### Nuance + Preflight
+
+The `nuance` parameter is an opaque token the client must obtain from `hello` and pass on every subsequent tool call. It is an opaque string reserved for future use (e.g. schema migrations, capability negotiation). If the nuance is missing or wrong, the tool returns an error with `data: { hint: "call 'hello' to get the current nuance" }`.
+
+**Purpose**: forces the client to call `hello` first, enabling future binary changes to communicate context or instructions before the client proceeds. The `nuance` value is versioned with the binary — clients that skipped `hello` and hard-coded a value will get an error when the binary changes.
+
+### Error Hints (`data` field)
+
+Errors may include a `data` field with a `hint` key to guide callers:
+
+| Condition | Error code | `data.hint` |
+|-----------|-----------|-------------|
+| `nuance` missing or wrong | `invalid_params` | `"call 'hello' to get the current nuance"` |
+| Journal not found | `invalid_params` | `"call 'list_journals' to see available journals"` |
+| Other store errors | `internal_error` | *(none)* |
+
 ### Tool response formats
+- `hello` → `{ version, nuance }` (e.g. `{ "version": "1.2.3", "nuance": "..." }`)
 - `open_journal` → `{ name, title, item_count, created }` (`created: bool` — true if new)
 - `sync_journal` → `{ name, title, items: [...], added_ids: [...], cursor, total }` (`cursor` is the position for the next call, `added_ids` lists IDs assigned to items added by this call in order)
 - `list_journals` → `{ journals: [{ name, title, item_count, meta }], total, limit, offset }`
@@ -242,7 +260,7 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 1. `server.rs` — `ForayServer` with `store: Arc<dyn JournalStore>`. Fully stateless.
 2. Server `instructions` field — bootstrap hint pointing to SETUP.md (raw URL) for per-client skill install paths and setup guidance.
 3. 3 MCP prompts: `start_journal`, `resume_journal`, `summarize`.
-4. 3 tools via `#[tool_router]`. Every tool that operates on a journal takes explicit name param.
+4. 4 tools via `#[tool_router]`. Every tool that operates on a journal takes explicit name + nuance params.
 5. `open_journal` implements the behavior matrix (create / fork / idempotent / error).
 
 ### Phase 5: CLI + Main *(parallel with Phase 4)*
@@ -337,7 +355,7 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 - Store trait is pure CRUD — no session/active state
 - Journal creation requires explicit `open_journal` — `sync_journal` with items to non-existent journal is an error
 - Companion skill encodes behavioral rules (suggest existing journals, stop writing to source after fork)
-- **Binary = stable platform, skill = evolving product**: binary rarely changes (3 tools, storage), skill evolves with better prompting and use case patterns. Distributed independently.
+- **Binary = stable platform, skill = evolving product**: binary rarely changes (4 tools, storage), skill evolves with better prompting and use case patterns. Distributed independently.
 - **No `foray skill` command**: companion skill is downloaded from GitHub, not embedded in binary
 - **Skill versioning**: no version field in the skill file — the content *is* the version. LLM fetches `update-url`, diffs against local, summarizes changes, offers to update. `requires` in frontmatter ensures binary compatibility.
 - **Setup guide (`SETUP.md`)**: one-time LLM-oriented instructions. User never clones the repo.

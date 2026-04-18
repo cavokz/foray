@@ -48,6 +48,10 @@ pub struct OpenJournalParams {
     /// Journal-level metadata (free-form key-value pairs)
     #[serde(default)]
     pub meta: Option<HashMap<String, serde_json::Value>>,
+    /// Nuance token from `hello` — must match current server nuance
+    #[serde(default)]
+    #[schemars(required)]
+    pub nuance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -83,6 +87,10 @@ pub struct SyncJournalParams {
     /// Items to add to the journal
     #[serde(default)]
     pub items: Option<Vec<SyncItemInput>>,
+    /// Nuance token from `hello` — must match current server nuance
+    #[serde(default)]
+    #[schemars(required)]
+    pub nuance: Option<String>,
 }
 
 #[derive(Debug, Deserialize, JsonSchema)]
@@ -94,9 +102,19 @@ pub struct ListJournalsParams {
     /// Number of journals to skip
     #[serde(default)]
     pub offset: Option<usize>,
+    /// Nuance token from `hello` — must match current server nuance
+    #[serde(default)]
+    #[schemars(required)]
+    pub nuance: Option<String>,
 }
 
 // ── Tool response types ─────────────────────────────────────────────
+
+#[derive(Serialize)]
+struct HelloResponse {
+    version: &'static str,
+    nuance: &'static str,
+}
 
 #[derive(Serialize)]
 struct OpenJournalResponse {
@@ -188,9 +206,12 @@ fn validate_tags(tags: &Option<Vec<String>>) -> Result<(), ErrorData> {
     Ok(())
 }
 
+const CURRENT_NUANCE: &str = "0";
+
 const SERVER_INSTRUCTIONS: &str = "\
 You have access to foray, a persistent journal system for capturing findings, decisions, \
 and context across sessions. \
+Always call `hello` first to obtain the nuance token, then pass it on every subsequent tool call. \
 Use `list_journals` to see existing journals, `open_journal` to create or resume one, \
 and `sync_journal` to read and write items.\n\n\
 For the best experience, install the foray companion skill. \
@@ -210,7 +231,25 @@ impl ForayServer {
     }
 
     fn store_err(e: StoreError) -> ErrorData {
-        ErrorData::internal_error(e.to_string(), None)
+        match e {
+            StoreError::NotFound(name) => ErrorData::invalid_params(
+                format!("journal not found: {name}"),
+                Some(
+                    serde_json::json!({ "hint": "call 'list_journals' to see available journals" }),
+                ),
+            ),
+            other => ErrorData::internal_error(other.to_string(), None),
+        }
+    }
+
+    fn preflight(nuance: Option<&str>) -> Result<(), ErrorData> {
+        if nuance != Some(CURRENT_NUANCE) {
+            return Err(ErrorData::invalid_params(
+                "nuance missing or wrong",
+                Some(serde_json::json!({ "hint": "call 'hello' to get the current nuance" })),
+            ));
+        }
+        Ok(())
     }
 
     fn parse_item_type(s: &str) -> Result<ItemType, ErrorData> {
@@ -232,6 +271,20 @@ impl ForayServer {
 #[tool_router]
 impl ForayServer {
     #[tool(
+        name = "hello",
+        description = "Establish a session handshake. Returns the server version and nuance token. Always call this before any other tool, then pass the returned nuance on every subsequent call."
+    )]
+    async fn hello(&self) -> Result<CallToolResult, ErrorData> {
+        let resp = HelloResponse {
+            version: env!("CARGO_PKG_VERSION"),
+            nuance: CURRENT_NUANCE,
+        };
+        Ok(CallToolResult::success(vec![Content::text(
+            serde_json::to_string(&resp).unwrap(),
+        )]))
+    }
+
+    #[tool(
         name = "open_journal",
         description = "Create, fork, or reopen a journal. title is required when creating or forking (error if missing), ignored when reopening. fork specifies source journal name. Idempotent if journal exists without fork."
     )]
@@ -239,6 +292,8 @@ impl ForayServer {
         &self,
         Parameters(args): Parameters<OpenJournalParams>,
     ) -> Result<CallToolResult, ErrorData> {
+        Self::preflight(args.nuance.as_deref())?;
+
         validate_name(&args.name).map_err(|e| ErrorData::invalid_params(e, None))?;
 
         let exists = self.store.exists(&args.name).map_err(Self::store_err)?;
@@ -340,6 +395,7 @@ impl ForayServer {
         &self,
         Parameters(args): Parameters<SyncJournalParams>,
     ) -> Result<CallToolResult, ErrorData> {
+        Self::preflight(args.nuance.as_deref())?;
         validate_name(&args.name).map_err(|e| ErrorData::invalid_params(e, None))?;
 
         // Add items if provided
@@ -422,6 +478,7 @@ impl ForayServer {
         &self,
         Parameters(args): Parameters<ListJournalsParams>,
     ) -> Result<CallToolResult, ErrorData> {
+        Self::preflight(args.nuance.as_deref())?;
         let pagination = Pagination {
             limit: Some(args.limit.unwrap_or(MAX_LIMIT).min(MAX_LIMIT)),
             offset: args.offset,
@@ -462,9 +519,11 @@ impl ForayServer {
             PromptMessageRole::User,
             format!(
                 "I want to start a new journal. \
-                First, check if there are existing journals with `list_journals`. \
+                First call `hello` to get the nuance token. \
+                Then check for existing journals with `list_journals` (pass nuance). \
                 Then create a new journal named \"{}\" with title \"{}\" using \
-                `open_journal`. Record items as you work with `sync_journal`.",
+                `open_journal` (pass nuance). \
+                Record items as you work with `sync_journal` (always pass nuance).",
                 args.name, args.title
             ),
         )])
@@ -483,8 +542,10 @@ impl ForayServer {
             PromptMessageRole::User,
             format!(
                 "I want to resume work on a journal. \
-                Load journal \"{}\" with `sync_journal` and summarize what has been \
-                recorded so far. Then continue, recording new items with `sync_journal`.",
+                First call `hello` to get the nuance token. \
+                Then load journal \"{}\" with `sync_journal` (pass nuance) and summarize \
+                what has been recorded so far. \
+                Then continue, recording new items with `sync_journal` (always pass nuance).",
                 args.name
             ),
         )])
@@ -502,9 +563,10 @@ impl ForayServer {
         Ok(GetPromptResult::new(vec![PromptMessage::new_text(
             PromptMessageRole::User,
             format!(
-                "Read all items from journal \"{}\" using `sync_journal` and produce \
-                a synthesis. Group findings by theme, highlight key decisions, note \
-                any open questions, and identify potential next steps.",
+                "First call `hello` to get the nuance token. \
+                Then read all items from journal \"{}\" using `sync_journal` (pass nuance) \
+                and produce a synthesis. Group findings by theme, highlight key decisions, \
+                note any open questions, and identify potential next steps.",
                 args.name
             ),
         )])
@@ -582,6 +644,51 @@ mod tests {
         let meta = v.meta.unwrap();
         assert_eq!(meta["vcs-branch"], serde_json::json!("main"));
         assert_eq!(meta["pr"], serde_json::json!(42));
+    }
+
+    // ── preflight ──────────────────────────────────────────────────
+
+    #[test]
+    fn preflight_passes_with_correct_nuance() {
+        assert!(ForayServer::preflight(Some(CURRENT_NUANCE)).is_ok());
+    }
+
+    #[test]
+    fn preflight_fails_with_missing_nuance() {
+        let err = ForayServer::preflight(None).unwrap_err();
+        assert_eq!(err.message, "nuance missing or wrong");
+        let hint = err.data.as_ref().and_then(|d| d["hint"].as_str());
+        assert_eq!(hint, Some("call 'hello' to get the current nuance"));
+    }
+
+    #[test]
+    fn preflight_fails_with_wrong_nuance() {
+        let err = ForayServer::preflight(Some("bogus")).unwrap_err();
+        assert_eq!(err.message, "nuance missing or wrong");
+        let hint = err.data.as_ref().and_then(|d| d["hint"].as_str());
+        assert_eq!(hint, Some("call 'hello' to get the current nuance"));
+    }
+
+    // ── store_err ──────────────────────────────────────────────────
+
+    #[test]
+    fn store_err_not_found_has_hint() {
+        let err = ForayServer::store_err(StoreError::NotFound("my-journal".into()));
+        let hint = err.data.as_ref().and_then(|d| d["hint"].as_str());
+        assert_eq!(hint, Some("call 'list_journals' to see available journals"));
+    }
+
+    // ── HelloResponse serialization ────────────────────────────────
+
+    #[test]
+    fn hello_response_serializes_version_and_nuance() {
+        let resp = HelloResponse {
+            version: env!("CARGO_PKG_VERSION"),
+            nuance: CURRENT_NUANCE,
+        };
+        let json: serde_json::Value = serde_json::to_value(&resp).unwrap();
+        assert_eq!(json["nuance"], CURRENT_NUANCE);
+        assert_eq!(json["version"], env!("CARGO_PKG_VERSION"));
     }
 
     // ── SyncJournalResponse serialization ──────────────────────────
