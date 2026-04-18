@@ -1,5 +1,7 @@
 # foray
 
+[![crates.io](https://img.shields.io/crates/v/foray.svg)](https://crates.io/crates/foray)
+
 *Start with a foray. Fork it when it branches. Keep the trail.*
 
 An MCP server + CLI that gives AI assistants persistent, forkable investigation journals.
