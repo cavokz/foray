@@ -286,7 +286,7 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 
     **Frontmatter:**
     - `name: foray`
-    - `requires: foray >= 0.1.0` (minimum binary version)
+    - `requires: foray >= 0.2.0` (minimum binary version)
     - `update-url:` GitHub release download URL for latest SKILL.md
     - `user-invocable: false` (auto-triggered, not a slash command)
 

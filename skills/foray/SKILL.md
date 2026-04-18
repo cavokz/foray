@@ -1,6 +1,6 @@
 ---
 name: foray
-requires: foray >= 0.1.0
+requires: foray >= 0.2.0
 update-url: https://github.com/cavokz/foray/releases/latest/download/SKILL.md
 user-invocable: false
 ---
