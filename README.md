@@ -8,7 +8,7 @@ An MCP server + CLI that gives AI assistants persistent, forkable journals. Use 
 
 ## Problem
 
-AI assistants lose context between sessions. When a conversation ends, findings, decisions, and in-progress work vanish. When work branches into multiple directions, there's no way to explore one without losing the other. And when multiple assistants work across different clients, their context stays siloed.
+AI assistants lose context between sessions. When a conversation ends, findings, decisions, and in-progress work vanish. When work branches into multiple directions, there's no way to explore one without losing the other. And when multiple assistants — or people — work across clients and machines, their context stays siloed.
 
 ## Why It Matters
 
@@ -18,6 +18,7 @@ foray gives AI assistants a persistent, forkable journal backed by plain JSON fi
 - **Forking with lineage** — branch without losing the original thread; compare paths side-by-side
 - **Cross-client** — VS Code, Cursor, Claude Desktop share the same journals simultaneously
 - **Human-editable** — plain JSON files you can `cat`, `jq`, `grep`, hand-edit
+- **Distributable** — local JSON store today; SSH and team backends planned, so intelligence isn't trapped on one machine
 
 ## How to Install
 
