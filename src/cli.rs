@@ -225,7 +225,7 @@ fn print_item(item: &JournalItem) {
 }
 
 /// Execute a CLI command against the store.
-pub fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
+pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
     match &cli.command {
         Commands::Serve => {
             unreachable!("serve is handled in main")
@@ -242,7 +242,7 @@ pub fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 limit: *limit,
                 offset: *offset,
             };
-            let (journal, total) = store.load(&journal_name, &pagination)?;
+            let (journal, total) = store.load(&journal_name, &pagination).await?;
             if *json {
                 for item in &journal.items {
                     println!("{}", serde_json::to_string(item)?);
@@ -263,7 +263,7 @@ pub fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 loop {
                     std::thread::sleep(std::time::Duration::from_millis(500));
                     let all = Pagination::default();
-                    let (journal, new_total) = store.load(&journal_name, &all)?;
+                    let (journal, new_total) = store.load(&journal_name, &all).await?;
                     if new_total > seen {
                         for item in &journal.items[seen..] {
                             if *json {
@@ -300,7 +300,7 @@ pub fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 added_at: Utc::now(),
                 meta: parse_meta(meta),
             };
-            let count = store.add_items(&journal_name, vec![item])?;
+            let count = store.add_items(&journal_name, vec![item]).await?;
             println!("Added to {journal_name} ({count} items)");
         }
         Commands::Open {
@@ -311,7 +311,7 @@ pub fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
         } => {
             validate_name(name).map_err(|e| anyhow::anyhow!(e))?;
             let meta = parse_meta(meta);
-            let exists = store.exists(name)?;
+            let exists = store.exists(name).await?;
 
             match (exists, fork) {
                 (false, None) => {
@@ -319,7 +319,7 @@ pub fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                         anyhow::anyhow!("--title is required when creating a new journal")
                     })?;
                     let journal = JournalFile::new(name, Some(title.clone()), meta);
-                    store.create(journal)?;
+                    store.create(journal).await?;
                     println!("Created journal: {name}");
                 }
                 (false, Some(source)) => {
@@ -332,7 +332,7 @@ pub fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                         validate_name(source).map_err(|e| anyhow::anyhow!(e))?;
                         source.clone()
                     };
-                    let forked = fork_journal(store, &source_name, name, title.clone(), meta)?;
+                    let forked = fork_journal(store, &source_name, name, title.clone(), meta).await?;
                     println!(
                         "Forked {} → {} ({} items)",
                         source_name,
@@ -364,14 +364,14 @@ pub fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 limit: *limit,
                 offset: *offset,
             };
-            let (summaries, total) = store.list(&pagination, *archived)?;
+            let (summaries, total) = store.list(&pagination, *archived).await?;
 
             if *tree {
                 let all_p = Pagination::default();
-                let (all_summaries, _) = store.list(&all_p, false)?;
+                let (all_summaries, _) = store.list(&all_p, false).await?;
                 let mut fork_data = Vec::new();
                 for s in &all_summaries {
-                    if let Ok((j, _)) = store.load(&s.name, &all_p) {
+                    if let Ok((j, _)) = store.load(&s.name, &all_p).await {
                         let infos = extract_fork_infos(&j.items);
                         if !infos.is_empty() {
                             fork_data.push((s.name.clone(), infos));
@@ -391,15 +391,15 @@ pub fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             }
         }
         Commands::Archive { name } => {
-            store.archive(name)?;
+            store.archive(name).await?;
             println!("Archived: {name}");
         }
         Commands::Unarchive { name } => {
-            store.unarchive(name)?;
+            store.unarchive(name).await?;
             println!("Unarchived: {name}");
         }
         Commands::Export { name, file } => {
-            let (journal, _) = store.load(name, &Pagination::default())?;
+            let (journal, _) = store.load(name, &Pagination::default()).await?;
             let data = serde_json::to_string_pretty(&journal)?;
             match file {
                 Some(path) => std::fs::write(path, format!("{data}\n"))?,
@@ -417,7 +417,7 @@ pub fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             };
             let journal: JournalFile = serde_json::from_str(&data)?;
             validate_name(&journal.name).map_err(|e| anyhow::anyhow!(e))?;
-            store.create(journal)?;
+            store.create(journal).await?;
             println!("Imported successfully");
         }
     }

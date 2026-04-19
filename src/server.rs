@@ -343,7 +343,7 @@ impl ForayServer {
         validate_name(&args.name).map_err(|e| ErrorData::invalid_params(e, None))?;
         let store = self.resolve_store(args.store.as_deref())?;
 
-        let exists = store.exists(&args.name).map_err(Self::store_err)?;
+        let exists = store.exists(&args.name).await.map_err(Self::store_err)?;
 
         match (exists, &args.fork) {
             (false, None) => {
@@ -361,9 +361,9 @@ impl ForayServer {
                 }
                 validate_meta(&args.meta)?;
                 let journal = JournalFile::new(&args.name, Some(title), args.meta);
-                store.create(journal).map_err(Self::store_err)?;
+                store.create(journal).await.map_err(Self::store_err)?;
                 let p = Pagination::default();
-                let (j, _) = store.load(&args.name, &p).map_err(Self::store_err)?;
+                let (j, _) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
                 let resp = OpenJournalResponse {
                     name: j.name,
                     title: j.title,
@@ -389,6 +389,7 @@ impl ForayServer {
                 }
                 validate_meta(&args.meta)?;
                 let forked = fork_journal(store.as_ref(), source, &args.name, title, args.meta)
+                    .await
                     .map_err(Self::store_err)?;
                 let resp = OpenJournalResponse {
                     name: forked.name,
@@ -402,7 +403,7 @@ impl ForayServer {
             }
             (true, None) => {
                 let p = Pagination::default();
-                let (j, total) = store.load(&args.name, &p).map_err(Self::store_err)?;
+                let (j, total) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
                 let resp = OpenJournalResponse {
                     name: j.name,
                     title: j.title,
@@ -415,7 +416,7 @@ impl ForayServer {
             }
             (true, Some(source)) if *source == args.name => {
                 let p = Pagination::default();
-                let (j, total) = store.load(&args.name, &p).map_err(Self::store_err)?;
+                let (j, total) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
                 let resp = OpenJournalResponse {
                     name: j.name,
                     title: j.title,
@@ -481,12 +482,16 @@ impl ForayServer {
             }
             store
                 .add_items(&args.name, items_to_add)
+                .await
                 .map_err(Self::store_err)?;
         }
 
         // Load journal and apply cursor
         let all = Pagination::default();
-        let (journal, total) = store.load(&args.name, &all).map_err(Self::store_err)?;
+        let (journal, total) = store
+            .load(&args.name, &all)
+            .await
+            .map_err(Self::store_err)?;
 
         let after = args.cursor.unwrap_or(0);
         let items_slice = if after < journal.items.len() {
@@ -532,7 +537,10 @@ impl ForayServer {
             limit: Some(args.limit.unwrap_or(MAX_LIMIT).min(MAX_LIMIT)),
             offset: args.offset,
         };
-        let (summaries, total) = store.list(&pagination, false).map_err(Self::store_err)?;
+        let (summaries, total) = store
+            .list(&pagination, false)
+            .await
+            .map_err(Self::store_err)?;
 
         let journals: Vec<serde_json::Value> = summaries
             .iter()

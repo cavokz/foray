@@ -1,4 +1,5 @@
 use crate::types::{JournalFile, JournalItem, JournalSummary, Pagination};
+use async_trait::async_trait;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -16,18 +17,22 @@ pub enum StoreError {
 }
 
 /// Backend-agnostic journal storage.
+#[async_trait]
 pub trait Store: Send + Sync {
-    fn load(&self, name: &str, pagination: &Pagination)
-    -> Result<(JournalFile, usize), StoreError>;
-    fn create(&self, journal: JournalFile) -> Result<(), StoreError>;
-    fn add_items(&self, name: &str, items: Vec<JournalItem>) -> Result<usize, StoreError>;
-    fn list(
+    async fn load(
+        &self,
+        name: &str,
+        pagination: &Pagination,
+    ) -> Result<(JournalFile, usize), StoreError>;
+    async fn create(&self, journal: JournalFile) -> Result<(), StoreError>;
+    async fn add_items(&self, name: &str, items: Vec<JournalItem>) -> Result<usize, StoreError>;
+    async fn list(
         &self,
         pagination: &Pagination,
         archived: bool,
     ) -> Result<(Vec<JournalSummary>, usize), StoreError>;
-    fn delete(&self, name: &str) -> Result<(), StoreError>;
-    fn exists(&self, name: &str) -> Result<bool, StoreError>;
-    fn archive(&self, name: &str) -> Result<(), StoreError>;
-    fn unarchive(&self, name: &str) -> Result<(), StoreError>;
+    async fn delete(&self, name: &str) -> Result<(), StoreError>;
+    async fn exists(&self, name: &str) -> Result<bool, StoreError>;
+    async fn archive(&self, name: &str) -> Result<(), StoreError>;
+    async fn unarchive(&self, name: &str) -> Result<(), StoreError>;
 }

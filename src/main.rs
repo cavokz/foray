@@ -18,6 +18,6 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let store = JsonFileStore::new(JsonFileStore::default_dir()?);
-    foray::cli::run(&cli, &store)?;
+    foray::cli::run(&cli, &store).await?;
     Ok(())
 }

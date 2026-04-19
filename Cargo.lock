@@ -290,6 +290,7 @@ name = "foray"
 version = "0.3.0-dev"
 dependencies = [
  "anyhow",
+ "async-trait",
  "chrono",
  "clap",
  "dirs",

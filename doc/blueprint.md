@@ -130,8 +130,9 @@ Unknown fields are rejected (`deny_unknown_fields`). The `meta` field on both `J
 ## Tech Stack
 - **Language**: Rust
 - **MCP SDK**: `rmcp` v1.4.0 (server, macros, transport-io)
-- **Deps**: tokio (rt, macros, sync, time — current_thread flavor), serde/serde_json, rand, chrono, dirs 6, fs2, anyhow, thiserror 2, clap (derive), toml
+- **Deps**: tokio (rt, macros, sync, time — current_thread flavor), serde/serde_json, rand, chrono, dirs 6, fs2, anyhow, thiserror 2, clap (derive), toml, async-trait
 - **Dev deps**: tempfile
+- `async-trait` used on `trait Store` for `dyn Store` object safety with async methods.
 
 ## MCP Server — fully stateless
 
@@ -257,7 +258,7 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
    - Both `JournalFile` and `JournalItem` get `#[serde(deny_unknown_fields)]` and `meta: Option<HashMap<String, serde_json::Value>>` for client-specific extensibility
    - `validate_name()` for journal name validation
 2. `store.rs`:
-   - `trait Store: Send + Sync` with: `load(name, pagination) -> (JournalFile, total)`, `create`, `add_items(name, Vec<JournalItem>)`, `list(pagination, archived) -> (Vec<JournalSummary>, total)`, `delete`, `exists`, `archive`, `unarchive`
+   - `#[async_trait] trait Store: Send + Sync` with async methods: `load(name, pagination) -> (JournalFile, total)`, `create`, `add_items(name, Vec<JournalItem>)`, `list(pagination, archived) -> (Vec<JournalSummary>, total)`, `delete`, `exists`, `archive`, `unarchive`
    - `load` reads both active and archived journals (always readable).
    - `add_items` errors if the journal is archived.
    - `archive(name)` marks a journal as archived; `unarchive(name)` restores it.
