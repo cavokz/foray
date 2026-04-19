@@ -94,6 +94,10 @@ auth-triage
 └── db-theory
 ```
 
+Global options available on all commands:
+- `--journal <name>` — override journal resolution (skips env + `.forayrc`)
+- `--store <name>` — select a named store (skips env + `.forayrc current-store`); defaults to the single configured store when unambiguous
+
 ## Architecture
 
 ```

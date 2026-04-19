@@ -1,3 +1,4 @@
+use crate::config::StoreRegistry;
 use crate::store::Store;
 use crate::store_json::fork_journal;
 use crate::tree::{build_tree, extract_fork_infos};
@@ -18,6 +19,10 @@ pub struct Cli {
     /// Override journal name (skips env + .forayrc resolution)
     #[arg(long, global = true)]
     pub journal: Option<String>,
+
+    /// Override store name (skips env + .forayrc resolution)
+    #[arg(long, global = true)]
+    pub store: Option<String>,
 
     #[command(subcommand)]
     pub command: Commands,
@@ -167,8 +172,66 @@ pub fn find_forayrc(start_dir: &std::path::Path) -> Option<String> {
     None
 }
 
+/// Resolve which store to use: CLI flag > FORAY_STORE env > .forayrc current-store > default.
+pub fn resolve_store<'a>(
+    registry: &'a StoreRegistry,
+    cli_flag: Option<&str>,
+) -> anyhow::Result<&'a dyn Store> {
+    let name: Option<String> = if let Some(n) = cli_flag {
+        Some(n.to_string())
+    } else if let Ok(n) = std::env::var("FORAY_STORE")
+        && !n.is_empty()
+    {
+        Some(n)
+    } else {
+        find_store_in_forayrc(&std::env::current_dir()?)
+    };
+
+    match name {
+        None => {
+            if registry.entries().len() == 1 {
+                Ok(registry.default_store().as_ref())
+            } else {
+                Err(anyhow::anyhow!(
+                    "no store specified. Use --store <name>, set FORAY_STORE, or add current-store to .forayrc (available: {})",
+                    registry.names_hint()
+                ))
+            }
+        }
+        Some(n) => registry.get(&n).map(|s| s.as_ref()).ok_or_else(|| {
+            anyhow::anyhow!(
+                "store '{n}' not found. Available: {}",
+                registry.names_hint()
+            )
+        }),
+    }
+}
+
+/// Walk up from `start_dir` looking for `.forayrc` with `current-store`.
+pub fn find_store_in_forayrc(start_dir: &std::path::Path) -> Option<String> {
+    let mut dir = start_dir.to_path_buf();
+    loop {
+        let rc_path = dir.join(".forayrc");
+        if rc_path.is_file()
+            && let Ok(contents) = std::fs::read_to_string(&rc_path)
+            && let Ok(table) = contents.parse::<toml::Table>()
+        {
+            if let Some(name) = table.get("current-store").and_then(|v| v.as_str()) {
+                return Some(name.to_string());
+            }
+            if table.get("root").and_then(|v| v.as_bool()) == Some(true) {
+                return None;
+            }
+        }
+        if !dir.pop() {
+            break;
+        }
+    }
+    None
+}
+
 /// Write or update `.forayrc` in the current directory.
-pub fn write_forayrc(name: &str) -> anyhow::Result<()> {
+pub fn write_forayrc(name: &str, store: Option<&str>) -> anyhow::Result<()> {
     let rc_path = std::env::current_dir()?.join(".forayrc");
     let mut table = if rc_path.is_file() {
         let contents = std::fs::read_to_string(&rc_path)?;
@@ -177,6 +240,9 @@ pub fn write_forayrc(name: &str) -> anyhow::Result<()> {
         toml::Table::new()
     };
     table.insert("current-journal".into(), toml::Value::String(name.into()));
+    if let Some(s) = store {
+        table.insert("current-store".into(), toml::Value::String(s.into()));
+    }
     std::fs::write(&rc_path, toml::to_string_pretty(&table)?)?;
     Ok(())
 }
@@ -261,7 +327,7 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             if *follow {
                 let mut seen = total;
                 loop {
-                    std::thread::sleep(std::time::Duration::from_millis(500));
+                    tokio::time::sleep(std::time::Duration::from_millis(500)).await;
                     let all = Pagination::default();
                     let (journal, new_total) = store.load(&journal_name, &all).await?;
                     if new_total > seen {
@@ -332,7 +398,8 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                         validate_name(source).map_err(|e| anyhow::anyhow!(e))?;
                         source.clone()
                     };
-                    let forked = fork_journal(store, &source_name, name, title.clone(), meta).await?;
+                    let forked =
+                        fork_journal(store, &source_name, name, title.clone(), meta).await?;
                     println!(
                         "Forked {} → {} ({} items)",
                         source_name,
@@ -350,7 +417,7 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                     anyhow::bail!("journal already exists: {name}");
                 }
             }
-            write_forayrc(name)?;
+            write_forayrc(name, cli.store.as_deref())?;
             println!("Set active journal in .forayrc");
         }
         Commands::List {
@@ -427,6 +494,10 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use std::sync::Mutex;
+
+    // Serialize tests that mutate process-global state (env vars, cwd) to avoid races.
+    static SERIAL_LOCK: Mutex<()> = Mutex::new(());
 
     #[test]
     fn test_find_forayrc() {
@@ -447,6 +518,34 @@ mod tests {
     }
 
     #[test]
+    fn write_forayrc_persists_store_when_given() {
+        let _guard = SERIAL_LOCK.lock().unwrap();
+        let dir = tempfile::TempDir::new().unwrap();
+        let orig = std::env::current_dir().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+        write_forayrc("my-journal", Some("remote")).unwrap();
+        std::env::set_current_dir(&orig).unwrap();
+        let contents = std::fs::read_to_string(dir.path().join(".forayrc")).unwrap();
+        let table: toml::Table = contents.parse().unwrap();
+        assert_eq!(table["current-journal"].as_str(), Some("my-journal"));
+        assert_eq!(table["current-store"].as_str(), Some("remote"));
+    }
+
+    #[test]
+    fn write_forayrc_omits_store_when_none() {
+        let _guard = SERIAL_LOCK.lock().unwrap();
+        let dir = tempfile::TempDir::new().unwrap();
+        let orig = std::env::current_dir().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+        write_forayrc("my-journal", None).unwrap();
+        std::env::set_current_dir(&orig).unwrap();
+        let contents = std::fs::read_to_string(dir.path().join(".forayrc")).unwrap();
+        let table: toml::Table = contents.parse().unwrap();
+        assert_eq!(table["current-journal"].as_str(), Some("my-journal"));
+        assert!(!table.contains_key("current-store"));
+    }
+
+    #[test]
     fn test_parse_meta() {
         let pairs = vec!["key1=value1".into(), "key2=value2".into()];
         let meta = parse_meta(&pairs).unwrap();
@@ -462,5 +561,121 @@ mod tests {
         assert_eq!(parse_item_type("snippet").unwrap(), ItemType::Snippet);
         assert_eq!(parse_item_type("note").unwrap(), ItemType::Note);
         assert!(parse_item_type("invalid").is_err());
+    }
+
+    fn make_registry() -> (StoreRegistry, tempfile::TempDir) {
+        let dir = tempfile::TempDir::new().unwrap();
+        let registry = StoreRegistry::for_test(dir.path().to_path_buf());
+        (registry, dir)
+    }
+
+    #[test]
+    fn resolve_store_uses_cli_flag() {
+        let (registry, _dir) = make_registry();
+        // "local" is the default name in for_test
+        assert!(resolve_store(&registry, Some("local")).is_ok());
+    }
+
+    #[test]
+    fn resolve_store_cli_flag_beats_env_var() {
+        let _guard = SERIAL_LOCK.lock().unwrap();
+        let (registry, _dir) = make_registry();
+        unsafe {
+            std::env::set_var("FORAY_STORE", "some-other-store");
+        }
+        let result = resolve_store(&registry, Some("local"));
+        unsafe {
+            std::env::remove_var("FORAY_STORE");
+        }
+        // CLI flag wins even though FORAY_STORE is set to an unknown store
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn resolve_store_cli_flag_unknown_errors() {
+        let (registry, _dir) = make_registry();
+        let result = resolve_store(&registry, Some("no-such-store"));
+        assert!(result.is_err());
+        let msg = result.err().unwrap().to_string();
+        assert!(msg.contains("not found"));
+        assert!(msg.contains("no-such-store"));
+    }
+
+    #[test]
+    fn resolve_store_env_var() {
+        let _guard = SERIAL_LOCK.lock().unwrap();
+        let (registry, _dir) = make_registry();
+        // env var wins when no CLI flag
+        unsafe {
+            std::env::set_var("FORAY_STORE", "local");
+        }
+        let result = resolve_store(&registry, None);
+        unsafe {
+            std::env::remove_var("FORAY_STORE");
+        }
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn resolve_store_env_var_unknown_errors() {
+        let _guard = SERIAL_LOCK.lock().unwrap();
+        let (registry, _dir) = make_registry();
+        unsafe {
+            std::env::set_var("FORAY_STORE", "nope");
+        }
+        let result = resolve_store(&registry, None);
+        unsafe {
+            std::env::remove_var("FORAY_STORE");
+        }
+        assert!(result.is_err());
+        assert!(result.err().unwrap().to_string().contains("not found"));
+    }
+
+    #[test]
+    fn resolve_store_forayrc() {
+        let (_registry, rc_dir) = make_registry();
+        let rc_path = rc_dir.path().join(".forayrc");
+        std::fs::write(&rc_path, "current-store = \"local\"\n").unwrap();
+        let found = find_store_in_forayrc(rc_dir.path());
+        assert_eq!(found, Some("local".to_string()));
+    }
+
+    #[test]
+    fn resolve_store_falls_back_to_default() {
+        let _guard = SERIAL_LOCK.lock().unwrap();
+        let (registry, _dir) = make_registry();
+        unsafe {
+            std::env::remove_var("FORAY_STORE");
+        }
+        // Single-store registry: implicit default is returned.
+        let result = resolve_store(&registry, None);
+        assert!(result.is_ok());
+    }
+
+    #[test]
+    fn resolve_store_errors_without_spec_when_multiple_stores() {
+        let _guard = SERIAL_LOCK.lock().unwrap();
+        let dir1 = tempfile::TempDir::new().unwrap();
+        let dir2 = tempfile::TempDir::new().unwrap();
+        let registry =
+            StoreRegistry::for_test_two(dir1.path().to_path_buf(), dir2.path().to_path_buf());
+        unsafe {
+            std::env::remove_var("FORAY_STORE");
+        }
+        let result = resolve_store(&registry, None);
+        assert!(result.is_err());
+        let msg = result.err().unwrap().to_string();
+        assert!(msg.contains("no store specified"));
+        assert!(msg.contains("available:"));
+    }
+
+    #[test]
+    fn find_store_in_forayrc_root_stops_walk() {
+        let dir = tempfile::TempDir::new().unwrap();
+        let rc_path = dir.path().join(".forayrc");
+        std::fs::write(&rc_path, "root = true\n").unwrap();
+        let child = dir.path().join("sub");
+        std::fs::create_dir(&child).unwrap();
+        assert_eq!(find_store_in_forayrc(&child), None);
     }
 }

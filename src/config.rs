@@ -130,6 +130,32 @@ impl StoreRegistry {
         }
     }
 
+    /// Construct a two-store registry. For use in tests only.
+    #[cfg(test)]
+    pub fn for_test_two(base_dir1: std::path::PathBuf, base_dir2: std::path::PathBuf) -> Self {
+        let store1: Arc<dyn Store> = Arc::new(JsonFileStore::new(base_dir1.clone()));
+        let store2: Arc<dyn Store> = Arc::new(JsonFileStore::new(base_dir2.clone()));
+        let nuance = compute_nuance(&[
+            format!("store1={}", base_dir1.display()),
+            format!("store2={}", base_dir2.display()),
+        ]);
+        Self {
+            stores: vec![
+                StoreEntry {
+                    name: "store1".to_string(),
+                    description: "Test store 1".to_string(),
+                    store: store1,
+                },
+                StoreEntry {
+                    name: "store2".to_string(),
+                    description: "Test store 2".to_string(),
+                    store: store2,
+                },
+            ],
+            nuance,
+        }
+    }
+
     /// Look up a store by name. Returns `None` if not found.
     pub fn get(&self, name: &str) -> Option<&Arc<dyn Store>> {
         self.stores

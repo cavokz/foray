@@ -1,7 +1,7 @@
 # Blueprint: foray — Persistent Journals via MCP
 
 ## TL;DR
-A **Rust MCP server + CLI** that gives any AI assistant persistent, forkable journals. Fully stateless server — every tool takes an explicit journal name. Pluggable journal store (ships with `JsonFileStore` at `~/.foray/journals/*.json`). CLI resolves journal via `--journal` flag > `FORAY_JOURNAL` env > `.forayrc` walk-up.
+A **Rust MCP server + CLI** that gives any AI assistant persistent, forkable journals. Fully stateless server — every tool takes an explicit journal name. Pluggable journal store (ships with `JsonFileStore` at `~/.foray/journals/*.json`). CLI resolves journal via `--journal` flag > `FORAY_JOURNAL` env > `.forayrc` walk-up; store via `--store` flag > `FORAY_STORE` env > `.forayrc current-store` > registry default.
 
 **Tagline:** *"Start with a foray. Fork it when it branches. Keep the trail."*
 
@@ -48,7 +48,9 @@ Any MCP Client (VS Code, Claude Desktop, Cursor, ...)
                   (cross-client context fusion)
 
 CLI journal resolution:
-  --journal flag > FORAY_JOURNAL env > .forayrc walk-up > error
+  --journal flag > FORAY_JOURNAL env > .forayrc current-journal > error
+CLI store resolution:
+  --store flag > FORAY_STORE env > .forayrc current-store > registry default (single-store) or error
 ```
 
 ## Core Abstractions
@@ -66,17 +68,20 @@ No project concept. No global active state.
 | Surface | Mechanism | Set by |
 |---------|-----------|--------|
 | **MCP server** | Fully stateless — every tool takes explicit journal name | N/A |
-| **CLI** | Resolution chain: `--journal` > `FORAY_JOURNAL` > `.forayrc` walk-up > error | User / `foray open` |
+| **CLI journal** | Resolution chain: `--journal` > `FORAY_JOURNAL` > `.forayrc current-journal` walk-up > error | User / `foray open` |
+| **CLI store** | Resolution chain: `--store` > `FORAY_STORE` > `.forayrc current-store` walk-up > registry default (single-store) or error | User / `foray open` |
 
 ### `.forayrc` (TOML)
 ```toml
 current-journal = "auth-triage"
+current-store = "work"
 root = true
 ```
 - `current-journal` — optional, journal name for CLI resolution
-- `root = true` — optional, stops the upward directory walk
+- `current-store` — optional, store name for CLI resolution
+- `root = true` — optional, stops the upward directory walk (applies to both journal and store walks)
 - First `.forayrc` with `current-journal` wins; `root = true` halts the walk regardless
-- `foray open` writes/updates `current-journal` in `.forayrc` in current directory
+- `foray open` writes/updates `current-journal` (and `current-store` if `--store` was passed) in `.forayrc` in current directory
 - Users can `.gitignore` or commit it
 
 ## Storage (default: `JsonFileStore`)
@@ -233,7 +238,7 @@ foray export <name> [--file PATH]       # Export journal JSON to stdout (or file
 foray import [--file PATH]              # Import journal JSON from stdin (or file)
 ```
 
-Global option: `--journal <name>` on all commands (overrides env + .forayrc).
+Global options: `--journal <name>` and `--store <name>` on all commands (override env + .forayrc).
 
 `open` creates the journal (or forks if `--fork`), writes `.forayrc` in cwd.
 - `foray open deep-dive --title "Explore DB connection pooling theory"` → create empty journal, write `.forayrc`
@@ -245,6 +250,13 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 2. `FORAY_JOURNAL` env var if set
 3. `.forayrc` file found walking up from cwd
 4. Error with helpful message listing the three options
+
+**Store resolution for CLI**:
+1. `--store` flag if provided
+2. `FORAY_STORE` env var if set
+3. `.forayrc current-store` found walking up from cwd
+4. Registry default if only one store is configured
+5. Error with available store names if multiple stores and none selected
 
 ## Steps
 
@@ -293,11 +305,13 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 6. `open_journal` implements the behavior matrix (create / fork / idempotent / error).
 
 ### Phase 5: CLI + Main *(parallel with Phase 4)*
-1. `cli.rs` — clap derive subcommands. Global `--journal` option. `--fork [SOURCE]` on `open`.
-2. `resolve_journal(cli_flag, env, cwd) -> Result<String>` — the resolution chain.
-3. `find_forayrc(start_dir) -> Option<String>` — walk up from cwd looking for `.forayrc`, parse TOML, return `current-journal` value. Stop at `root = true` or filesystem root.
-4. `main.rs` — parse CLI, construct `JsonFileStore`, route subcommands. `serve` → MCP server. Everything else → resolve journal via chain, call store, format output.
-5. `open` handler: create/fork journal, write `.forayrc` in cwd.
+1. `cli.rs` — clap derive subcommands. Global `--journal` and `--store` options. `--fork [SOURCE]` on `open`.
+2. `resolve_journal(cli_flag, explicit_name) -> Result<String>` — the resolution chain.
+3. `resolve_store<'a>(registry, cli_flag) -> Result<&'a dyn Store>` — `--store` > `FORAY_STORE` > `.forayrc current-store` > registry default (single-store) or error.
+4. `find_forayrc(start_dir) -> Option<String>` — walk up from cwd looking for `.forayrc`, parse TOML, return `current-journal` value. Stop at `root = true` or filesystem root.
+5. `find_store_in_forayrc(start_dir) -> Option<String>` — same walk, returns `current-store` value.
+6. `main.rs` — parse CLI, load `StoreRegistry`, call `resolve_store()`, route subcommands. `serve` → MCP server. Everything else → resolve journal + store via chains, call store, format output.
+7. `open` handler: create/fork journal, write `.forayrc` in cwd (includes `current-store` if `--store` was passed).
 
 ### Phase 6: Setup Guide + Companion Skill + README + Config
 
