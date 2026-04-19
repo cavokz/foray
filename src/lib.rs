@@ -3,5 +3,6 @@ pub mod config;
 pub mod server;
 pub mod store;
 pub mod store_json;
+pub mod store_stdio;
 pub mod tree;
 pub mod types;

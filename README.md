@@ -34,7 +34,7 @@ Then direct your AI assistant to fetch the [Setup Guide](https://raw.githubuserc
 
 | Tool | Description |
 |------|-------------|
-| `hello` | Handshake — call first every session, returns `{version, nuance}` |
+| `hello` | Handshake — call first every session, returns `{version, nuance, stores}` |
 | `open_journal` | Create, fork, or reopen a journal |
 | `sync_journal` | Read and/or write items (cursor-based) |
 | `list_journals` | List active or archived journals |
@@ -94,9 +94,17 @@ auth-triage
 └── db-theory
 ```
 
-Global options available on all commands:
-- `--journal <name>` — override journal resolution (skips env + `.forayrc`)
-- `--store <name>` — select a named store (skips env + `.forayrc current-store`); defaults to the single configured store when unambiguous
+Work against a remote foray instance configured in `~/.foray/config.toml`:
+
+```
+$ foray list --store remote
+Connecting to remote foray...
+2 journal(s) (active):
+  auth-triage (3 items) Auth cache investigation
+  db-theory (5 items) DB pooling theory
+```
+
+The `--store` flag selects a named store from `~/.foray/config.toml`. Without it the default (local) store is used. `foray open --store remote my-journal` also persists `current-store = "remote"` in `.forayrc` so subsequent commands in that directory use the remote store automatically.
 
 ## Architecture
 

@@ -172,7 +172,8 @@ pub fn find_forayrc(start_dir: &std::path::Path) -> Option<String> {
     None
 }
 
-/// Resolve which store to use: CLI flag > FORAY_STORE env > .forayrc current-store > default.
+/// Resolve which store to use: CLI flag > FORAY_STORE env > .forayrc current-store >
+/// implicit default (only when exactly one store is configured) > error.
 pub fn resolve_store<'a>(
     registry: &'a StoreRegistry,
     cli_flag: Option<&str>,
@@ -447,7 +448,12 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 }
                 print!("{}", build_tree(&all_summaries, &fork_data));
             } else if *json {
-                println!("{}", serde_json::to_string_pretty(&summaries)?);
+                println!(
+                    "{}",
+                    serde_json::to_string_pretty(
+                        &serde_json::json!({"total": total, "journals": &summaries})
+                    )?
+                );
             } else {
                 let label = if *archived { "archived" } else { "active" };
                 println!("{} journal(s) ({label}):", total);

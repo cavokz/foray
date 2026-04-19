@@ -1,5 +1,6 @@
 use crate::store::{Store, StoreError};
 use crate::store_json::JsonFileStore;
+use crate::store_stdio::StdioStore;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
@@ -23,6 +24,25 @@ enum RawStoreConfig {
         path: PathBuf,
         /// Human-readable description — required; helps the model suggest the right store.
         description: String,
+    },
+    #[serde(rename = "foray_stdio")]
+    ForayStdio {
+        /// Command to spawn the remote foray server (must be a `foray` binary or a
+        /// transport that ends up invoking one).
+        command: String,
+        /// Arguments passed to `command` **before** the implicit `serve` that
+        /// `StdioStore` always appends.
+        ///
+        /// Local:  `command = "foray"`, `args = []`  →  spawns `foray serve`
+        /// SSH:    `command = "ssh"`, `args = ["user@host", "--", "foray"]`
+        ///         →  spawns `ssh user@host -- foray serve`
+        #[serde(default)]
+        args: Vec<String>,
+        /// Human-readable description — required; helps the model suggest the right store.
+        description: String,
+        /// Preferred store name on the remote server (first from hello if absent).
+        #[serde(default)]
+        store: Option<String>,
     },
 }
 
@@ -84,6 +104,18 @@ impl StoreRegistry {
                     }
                     fingerprints.push(format!("{}={}", name, path.display()));
                     (Arc::new(JsonFileStore::new(path)), description)
+                }
+                RawStoreConfig::ForayStdio {
+                    command,
+                    args,
+                    description,
+                    store,
+                } => {
+                    fingerprints.push(format!("{}={} {}", name, command, args.join(" ")));
+                    (
+                        Arc::new(StdioStore::new(command, args, vec![], store)),
+                        description,
+                    )
                 }
             };
             stores.push(StoreEntry {
