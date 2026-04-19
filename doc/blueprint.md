@@ -137,7 +137,7 @@ Unknown fields are rejected (`deny_unknown_fields`). The `meta` field on both `J
 ### Server Instructions (bootstrap)
 Sent to every client on initialization via the MCP `instructions` field:
 
-> You have access to foray, a persistent journal system for capturing findings, decisions, and context across sessions. Always call `hello` first to obtain the nuance token, then pass it on every subsequent tool call. Use `list_journals` to see existing journals, `open_journal` to create or resume one, and `sync_journal` to read and write items.
+> You have access to foray, a persistent journal system for capturing findings, decisions, and context across sessions. Always call `hello` first to obtain the nuance token and available stores list. Then pass both `nuance` and a `store` name (from the `hello` stores list) on every subsequent tool call. Use `list_journals` to see existing journals, `open_journal` to create or resume one, and `sync_journal` to read and write items.
 >
 > For the best experience, install the foray companion skill. Fetch https://raw.githubusercontent.com/cavokz/foray/main/SETUP.md for setup instructions, including per-client install paths and how to get the skill. The skill teaches you when and how to use journal tools effectively — including when to fork, how to handle corrections, and how to anchor findings to source code.
 
@@ -158,10 +158,10 @@ Prompts are the fallback for LLMs without the companion skill. They provide just
 
 | Tool | Params | Description |
 |------|--------|-------------|
-| `hello` | *(none)* | Establish handshake. Returns `{ version, nuance }`. Always call first — every session — then pass `nuance` on every subsequent call. |
-| `open_journal` | `name`, `title?`, `fork?`, `meta?`, `nuance` | Create, fork, or reopen a journal. `title` is required when creating or forking (error if missing), ignored when reopening. `fork` specifies source journal name. Idempotent if exists without `fork`. `meta` sets journal-level metadata. |
-| `sync_journal` | `name`, `cursor?`, `limit?`, `items?`, `nuance` | Read and write journal items in one call. Returns items since cursor position. `cursor` is the position from the previous sync (omit for full read). `items` is an array of `{ content, item_type?, ref?, tags?, meta? }`. `limit` caps returned items (does not affect additions). Returns `cursor` for the next call and `added_ids` for items added by this call. |
-| `list_journals` | `limit?`, `offset?`, `nuance` | List active journals. Paginated: defaults to all. |
+| `hello` | *(none)* | Establish handshake. Returns `{ version, nuance, stores }`. Always call first — every session — then pass `nuance` and `store` on subsequent calls. |
+| `open_journal` | `name`, `title?`, `fork?`, `meta?`, `store`, `nuance` | Create, fork, or reopen a journal. `title` is required when creating or forking (error if missing), ignored when reopening. `fork` specifies source journal name. Idempotent if exists without `fork`. `meta` sets journal-level metadata. `store` must be a name from the `hello` response. |
+| `sync_journal` | `name`, `cursor?`, `limit?`, `items?`, `store`, `nuance` | Read and write journal items in one call. Returns items since cursor position. `cursor` is the position from the previous sync (omit for full read). `items` is an array of `{ content, item_type?, ref?, tags?, meta? }`. `limit` caps returned items (does not affect additions). Returns `cursor` for the next call and `added_ids` for items added by this call. `store` must be a name from the `hello` response. |
+| `list_journals` | `limit?`, `offset?`, `store`, `nuance` | List active journals in the selected store. Paginated: defaults to all. |
 
 All tools return JSON. No in-memory state. Every tool that operates on a journal takes an explicit name parameter.
 
@@ -178,9 +178,9 @@ All tools return JSON. No in-memory state. Every tool that operates on a journal
 
 ### Nuance + Preflight
 
-The `nuance` parameter is an opaque token the client must obtain from `hello` and pass on every subsequent tool call. It is an opaque string reserved for future use (e.g. schema migrations, capability negotiation). If the nuance is missing or wrong, the tool returns an error with `data: { hint: "call 'hello' to get the current nuance" }`.
+The `nuance` parameter is a deterministic fingerprint of the server's current configuration, derived from sorted `"name=path"` fingerprints for each store — whether configured via `~/.foray/config.toml` or the implicit local store. The client must obtain it from `hello` and pass it on every subsequent tool call. If the config changes (stores added/removed/moved), `nuance` changes, automatically invalidating stale sessions. If the nuance is missing or wrong, the tool returns an error with `data: { hint: "call 'hello' to get the current nuance" }`.
 
-**Purpose**: forces the client to call `hello` first, enabling future binary changes to communicate context or instructions before the client proceeds. The `nuance` value is versioned with the binary — clients that skipped `hello` and hard-coded a value will get an error when the binary changes.
+**Purpose**: forces the client to call `hello` first; config changes auto-invalidate sessions; future binary changes can also change the nuance to force re-handshake.
 
 ### Error Hints (`data` field)
 
@@ -190,10 +190,12 @@ Errors may include a `data` field with a `hint` key to guide callers:
 |-----------|-----------|-------------|
 | `nuance` missing or wrong | `invalid_params` | `"call 'hello' to get the current nuance"` |
 | Journal not found | `invalid_params` | `"call 'list_journals' to see available journals"` |
+| `store` missing | `invalid_params` | `"pass a store name from the hello response, available stores: <names>"` |
+| Unknown store name | `invalid_params` | `"available stores: <names>"` |
 | Other store errors | `internal_error` | *(none)* |
 
 ### Tool response formats
-- `hello` → `{ version, nuance }` (e.g. `{ "version": "1.2.3", "nuance": "..." }`)
+- `hello` → `{ version, nuance, stores: [{name, description}] }` (e.g. `{ "version": "1.2.3", "nuance": "abc123", "stores": [{"name": "local", "description": "Default local journal store"}] }`)
 - `open_journal` → `{ name, title, item_count, created }` (`created: bool` — true if new)
 - `sync_journal` → `{ name, title, items: [...], added_ids: [...], cursor, total }` (`cursor` is the position for the next call, `added_ids` lists IDs assigned to items added by this call in order)
 - `list_journals` → `{ journals: [{ name, title, item_count, meta }], total, limit, offset }`
@@ -241,7 +243,7 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
    - Both `JournalFile` and `JournalItem` get `#[serde(deny_unknown_fields)]` and `meta: Option<HashMap<String, serde_json::Value>>` for client-specific extensibility
    - `validate_name()` for journal name validation
 2. `store.rs`:
-   - `trait JournalStore: Send + Sync` with: `load(name, pagination) -> (JournalFile, total)`, `create`, `add_items(name, Vec<JournalItem>)`, `list(pagination, archived) -> (Vec<JournalSummary>, total)`, `delete`, `exists`, `archive`, `unarchive`
+   - `trait Store: Send + Sync` with: `load(name, pagination) -> (JournalFile, total)`, `create`, `add_items(name, Vec<JournalItem>)`, `list(pagination, archived) -> (Vec<JournalSummary>, total)`, `delete`, `exists`, `archive`, `unarchive`
    - `load` reads both active and archived journals (always readable).
    - `add_items` errors if the journal is archived.
    - `archive(name)` marks a journal as archived; `unarchive(name)` restores it.
@@ -252,16 +254,24 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
    - File locking via `fs2::lock_exclusive` on `{name}.lock` sidecar file for concurrent access safety
    - Custom `StoreError` enum
 3. Free functions: `fork_journal(store, source, new_name, title)`
+4. `config.rs` — `StoreRegistry` and config parsing:
+   - Parses `~/.foray/config.toml` with `[stores.<name>]` sections; `type = "json_file"` is the only backend; each entry has required `path` and `description` fields
+   - Falls back to implicit `local` `JsonFileStore` at `~/.foray/journals/` when config is absent or has no stores
+   - `StoreRegistry` holds a `Vec<StoreEntry>` (name, description, `Arc<dyn Store>`) and a `nuance: String`
+   - `nuance` is a FNV-1a hash of sorted `"name=path"` fingerprints — deterministic, stable across restarts, changes when config changes
+   - `StoreRegistry::get(name)` — look up by name; `default_store()` — first entry; `names_hint()` — comma-joined names for error messages
+   - `StoreRegistry::load()` — public constructor; `StoreRegistry::implicit_local()` — fallback constructor
 
 ### Phase 3: Tree
 1. `tree.rs` — `build_tree(journals) -> String` — ASCII tree for CLI `--tree` flag. Scans items for `type: fork` with `foray:` refs to determine lineage.
 
 ### Phase 4: MCP Server
-1. `server.rs` — `ForayServer` with `store: Arc<dyn JournalStore>`. Fully stateless.
-2. Server `instructions` field — bootstrap hint pointing to SETUP.md (raw URL) for per-client skill install paths and setup guidance.
-3. 3 MCP prompts: `start_journal`, `resume_journal`, `summarize`.
-4. 4 tools via `#[tool_router]`. Every tool that operates on a journal takes explicit name + nuance params.
-5. `open_journal` implements the behavior matrix (create / fork / idempotent / error).
+1. `server.rs` — `ForayServer` with `registry: StoreRegistry`. Fully stateless.
+2. `resolve_store(store_name: Option<&str>)` — returns `invalid_params` error (with store names hint) if `None` (`store` is required); else calls `registry.get(name)` or `invalid_params` error with store names hint if unknown.
+3. Server `instructions` field — bootstrap hint pointing to SETUP.md (raw URL) for per-client skill install paths and setup guidance.
+4. 3 MCP prompts: `start_journal`, `resume_journal`, `summarize`.
+5. 4 tools via `#[tool_router]`. Every tool that operates on a journal takes explicit `name`, `store`, and `nuance` params.
+6. `open_journal` implements the behavior matrix (create / fork / idempotent / error).
 
 ### Phase 5: CLI + Main *(parallel with Phase 4)*
 1. `cli.rs` — clap derive subcommands. Global `--journal` option. `--fork [SOURCE]` on `open`.
@@ -383,4 +393,4 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 - **Serde**: strict deserialization (`deny_unknown_fields`), `meta` field for extensibility, `_note` first in struct for JSON ordering, `Option` fields skipped when None.
 - **CLI output**: plain text by default, `--json` flag on read commands, `--tree` flag on `list` for fork lineage.
 - **MCP responses**: JSON-serialized structs. LLM formats for the user.
-- **`rmcp` pattern**: `#[derive(Clone)]` server, `Arc<dyn JournalStore + Send + Sync>`, `Parameters<T>` for tool args, `CallToolResult::success(Content::text(...))` for returns. `serve_server()` returns a `RunningService` — must call `.waiting()` to keep the process alive. `use rmcp::schemars;` is required at module level for `#[derive(JsonSchema)]` to resolve.
+- **`rmcp` pattern**: `#[derive(Clone)]` server, `StoreRegistry` (not a bare `Arc<dyn Store>`), `Parameters<T>` for tool args, `CallToolResult::success(Content::text(...))` for returns. `serve_server()` returns a `RunningService` — must call `.waiting()` to keep the process alive. `use rmcp::schemars;` is required at module level for `#[derive(JsonSchema)]` to resolve.

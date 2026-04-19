@@ -1,4 +1,5 @@
-use crate::store::{JournalStore, StoreError, fork_journal};
+use crate::config::StoreRegistry;
+use crate::store::{Store, StoreError, fork_journal};
 use crate::types::{ItemType, JournalFile, JournalItem, Pagination, item_id, validate_name};
 use chrono::Utc;
 use rmcp::handler::server::wrapper::Parameters;
@@ -48,6 +49,10 @@ pub struct OpenJournalParams {
     /// Journal-level metadata (free-form key-value pairs)
     #[serde(default)]
     pub meta: Option<HashMap<String, serde_json::Value>>,
+    /// Store name from `hello` stores list — required
+    #[serde(default)]
+    #[schemars(required)]
+    pub store: Option<String>,
     /// Nuance token from `hello` — must match current server nuance
     #[serde(default)]
     #[schemars(required)]
@@ -87,6 +92,10 @@ pub struct SyncJournalParams {
     /// Items to add to the journal
     #[serde(default)]
     pub items: Option<Vec<SyncItemInput>>,
+    /// Store name from `hello` stores list — required
+    #[serde(default)]
+    #[schemars(required)]
+    pub store: Option<String>,
     /// Nuance token from `hello` — must match current server nuance
     #[serde(default)]
     #[schemars(required)]
@@ -102,6 +111,10 @@ pub struct ListJournalsParams {
     /// Number of journals to skip
     #[serde(default)]
     pub offset: Option<usize>,
+    /// Store name from `hello` stores list — required
+    #[serde(default)]
+    #[schemars(required)]
+    pub store: Option<String>,
     /// Nuance token from `hello` — must match current server nuance
     #[serde(default)]
     #[schemars(required)]
@@ -113,7 +126,14 @@ pub struct ListJournalsParams {
 #[derive(Serialize)]
 struct HelloResponse {
     version: &'static str,
-    nuance: &'static str,
+    nuance: String,
+    stores: Vec<StoreInfo>,
+}
+
+#[derive(Serialize)]
+struct StoreInfo {
+    name: String,
+    description: String,
 }
 
 #[derive(Serialize)]
@@ -206,12 +226,11 @@ fn validate_tags(tags: &Option<Vec<String>>) -> Result<(), ErrorData> {
     Ok(())
 }
 
-const CURRENT_NUANCE: &str = "0";
-
 const SERVER_INSTRUCTIONS: &str = "\
 You have access to foray, a persistent journal system for capturing findings, decisions, \
 and context across sessions. \
-Always call `hello` first to obtain the nuance token, then pass it on every subsequent tool call. \
+Always call `hello` first to obtain the nuance token and available stores list. \
+Then pass both `nuance` and a `store` name (from the `hello` stores list) on every subsequent tool call. \
 Use `list_journals` to see existing journals, `open_journal` to create or resume one, \
 and `sync_journal` to read and write items.\n\n\
 For the best experience, install the foray companion skill. \
@@ -222,12 +241,27 @@ how to handle corrections, and how to anchor findings to source code.";
 
 #[derive(Clone)]
 pub struct ForayServer {
-    store: Arc<dyn JournalStore>,
+    registry: StoreRegistry,
 }
 
 impl ForayServer {
-    pub fn new(store: Arc<dyn JournalStore>) -> Self {
-        Self { store }
+    pub fn new(registry: StoreRegistry) -> Self {
+        Self { registry }
+    }
+
+    fn resolve_store(&self, store_name: Option<&str>) -> Result<&Arc<dyn Store>, ErrorData> {
+        match store_name {
+            None => Err(ErrorData::invalid_params(
+                "store is required",
+                Some(serde_json::json!({"hint": format!("pass a store name from the hello response, available stores: {}", self.registry.names_hint())})),
+            )),
+            Some(name) => self.registry.get(name).ok_or_else(|| {
+                ErrorData::invalid_params(
+                    format!("unknown store: {name}"),
+                    Some(serde_json::json!({"hint": format!("available stores: {}", self.registry.names_hint())})),
+                )
+            }),
+        }
     }
 
     fn store_err(e: StoreError) -> ErrorData {
@@ -242,8 +276,8 @@ impl ForayServer {
         }
     }
 
-    fn preflight(nuance: Option<&str>) -> Result<(), ErrorData> {
-        if nuance != Some(CURRENT_NUANCE) {
+    fn preflight(&self, nuance: Option<&str>) -> Result<(), ErrorData> {
+        if nuance != Some(self.registry.nuance.as_str()) {
             return Err(ErrorData::invalid_params(
                 "nuance missing or wrong",
                 Some(serde_json::json!({ "hint": "call 'hello' to get the current nuance" })),
@@ -272,12 +306,22 @@ impl ForayServer {
 impl ForayServer {
     #[tool(
         name = "hello",
-        description = "Establish a session handshake. Returns the server version and nuance token. Always call this before any other tool, then pass the returned nuance on every subsequent call."
+        description = "Establish a session handshake. Returns the server version, nuance token, and available stores. Always call this before any other tool, then pass the returned nuance and a store name on every subsequent call."
     )]
     async fn hello(&self) -> Result<CallToolResult, ErrorData> {
+        let stores = self
+            .registry
+            .entries()
+            .iter()
+            .map(|e| StoreInfo {
+                name: e.name.clone(),
+                description: e.description.clone(),
+            })
+            .collect();
         let resp = HelloResponse {
             version: env!("CARGO_PKG_VERSION"),
-            nuance: CURRENT_NUANCE,
+            nuance: self.registry.nuance.clone(),
+            stores,
         };
         Ok(CallToolResult::success(vec![Content::text(
             serde_json::to_string(&resp).unwrap(),
@@ -292,11 +336,12 @@ impl ForayServer {
         &self,
         Parameters(args): Parameters<OpenJournalParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        Self::preflight(args.nuance.as_deref())?;
+        self.preflight(args.nuance.as_deref())?;
 
         validate_name(&args.name).map_err(|e| ErrorData::invalid_params(e, None))?;
+        let store = self.resolve_store(args.store.as_deref())?;
 
-        let exists = self.store.exists(&args.name).map_err(Self::store_err)?;
+        let exists = store.exists(&args.name).map_err(Self::store_err)?;
 
         match (exists, &args.fork) {
             (false, None) => {
@@ -314,9 +359,9 @@ impl ForayServer {
                 }
                 validate_meta(&args.meta)?;
                 let journal = JournalFile::new(&args.name, Some(title), args.meta);
-                self.store.create(journal).map_err(Self::store_err)?;
+                store.create(journal).map_err(Self::store_err)?;
                 let p = Pagination::default();
-                let (j, _) = self.store.load(&args.name, &p).map_err(Self::store_err)?;
+                let (j, _) = store.load(&args.name, &p).map_err(Self::store_err)?;
                 let resp = OpenJournalResponse {
                     name: j.name,
                     title: j.title,
@@ -341,9 +386,8 @@ impl ForayServer {
                     ));
                 }
                 validate_meta(&args.meta)?;
-                let forked =
-                    fork_journal(self.store.as_ref(), source, &args.name, title, args.meta)
-                        .map_err(Self::store_err)?;
+                let forked = fork_journal(store.as_ref(), source, &args.name, title, args.meta)
+                    .map_err(Self::store_err)?;
                 let resp = OpenJournalResponse {
                     name: forked.name,
                     title: forked.title,
@@ -356,7 +400,7 @@ impl ForayServer {
             }
             (true, None) => {
                 let p = Pagination::default();
-                let (j, total) = self.store.load(&args.name, &p).map_err(Self::store_err)?;
+                let (j, total) = store.load(&args.name, &p).map_err(Self::store_err)?;
                 let resp = OpenJournalResponse {
                     name: j.name,
                     title: j.title,
@@ -369,7 +413,7 @@ impl ForayServer {
             }
             (true, Some(source)) if *source == args.name => {
                 let p = Pagination::default();
-                let (j, total) = self.store.load(&args.name, &p).map_err(Self::store_err)?;
+                let (j, total) = store.load(&args.name, &p).map_err(Self::store_err)?;
                 let resp = OpenJournalResponse {
                     name: j.name,
                     title: j.title,
@@ -395,8 +439,9 @@ impl ForayServer {
         &self,
         Parameters(args): Parameters<SyncJournalParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        Self::preflight(args.nuance.as_deref())?;
+        self.preflight(args.nuance.as_deref())?;
         validate_name(&args.name).map_err(|e| ErrorData::invalid_params(e, None))?;
+        let store = self.resolve_store(args.store.as_deref())?;
 
         // Add items if provided
         let mut added_ids = Vec::new();
@@ -432,14 +477,14 @@ impl ForayServer {
                 items_to_add.push(item);
                 added_ids.push(id);
             }
-            self.store
+            store
                 .add_items(&args.name, items_to_add)
                 .map_err(Self::store_err)?;
         }
 
         // Load journal and apply cursor
         let all = Pagination::default();
-        let (journal, total) = self.store.load(&args.name, &all).map_err(Self::store_err)?;
+        let (journal, total) = store.load(&args.name, &all).map_err(Self::store_err)?;
 
         let after = args.cursor.unwrap_or(0);
         let items_slice = if after < journal.items.len() {
@@ -478,15 +523,13 @@ impl ForayServer {
         &self,
         Parameters(args): Parameters<ListJournalsParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        Self::preflight(args.nuance.as_deref())?;
+        self.preflight(args.nuance.as_deref())?;
+        let store = self.resolve_store(args.store.as_deref())?;
         let pagination = Pagination {
             limit: Some(args.limit.unwrap_or(MAX_LIMIT).min(MAX_LIMIT)),
             offset: args.offset,
         };
-        let (summaries, total) = self
-            .store
-            .list(&pagination, false)
-            .map_err(Self::store_err)?;
+        let (summaries, total) = store.list(&pagination, false).map_err(Self::store_err)?;
 
         let journals: Vec<serde_json::Value> = summaries
             .iter()
@@ -646,16 +689,30 @@ mod tests {
         assert_eq!(meta["pr"], serde_json::json!(42));
     }
 
+    use crate::config::StoreRegistry;
+
+    fn test_server() -> ForayServer {
+        ForayServer::new(StoreRegistry::for_test(
+            tempfile::tempdir().unwrap().into_path(),
+        ))
+    }
+
     // ── preflight ──────────────────────────────────────────────────
 
     #[test]
     fn preflight_passes_with_correct_nuance() {
-        assert!(ForayServer::preflight(Some(CURRENT_NUANCE)).is_ok());
+        let server = test_server();
+        assert!(
+            server
+                .preflight(Some(server.registry.nuance.as_str()))
+                .is_ok()
+        );
     }
 
     #[test]
     fn preflight_fails_with_missing_nuance() {
-        let err = ForayServer::preflight(None).unwrap_err();
+        let server = test_server();
+        let err = server.preflight(None).unwrap_err();
         assert_eq!(err.message, "nuance missing or wrong");
         let hint = err.data.as_ref().and_then(|d| d["hint"].as_str());
         assert_eq!(hint, Some("call 'hello' to get the current nuance"));
@@ -663,7 +720,8 @@ mod tests {
 
     #[test]
     fn preflight_fails_with_wrong_nuance() {
-        let err = ForayServer::preflight(Some("bogus")).unwrap_err();
+        let server = test_server();
+        let err = server.preflight(Some("bogus")).unwrap_err();
         assert_eq!(err.message, "nuance missing or wrong");
         let hint = err.data.as_ref().and_then(|d| d["hint"].as_str());
         assert_eq!(hint, Some("call 'hello' to get the current nuance"));
@@ -682,15 +740,100 @@ mod tests {
 
     #[test]
     fn hello_response_serializes_version_and_nuance() {
+        let server = test_server();
+        let nuance = server.registry.nuance.clone();
         let resp = HelloResponse {
             version: env!("CARGO_PKG_VERSION"),
-            nuance: CURRENT_NUANCE,
+            nuance: nuance.clone(),
+            stores: vec![],
         };
         let json: serde_json::Value = serde_json::to_value(&resp).unwrap();
-        assert_eq!(json["nuance"], CURRENT_NUANCE);
+        assert_eq!(json["nuance"], nuance);
         assert_eq!(json["version"], env!("CARGO_PKG_VERSION"));
     }
+    // ── resolve_store ──────────────────────────────────────────
 
+    #[test]
+    fn resolve_store_missing_store_returns_error_with_hint() {
+        let server = test_server();
+        let err = server.resolve_store(None).err().unwrap();
+        assert_eq!(err.message, "store is required");
+        let hint = err
+            .data
+            .as_ref()
+            .and_then(|d| d["hint"].as_str())
+            .unwrap_or("");
+        assert!(hint.contains("available stores"), "hint was: {hint}");
+    }
+
+    #[test]
+    fn resolve_store_unknown_store_returns_error_with_hint() {
+        let server = test_server();
+        let err = server.resolve_store(Some("nonexistent")).err().unwrap();
+        assert_eq!(err.message, "unknown store: nonexistent");
+        let hint = err
+            .data
+            .as_ref()
+            .and_then(|d| d["hint"].as_str())
+            .unwrap_or("");
+        assert!(hint.contains("available stores"), "hint was: {hint}");
+    }
+
+    #[test]
+    fn resolve_store_known_store_succeeds() {
+        let server = test_server();
+        assert!(server.resolve_store(Some("local")).is_ok());
+    }
+    // ── HelloResponse stores field ─────────────────────────────────
+
+    #[test]
+    fn hello_response_stores_populated_from_registry() {
+        let server = test_server();
+        let stores: Vec<StoreInfo> = server
+            .registry
+            .entries()
+            .iter()
+            .map(|e| StoreInfo {
+                name: e.name.clone(),
+                description: e.description.clone(),
+            })
+            .collect();
+        assert!(!stores.is_empty());
+        assert_eq!(stores[0].name, "local");
+        let json: serde_json::Value = serde_json::to_value(&HelloResponse {
+            version: env!("CARGO_PKG_VERSION"),
+            nuance: server.registry.nuance.clone(),
+            stores,
+        })
+        .unwrap();
+        assert!(json["stores"].is_array());
+        assert_eq!(json["stores"][0]["name"], "local");
+    }
+
+    // ── Tool param store field deserialization ─────────────────────
+
+    #[test]
+    fn open_journal_params_store_field() {
+        let p: OpenJournalParams =
+            serde_json::from_str(r#"{"name":"j","store":"local","nuance":"abc"}"#).unwrap();
+        assert_eq!(p.store.as_deref(), Some("local"));
+        assert_eq!(p.nuance.as_deref(), Some("abc"));
+    }
+
+    #[test]
+    fn list_journals_params_store_field() {
+        let p: ListJournalsParams =
+            serde_json::from_str(r#"{"store":"local","nuance":"abc"}"#).unwrap();
+        assert_eq!(p.store.as_deref(), Some("local"));
+    }
+
+    #[test]
+    fn sync_journal_params_store_field() {
+        let p: SyncJournalParams =
+            serde_json::from_str(r#"{"name":"j","cursor":0,"store":"local","nuance":"abc"}"#)
+                .unwrap();
+        assert_eq!(p.store.as_deref(), Some("local"));
+    }
     // ── SyncJournalResponse serialization ──────────────────────────
 
     #[test]
