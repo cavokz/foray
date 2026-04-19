@@ -2,9 +2,12 @@
 name = "foray"
 version = "0.3.0-dev"
 edition = "2024"
-description = "Persistent, forkable investigation journals via MCP"
+description = "Persistent, forkable journals for AI agents — shareable across machines and teams"
 license = "Apache-2.0"
 repository = "https://github.com/cavokz/foray"
+keywords = ["mcp", "journal", "ai-agents", "llm", "context"]
+categories = ["artificial-intelligence", "command-line-utilities", "development-tools"]
+readme = "README.md"
 
 [dependencies]
 anyhow = "1"

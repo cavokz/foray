@@ -628,7 +628,11 @@ impl rmcp::ServerHandler for ForayServer {
                 .build(),
         )
         .with_instructions(SERVER_INSTRUCTIONS.to_string())
-        .with_server_info(Implementation::new("foray", env!("CARGO_PKG_VERSION")))
+        .with_server_info(
+            Implementation::new("foray", env!("CARGO_PKG_VERSION"))
+                .with_title("Foray — Persistent Journals for AI Agents")
+                .with_description(env!("CARGO_PKG_DESCRIPTION")),
+        )
     }
 }
 
@@ -849,5 +853,25 @@ mod tests {
         let json: serde_json::Value = serde_json::to_value(&resp).unwrap();
         assert_eq!(json["cursor"], 7);
         assert_eq!(json["added_ids"], serde_json::json!(["abc-123"]));
+    }
+
+    // ── get_info / serverInfo identity ─────────────────────────────
+
+    #[test]
+    fn get_info_server_title_and_description() {
+        use rmcp::ServerHandler;
+        let server = test_server();
+        let info = server.get_info();
+        let si = &info.server_info;
+        assert_eq!(si.name, "foray");
+        assert_eq!(si.version, env!("CARGO_PKG_VERSION"));
+        assert_eq!(
+            si.title.as_deref(),
+            Some("Foray — Persistent Journals for AI Agents")
+        );
+        assert_eq!(
+            si.description.as_deref(),
+            Some(env!("CARGO_PKG_DESCRIPTION"))
+        );
     }
 }

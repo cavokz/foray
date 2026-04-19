@@ -7,7 +7,7 @@ A **Rust MCP server + CLI** that gives any AI assistant persistent, forkable jou
 
 ## Positioning
 
-**Problem**: AI assistants lose context between sessions. When a conversation ends, findings, decisions, and in-progress work vanish. When work branches into multiple directions, there's no way to explore one without losing the other. And when multiple assistants work across different environments — backend in one client, frontend in another — their context stays siloed.
+**Problem**: AI assistants lose context between sessions. When a conversation ends, findings, decisions, and in-progress work vanish. When work branches into multiple directions, there's no way to explore one without losing the other. And when multiple assistants — or people — work across clients and machines, their context stays siloed.
 
 **Solution**: foray gives AI assistants a persistent, forkable journal backed by a pluggable store. Start a journal, record items as you work, fork when it branches, pick it back up in any session or client. Because the default store uses plain JSON files, multiple assistants across different clients and environments can read and write to the same journal simultaneously. This is cross-client context fusion.
 
@@ -21,6 +21,7 @@ A **Rust MCP server + CLI** that gives any AI assistant persistent, forkable jou
 - **Persistent context** — findings, decisions, and work-in-progress survive across sessions, windows, and clients
 - **Forking with lineage** — branch work without losing the original thread; compare paths side-by-side
 - **Human-editable** — default store uses pretty-printed JSON you can `cat`, `jq`, `grep`, hand-edit
+- **Distributable** — local JSON store today; SSH and team backends planned, so intelligence isn't trapped on one machine
 - **Radically simple** — 4 tools, single binary, no database, no daemon
 - **Forward-compatible** — strict schema with `meta` fields for client-specific data; the skill evolves without binary changes
 
@@ -133,6 +134,19 @@ Unknown fields are rejected (`deny_unknown_fields`). The `meta` field on both `J
 - **Dev deps**: tempfile
 
 ## MCP Server — fully stateless
+
+### Server Identity (initialize response)
+
+The `initialize` response includes `serverInfo` with:
+
+| Field | Value |
+|-------|-------|
+| `name` | `"foray"` |
+| `version` | `CARGO_PKG_VERSION` (e.g. `"0.3.0"`) |
+| `title` | `"Foray — Persistent Journals for AI Agents"` |
+| `description` | `CARGO_PKG_DESCRIPTION` (from `Cargo.toml`) |
+
+`title` is the human-readable display name shown by MCP clients (e.g. VS Code MCP server list). `description` is the crates.io package description.
 
 ### Server Instructions (bootstrap)
 Sent to every client on initialization via the MCP `instructions` field:
