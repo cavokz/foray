@@ -37,7 +37,9 @@ Then direct your AI assistant to fetch the [Setup Guide](https://raw.githubuserc
 | `hello` | Handshake — call first every session, returns `{version, nuance}` |
 | `open_journal` | Create, fork, or reopen a journal |
 | `sync_journal` | Read and/or write items (cursor-based) |
-| `list_journals` | List active journals |
+| `list_journals` | List active or archived journals |
+| `archive_journal` | Archive a journal (readable but not writable) |
+| `unarchive_journal` | Restore an archived journal |
 
 ## MCP Prompts
 

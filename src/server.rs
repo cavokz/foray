@@ -38,6 +38,36 @@ fn deserialize_tags<'de, D: Deserializer<'de>>(
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
+pub struct ArchiveJournalParams {
+    /// Journal name to archive
+    pub name: String,
+    /// Store name from `hello` stores list — required
+    #[serde(default)]
+    #[schemars(required)]
+    pub store: Option<String>,
+    /// Nuance token from `hello` — must match current server nuance
+    #[serde(default)]
+    #[schemars(required)]
+    pub nuance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UnarchiveJournalParams {
+    /// Journal name to unarchive
+    pub name: String,
+    /// Store name from `hello` stores list — required
+    #[serde(default)]
+    #[schemars(required)]
+    pub store: Option<String>,
+    /// Nuance token from `hello` — must match current server nuance
+    #[serde(default)]
+    #[schemars(required)]
+    pub nuance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
 pub struct OpenJournalParams {
     /// Journal name ([a-z0-9_-], max 64 chars)
     pub name: String,
@@ -112,6 +142,9 @@ pub struct ListJournalsParams {
     /// Number of journals to skip
     #[serde(default)]
     pub offset: Option<usize>,
+    /// List archived journals instead of active ones
+    #[serde(default)]
+    pub archived: bool,
     /// Store name from `hello` stores list — required
     #[serde(default)]
     #[schemars(required)]
@@ -525,7 +558,7 @@ impl ForayServer {
 
     #[tool(
         name = "list_journals",
-        description = "List active journals. Paginated: defaults to first 500."
+        description = "List journals. Pass `archived: true` to list archived journals instead of active ones. Paginated: defaults to first 500."
     )]
     async fn list_journals(
         &self,
@@ -538,7 +571,7 @@ impl ForayServer {
             offset: args.offset,
         };
         let (summaries, total) = store
-            .list(&pagination, false)
+            .list(&pagination, args.archived)
             .await
             .map_err(Self::store_err)?;
 
@@ -556,6 +589,40 @@ impl ForayServer {
         Ok(CallToolResult::success(vec![Content::text(
             serde_json::to_string(&resp).unwrap(),
         )]))
+    }
+
+    #[tool(
+        name = "archive_journal",
+        description = "Archive a journal. Archived journals are readable but not writable. Use `unarchive_journal` to restore."
+    )]
+    async fn archive_journal(
+        &self,
+        Parameters(args): Parameters<ArchiveJournalParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        self.preflight(args.nuance.as_deref())?;
+        let store = self.resolve_store(args.store.as_deref())?;
+        let id = store.archive(&args.name).await.map_err(Self::store_err)?;
+        Ok(CallToolResult::success(vec![Content::text(format!(
+            "{{\"archived\": \"{}\", \"id\": \"{}\"}}",
+            args.name, id
+        ))]))
+    }
+
+    #[tool(
+        name = "unarchive_journal",
+        description = "Unarchive a previously archived journal, making it writable again."
+    )]
+    async fn unarchive_journal(
+        &self,
+        Parameters(args): Parameters<UnarchiveJournalParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        self.preflight(args.nuance.as_deref())?;
+        let store = self.resolve_store(args.store.as_deref())?;
+        let id = store.unarchive(&args.name).await.map_err(Self::store_err)?;
+        Ok(CallToolResult::success(vec![Content::text(format!(
+            "{{\"unarchived\": \"{}\", \"id\": \"{}\"}}",
+            args.name, id
+        ))]))
     }
 }
 

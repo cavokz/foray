@@ -177,7 +177,7 @@ impl Store for JsonFileStore {
         Ok(self.find(name).is_some())
     }
 
-    async fn archive(&self, name: &str) -> Result<(), StoreError> {
+    async fn archive(&self, name: &str) -> Result<String, StoreError> {
         let active = self.journal_path(name);
         if !active.exists() {
             if self.archive_path(name).exists() {
@@ -185,25 +185,28 @@ impl Store for JsonFileStore {
             }
             return Err(StoreError::NotFound(name.into()));
         }
+        let id = self.read_journal(&active)?.id;
         let dest = self.archive_path(name);
         if let Some(parent) = dest.parent() {
             fs::create_dir_all(parent)?;
         }
         fs::rename(active, dest)?;
-        Ok(())
+        Ok(id)
     }
 
-    async fn unarchive(&self, name: &str) -> Result<(), StoreError> {
+    async fn unarchive(&self, name: &str) -> Result<String, StoreError> {
         let archived = self.archive_path(name);
         if !archived.exists() {
             if self.journal_path(name).exists() {
-                return Ok(());
+                let id = self.read_journal(&self.journal_path(name))?.id;
+                return Ok(id);
             }
             return Err(StoreError::NotFound(name.into()));
         }
+        let id = self.read_journal(&archived)?.id;
         let dest = self.journal_path(name);
         fs::rename(archived, dest)?;
-        Ok(())
+        Ok(id)
     }
 }
 
@@ -369,7 +372,15 @@ mod tests {
             .await
             .unwrap();
 
-        store.archive("arch-test").await.unwrap();
+        let (j, _) = store
+            .load("arch-test", &Pagination::default())
+            .await
+            .unwrap();
+        let expected_id = j.id.clone();
+
+        let archived_id = store.archive("arch-test").await.unwrap();
+        assert_eq!(archived_id, expected_id);
+
         let (loaded, _) = store
             .load("arch-test", &Pagination::default())
             .await
@@ -379,14 +390,62 @@ mod tests {
             store.add_items("arch-test", vec![make_item("x")]).await,
             Err(StoreError::Archived(_))
         ));
-        let (archived, _) = store.list(&Pagination::default(), true).await.unwrap();
-        assert_eq!(archived.len(), 1);
+        let (archived_list, _) = store.list(&Pagination::default(), true).await.unwrap();
+        assert_eq!(archived_list.len(), 1);
         let (active, _) = store.list(&Pagination::default(), false).await.unwrap();
         assert_eq!(active.len(), 0);
 
-        store.unarchive("arch-test").await.unwrap();
+        let unarchived_id = store.unarchive("arch-test").await.unwrap();
+        assert_eq!(unarchived_id, expected_id);
         let (active, _) = store.list(&Pagination::default(), false).await.unwrap();
         assert_eq!(active.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn archive_already_archived_errors() {
+        let (store, _dir) = make_store();
+        store
+            .create(JournalFile::new("to-archive", Some("A".into()), None))
+            .await
+            .unwrap();
+        store.archive("to-archive").await.unwrap();
+        assert!(matches!(
+            store.archive("to-archive").await,
+            Err(StoreError::Archived(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn archive_not_found_errors() {
+        let (store, _dir) = make_store();
+        assert!(matches!(
+            store.archive("missing").await,
+            Err(StoreError::NotFound(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn unarchive_already_active_returns_id() {
+        let (store, _dir) = make_store();
+        store
+            .create(JournalFile::new("active", Some("A".into()), None))
+            .await
+            .unwrap();
+        let (j, _) = store.load("active", &Pagination::default()).await.unwrap();
+        let id = store.unarchive("active").await.unwrap();
+        assert_eq!(id, j.id);
+        // still active
+        let (active, _) = store.list(&Pagination::default(), false).await.unwrap();
+        assert_eq!(active.len(), 1);
+    }
+
+    #[tokio::test]
+    async fn unarchive_not_found_errors() {
+        let (store, _dir) = make_store();
+        assert!(matches!(
+            store.unarchive("missing").await,
+            Err(StoreError::NotFound(_))
+        ));
     }
 
     #[tokio::test]
