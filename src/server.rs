@@ -146,6 +146,7 @@ struct OpenJournalResponse {
 
 #[derive(Serialize)]
 struct SyncJournalResponse {
+    id: String,
     name: String,
     title: Option<String>,
     items: Vec<serde_json::Value>,
@@ -503,6 +504,7 @@ impl ForayServer {
         let cursor = after + items.len();
 
         let resp = SyncJournalResponse {
+            id: journal.id,
             name: journal.name,
             title: journal.title,
             items,
@@ -843,6 +845,7 @@ mod tests {
     #[test]
     fn sync_response_cursor_and_added_ids_present() {
         let resp = SyncJournalResponse {
+            id: "test-id-1234".into(),
             name: "my-journal".into(),
             title: Some("My Journal".into()),
             items: vec![],
@@ -851,6 +854,7 @@ mod tests {
             total: 7,
         };
         let json: serde_json::Value = serde_json::to_value(&resp).unwrap();
+        assert!(json["id"].as_str().is_some());
         assert_eq!(json["cursor"], 7);
         assert_eq!(json["added_ids"], serde_json::json!(["abc-123"]));
     }

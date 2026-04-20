@@ -211,7 +211,7 @@ Errors may include a `data` field with a `hint` key to guide callers:
 ### Tool response formats
 - `hello` → `{ version, nuance, stores: [{name, description}] }` (e.g. `{ "version": "1.2.3", "nuance": "abc123", "stores": [{"name": "local", "description": "Default local journal store"}] }`)
 - `open_journal` → `{ name, title, item_count, created }` (`created: bool` — true if new)
-- `sync_journal` → `{ name, title, items: [...], added_ids: [...], cursor, total }` (`cursor` is the position for the next call, `added_ids` lists IDs assigned to items added by this call in order)
+- `sync_journal` → `{ id, name, title, items: [...], added_ids: [...], cursor, total }` (`id` is the journal's immutable ID, `cursor` is the position for the next call, `added_ids` lists IDs assigned to items added by this call in order)
 - `list_journals` → `{ journals: [{ name, title, item_count, meta }], total, limit, offset }`
 
 ## CLI Commands
