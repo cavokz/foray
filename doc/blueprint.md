@@ -1,7 +1,7 @@
 # Blueprint: foray — Persistent Journals via MCP
 
 ## TL;DR
-A **Rust MCP server + CLI** that gives any AI assistant persistent, forkable journals. Fully stateless server — every tool takes an explicit journal name. Pluggable journal store (ships with `JsonFileStore` at `~/.foray/journals/*.json`). CLI resolves journal via `--journal` flag > `FORAY_JOURNAL` env > `.forayrc` walk-up.
+A **Rust MCP server + CLI** that gives any AI assistant persistent, forkable journals. Fully stateless server — every tool takes an explicit journal name. Pluggable journal store (ships with `JsonFileStore` at `~/.foray/journals/*.json`). CLI resolves journal via `--journal` flag > `FORAY_JOURNAL` env > `.forayrc` walk-up; store via `--store` flag > `FORAY_STORE` env > `.forayrc current-store` > registry default.
 
 **Tagline:** *"Start with a foray. Fork it when it branches. Keep the trail."*
 
@@ -14,7 +14,7 @@ A **Rust MCP server + CLI** that gives any AI assistant persistent, forkable jou
 **Use cases**: debugging and investigation, architecture design and planning, feature development across sessions, team stand-ups (shared journal per team, each assistant contributes updates), research, and any work that spans multiple conversations or needs to be handed off.
 
 **Two-layer architecture**:
-- **The binary** (infrastructure) — a minimal Rust MCP server + CLI. 4 tools, pluggable journal store, stateless. Rarely changes. Ships via `cargo install` or prebuilt binaries.
+- **The binary** (infrastructure) — a minimal Rust MCP server + CLI. 6 tools, pluggable journal store, stateless. Rarely changes. Ships via `cargo install` or prebuilt binaries.
 - **The companion skill** (product) — an agent skill that teaches the AI *when* and *how* to use journals. Evolves independently as prompting patterns improve. Self-updates from GitHub.
 
 **Why this matters**:
@@ -22,7 +22,7 @@ A **Rust MCP server + CLI** that gives any AI assistant persistent, forkable jou
 - **Forking with lineage** — branch work without losing the original thread; compare paths side-by-side
 - **Human-editable** — default store uses pretty-printed JSON you can `cat`, `jq`, `grep`, hand-edit
 - **Distributable** — local JSON store today; SSH and team backends planned, so intelligence isn't trapped on one machine
-- **Radically simple** — 4 tools, single binary, no database, no daemon
+- **Radically simple** — 6 tools, single binary, no database, no daemon
 - **Forward-compatible** — strict schema with `meta` fields for client-specific data; the skill evolves without binary changes
 
 ## Architecture
@@ -48,7 +48,9 @@ Any MCP Client (VS Code, Claude Desktop, Cursor, ...)
                   (cross-client context fusion)
 
 CLI journal resolution:
-  --journal flag > FORAY_JOURNAL env > .forayrc walk-up > error
+  --journal flag > FORAY_JOURNAL env > .forayrc current-journal > error
+CLI store resolution:
+  --store flag > FORAY_STORE env > .forayrc current-store > registry default (single-store) or error
 ```
 
 ## Core Abstractions
@@ -66,17 +68,20 @@ No project concept. No global active state.
 | Surface | Mechanism | Set by |
 |---------|-----------|--------|
 | **MCP server** | Fully stateless — every tool takes explicit journal name | N/A |
-| **CLI** | Resolution chain: `--journal` > `FORAY_JOURNAL` > `.forayrc` walk-up > error | User / `foray open` |
+| **CLI journal** | Resolution chain: `--journal` > `FORAY_JOURNAL` > `.forayrc current-journal` walk-up > error | User / `foray open` |
+| **CLI store** | Resolution chain: `--store` > `FORAY_STORE` > `.forayrc current-store` walk-up > registry default (single-store) or error | User / `foray open` |
 
 ### `.forayrc` (TOML)
 ```toml
 current-journal = "auth-triage"
+current-store = "remote"
 root = true
 ```
 - `current-journal` — optional, journal name for CLI resolution
+- `current-store` — optional, store name for CLI resolution; written by `foray open --store <name>`
 - `root = true` — optional, stops the upward directory walk
-- First `.forayrc` with `current-journal` wins; `root = true` halts the walk regardless
-- `foray open` writes/updates `current-journal` in `.forayrc` in current directory
+- First `.forayrc` with the relevant key wins; `root = true` halts the walk regardless
+- `foray open` writes/updates `current-journal` (and `current-store` when `--store` was given) in `.forayrc` in current directory
 - Users can `.gitignore` or commit it
 
 ## Storage (default: `JsonFileStore`)
@@ -129,9 +134,10 @@ Unknown fields are rejected (`deny_unknown_fields`). The `meta` field on both `J
 
 ## Tech Stack
 - **Language**: Rust
-- **MCP SDK**: `rmcp` v1.4.0 (server, macros, transport-io)
-- **Deps**: tokio (rt, macros, sync, time — current_thread flavor), serde/serde_json, rand, chrono, dirs 6, fs2, anyhow, thiserror 2, clap (derive), toml
+- **MCP SDK**: `rmcp` v1.4.0 (server, client, macros, transport-io, transport-child-process)
+- **Deps**: tokio (rt, macros, sync, time — current_thread flavor), serde/serde_json, rand, chrono, dirs 6, fs2, anyhow, thiserror 2, clap (derive), toml, async-trait
 - **Dev deps**: tempfile
+- `async-trait` used on `trait Store` for `dyn Store` object safety with async methods. `rmcp` client + transport-child-process features enable `StdioStore` to act as an MCP client that tunnels over a subprocess stdio channel.
 
 ## MCP Server — fully stateless
 
@@ -168,14 +174,16 @@ Predefined prompt templates for basic workflows. Any MCP client discovers them a
 
 Prompts are the fallback for LLMs without the companion skill. They provide just enough guidance to use the tools correctly.
 
-### MCP Tools (4 tools)
+### MCP Tools (6 tools)
 
 | Tool | Params | Description |
 |------|--------|-------------|
 | `hello` | *(none)* | Establish handshake. Returns `{ version, nuance, stores }`. Always call first — every session — then pass `nuance` and `store` on subsequent calls. |
 | `open_journal` | `name`, `title?`, `fork?`, `meta?`, `store`, `nuance` | Create, fork, or reopen a journal. `title` is required when creating or forking (error if missing), ignored when reopening. `fork` specifies source journal name. Idempotent if exists without `fork`. `meta` sets journal-level metadata. `store` must be a name from the `hello` response. |
 | `sync_journal` | `name`, `cursor?`, `limit?`, `items?`, `store`, `nuance` | Read and write journal items in one call. Returns items since cursor position. `cursor` is the position from the previous sync (omit for full read). `items` is an array of `{ content, item_type?, ref?, tags?, meta? }`. `limit` caps returned items (does not affect additions). Returns `cursor` for the next call and `added_ids` for items added by this call. `store` must be a name from the `hello` response. |
-| `list_journals` | `limit?`, `offset?`, `store`, `nuance` | List active journals in the selected store. Paginated: defaults to all. |
+| `list_journals` | `limit?`, `offset?`, `archived?`, `store`, `nuance` | List journals in the selected store. Pass `archived: true` to list archived journals instead of active ones. Paginated: defaults to all. |
+| `archive_journal` | `name`, `store`, `nuance` | Archive a journal. Archived journals are readable but not writable. |
+| `unarchive_journal` | `name`, `store`, `nuance` | Restore an archived journal, making it writable again. |
 
 All tools return JSON. No in-memory state. Every tool that operates on a journal takes an explicit name parameter.
 
@@ -204,6 +212,8 @@ Errors may include a `data` field with a `hint` key to guide callers:
 |-----------|-----------|-------------|
 | `nuance` missing or wrong | `invalid_params` | `"call 'hello' to get the current nuance"` |
 | Journal not found | `invalid_params` | `"call 'list_journals' to see available journals"` |
+| Journal already exists | `invalid_params` | `"use a different name or load the existing journal"` |
+| Journal is archived | `invalid_params` | `"call 'unarchive_journal' to restore it"` |
 | `store` missing | `invalid_params` | `"pass a store name from the hello response, available stores: <names>"` |
 | Unknown store name | `invalid_params` | `"available stores: <names>"` |
 | Other store errors | `internal_error` | *(none)* |
@@ -211,8 +221,10 @@ Errors may include a `data` field with a `hint` key to guide callers:
 ### Tool response formats
 - `hello` → `{ version, nuance, stores: [{name, description}] }` (e.g. `{ "version": "1.2.3", "nuance": "abc123", "stores": [{"name": "local", "description": "Default local journal store"}] }`)
 - `open_journal` → `{ name, title, item_count, created }` (`created: bool` — true if new)
-- `sync_journal` → `{ name, title, items: [...], added_ids: [...], cursor, total }` (`cursor` is the position for the next call, `added_ids` lists IDs assigned to items added by this call in order)
-- `list_journals` → `{ journals: [{ name, title, item_count, meta }], total, limit, offset }`
+- `sync_journal` → `{ id, name, title, items: [...], added_ids: [...], cursor, total }` (`id` is the journal's immutable ID, `cursor` is the position for the next call, `added_ids` lists IDs assigned to items added by this call in order)
+- `list_journals` → `{ journals: [{ name, title, item_count, meta }], total, limit, offset }` (pass `archived: true` to list archived journals)
+- `archive_journal` → `{ archived: "<name>", id: "<id>" }`
+- `unarchive_journal` → `{ unarchived: "<name>", id: "<id>" }`
 
 ## CLI Commands
 
@@ -221,14 +233,14 @@ foray serve                          # Start MCP stdio server
 foray show [name] [--json] [--limit N] [--offset N]  # Full journal with items
 foray add <content> [--type TYPE] [--ref FILE] [--tags CSV] [--meta KEY=VALUE]...
 foray open <name> [--title "..."] [--fork [SOURCE]] [--meta KEY=VALUE]...  # Create or fork. --title required for new/fork. --fork without SOURCE forks from active journal.
-foray list [--json] [--tree] [--archived] [--limit N] [--offset N]  # List journals. --tree shows fork lineage. --archived shows archived.
+foray list [--json] [--tree] [--archived] [--limit N] [--offset N]  # List journals. --tree shows fork lineage. --archived shows archived. --json outputs {"total": N, "journals": [...]}
 foray archive <name>                   # Archive a journal
 foray unarchive <name>                 # Unarchive a journal
 foray export <name> [--file PATH]       # Export journal JSON to stdout (or file)
 foray import [--file PATH]              # Import journal JSON from stdin (or file)
 ```
 
-Global option: `--journal <name>` on all commands (overrides env + .forayrc).
+Global options: `--journal <name>` and `--store <name>` on all commands (override env + .forayrc).
 
 `open` creates the journal (or forks if `--fork`), writes `.forayrc` in cwd.
 - `foray open deep-dive --title "Explore DB connection pooling theory"` → create empty journal, write `.forayrc`
@@ -241,11 +253,18 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 3. `.forayrc` file found walking up from cwd
 4. Error with helpful message listing the three options
 
+**Store resolution for CLI**:
+1. `--store` flag if provided
+2. `FORAY_STORE` env var if set
+3. `.forayrc current-store` found walking up from cwd
+4. Registry default if only one store is configured
+5. Error with available store names if multiple stores and none selected
+
 ## Steps
 
 ### Phase 1: Scaffold
 1. `cargo init .` — set up `Cargo.toml` with all deps
-2. Module structure: `lib.rs` (re-exports), `types.rs`, `store.rs`, `tree.rs`, `server.rs`, `cli.rs`, `main.rs`
+2. Module structure: `lib.rs` (re-exports), `types.rs`, `store.rs`, `store_json.rs`, `store_stdio.rs`, `tree.rs`, `server.rs`, `cli.rs`, `main.rs`
 
 ### Phase 2: Types + Store
 1. `types.rs`:
@@ -257,10 +276,10 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
    - Both `JournalFile` and `JournalItem` get `#[serde(deny_unknown_fields)]` and `meta: Option<HashMap<String, serde_json::Value>>` for client-specific extensibility
    - `validate_name()` for journal name validation
 2. `store.rs`:
-   - `trait Store: Send + Sync` with: `load(name, pagination) -> (JournalFile, total)`, `create`, `add_items(name, Vec<JournalItem>)`, `list(pagination, archived) -> (Vec<JournalSummary>, total)`, `delete`, `exists`, `archive`, `unarchive`
+   - `#[async_trait] trait Store: Send + Sync` with async methods: `load(name, pagination) -> (JournalFile, total)`, `create`, `add_items(name, Vec<JournalItem>)`, `list(pagination, archived) -> (Vec<JournalSummary>, total)`, `delete`, `exists`, `archive`, `unarchive`
    - `load` reads both active and archived journals (always readable).
    - `add_items` errors if the journal is archived.
-   - `archive(name)` marks a journal as archived; `unarchive(name)` restores it.
+   - `archive(name) -> Result<String>` marks a journal as archived and returns the journal id; `unarchive(name) -> Result<String>` restores it and returns the journal id. `unarchive` on an already-active journal is idempotent (returns id). `archive` on an already-archived journal returns `StoreError::Archived`.
    - `list(archived: bool)` returns active journals by default, archived when `archived = true`.
    - Pagination pushed down to the trait so backends (Elasticsearch, etc.) can handle it natively. `JsonFileStore` reads the full file and slices in memory — the cost is trivial compared to the LLM API call that follows. Pagination controls how much data the LLM receives, not I/O efficiency.
    - `JsonFileStore::new(base_dir)` — flat `~/.foray/journals/*.json`
@@ -269,12 +288,13 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
    - Custom `StoreError` enum
 3. Free functions: `fork_journal(store, source, new_name, title)`
 4. `config.rs` — `StoreRegistry` and config parsing:
-   - Parses `~/.foray/config.toml` with `[stores.<name>]` sections; `type = "json_file"` is the only backend; each entry has required `path` and `description` fields
+   - Parses `~/.foray/config.toml` with `[stores.<name>]` sections; two backends: `type = "json_file"` (`path`, `description`) and `type = "foray_stdio"` (`command`, `args`, `description`, `store?`). `StdioStore` always appends `serve` to the configured command, so `args` contains only transport arguments — e.g. for SSH: `command = "ssh"`, `args = ["user@host", "--", "foray"]` → spawns `ssh user@host -- foray serve`
    - Falls back to implicit `local` `JsonFileStore` at `~/.foray/journals/` when config is absent or has no stores
    - `StoreRegistry` holds a `Vec<StoreEntry>` (name, description, `Arc<dyn Store>`) and a `nuance: String`
-   - `nuance` is a FNV-1a hash of sorted `"name=path"` fingerprints — deterministic, stable across restarts, changes when config changes
+   - `nuance` is a FNV-1a hash of sorted fingerprints (`"name=path"` for json_file, `"name=command arg0 …"` for foray_stdio) — deterministic, stable across restarts, changes when config changes
    - `StoreRegistry::get(name)` — look up by name; `default_store()` — first entry; `names_hint()` — comma-joined names for error messages
    - `StoreRegistry::load()` — public constructor; `StoreRegistry::implicit_local()` — fallback constructor
+5. `store_stdio.rs` — `StdioStore`: spawns subprocess via rmcp `TokioChildProcess`, performs MCP `initialize` handshake via `serve_client`, caches remote `nuance` + `store_name` obtained from `hello`. All `Store` trait methods map to MCP tool calls (`open_journal`, `sync_journal`, `list_journals`, `archive_journal`, `unarchive_journal`). Connection is lazily established and cached in `Mutex<Option<Connection>>`; `Peer<RoleClient>` is cloned out before `.await` to avoid holding the lock across the await point.
 
 ### Phase 3: Tree
 1. `tree.rs` — `build_tree(journals) -> String` — ASCII tree for CLI `--tree` flag. Scans items for `type: fork` with `foray:` refs to determine lineage.
@@ -284,19 +304,21 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 2. `resolve_store(store_name: Option<&str>)` — returns `invalid_params` error (with store names hint) if `None` (`store` is required); else calls `registry.get(name)` or `invalid_params` error with store names hint if unknown.
 3. Server `instructions` field — bootstrap hint pointing to SETUP.md (raw URL) for per-client skill install paths and setup guidance.
 4. 3 MCP prompts: `start_journal`, `resume_journal`, `summarize`.
-5. 4 tools via `#[tool_router]`. Every tool that operates on a journal takes explicit `name`, `store`, and `nuance` params.
+5. 8 tools via `#[tool_router]`. Every tool that operates on a journal takes explicit `name`, `store`, and `nuance` params. Tools that take a journal `name` (`open_journal`, `sync_journal`, `archive_journal`, `unarchive_journal`) validate it with `validate_name()` and return `invalid_params` on violation before any store access.
 6. `open_journal` implements the behavior matrix (create / fork / idempotent / error).
 
 ### Phase 5: CLI + Main *(parallel with Phase 4)*
-1. `cli.rs` — clap derive subcommands. Global `--journal` option. `--fork [SOURCE]` on `open`.
-2. `resolve_journal(cli_flag, env, cwd) -> Result<String>` — the resolution chain.
-3. `find_forayrc(start_dir) -> Option<String>` — walk up from cwd looking for `.forayrc`, parse TOML, return `current-journal` value. Stop at `root = true` or filesystem root.
-4. `main.rs` — parse CLI, construct `JsonFileStore`, route subcommands. `serve` → MCP server. Everything else → resolve journal via chain, call store, format output.
-5. `open` handler: create/fork journal, write `.forayrc` in cwd.
+1. `cli.rs` — clap derive subcommands. Global `--journal` and `--store` options. `--fork [SOURCE]` on `open`.
+2. `resolve_journal(cli_flag, explicit_name) -> Result<String>` — the resolution chain.
+3. `resolve_store<'a>(registry, cli_flag) -> Result<&'a dyn Store>` — `--store` > `FORAY_STORE` > `.forayrc current-store` > registry default (single-store) or error.
+4. `find_forayrc(start_dir) -> Option<String>` — walk up from cwd looking for `.forayrc`, parse TOML, return `current-journal` value. Stop at `root = true` or filesystem root.
+5. `find_store_in_forayrc(start_dir) -> Option<String>` — same walk, returns `current-store` value.
+6. `main.rs` — parse CLI, load `StoreRegistry`, call `resolve_store()`, route subcommands. `serve` → MCP server. Everything else → resolve journal + store via chains, call store, format output.
+7. `open` handler: create/fork journal, write `.forayrc` in cwd (includes `current-store` if `--store` was passed).
 
 ### Phase 6: Setup Guide + Companion Skill + README + Config
 
-**Architecture**: The binary is the stable platform (4 MCP tools, pluggable journal store). The companion skill is the evolving product (behavioral rules, use case patterns). The setup guide bootstraps everything.
+**Architecture**: The binary is the stable platform (6 MCP tools, pluggable journal store). The companion skill is the evolving product (behavioral rules, use case patterns). The setup guide bootstraps everything.
 
 1. `SETUP.md` — LLM-oriented setup guide (not a skill, a one-time instruction document). User downloads it from GitHub and directs each AI assistant to read it and follow the steps for itself. The guide is split into two sections:
     - **Step 1 (one-time)**: binary installation — check if `foray` is on PATH (`foray --version`). If not: download a prebuilt binary from GitHub releases or `cargo install foray`. The AI confirms with the user before attempting.
@@ -379,14 +401,14 @@ Global option: `--journal <name>` on all commands (overrides env + .forayrc).
 - Store trait is pure CRUD — no session/active state
 - Journal creation requires explicit `open_journal` — `sync_journal` with items to non-existent journal is an error
 - Companion skill encodes behavioral rules (suggest existing journals, stop writing to source after fork)
-- **Binary = stable platform, skill = evolving product**: binary rarely changes (4 tools, storage), skill evolves with better prompting and use case patterns. Distributed independently.
+- **Binary = stable platform, skill = evolving product**: binary rarely changes (6 tools, storage), skill evolves with better prompting and use case patterns. Distributed independently.
 - **No `foray skill` command**: companion skill is downloaded from GitHub, not embedded in binary
 - **Skill versioning**: no version field in the skill file — the content *is* the version. LLM fetches `update-url`, diffs against local, summarizes changes, offers to update. `requires` in frontmatter ensures binary compatibility.
 - **Setup guide (`SETUP.md`)**: one-time LLM-oriented instructions. User never clones the repo.
 - Rust with official `rmcp` SDK, stdio transport, pluggable journal store (ships with `JsonFileStore`: JSON files, atomic writes)
 - **Out of scope**: UI, auto-summarization, remote sync, `edit_item` tool, `remove_item` tool
 - **Append-only journals**: wrong findings are corrected by adding a new item, not deleting. Preserves the trail, prevents re-exploring dead ends, avoids cross-client conflicts.
-- **Archive**: CLI-only (no MCP tool). Archived journals are readable but not writable (`sync_journal` with items/`open` with create/fork error). `unarchive` to resume. `JsonFileStore` implements this by moving files to an `archive/` subdirectory.
+- **Archive**: MCP tools `archive_journal` and `unarchive_journal` (also available via CLI). Archived journals are readable but not writable (`sync_journal` with items/`open` with create/fork error). `unarchive_journal` to restore. `list_journals` with `archived: true` lists archived journals. `JsonFileStore` implements this by moving files to an `archive/` subdirectory. `StdioStore` implements all archive operations via MCP tool calls.
 - **Companion skill**: `user-invocable: false` so it's auto-triggered by the agent, not a slash command — the whole point is zero-friction adoption
 - **Name**: "foray" — short, memorable, evocative of venturing into new territory. Tagline: "Start with a foray. Fork it when it branches. Keep the trail."
 - **Positioning**: Not "another memory tool" (100+ exist). The only MCP server where you can fork a journal and compare paths.

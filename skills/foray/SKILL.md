@@ -31,6 +31,8 @@ Use foray when the conversation involves **substantive, evolving work** — not 
 | `list_journals` | Check existing journals before creating |
 | `open_journal` | Create, fork, or reopen a journal |
 | `sync_journal` | Read items and/or add new ones (the workhorse) |
+| `archive_journal` | Archive a journal (readable but not writable) |
+| `unarchive_journal` | Restore an archived journal |
 
 ## Starting a Journal
 

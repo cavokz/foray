@@ -1,5 +1,6 @@
 use crate::config::StoreRegistry;
-use crate::store::{Store, StoreError, fork_journal};
+use crate::store::{Store, StoreError};
+use crate::store_json::fork_journal;
 use crate::types::{ItemType, JournalFile, JournalItem, Pagination, item_id, validate_name};
 use chrono::Utc;
 use rmcp::handler::server::wrapper::Parameters;
@@ -34,6 +35,36 @@ fn deserialize_tags<'de, D: Deserializer<'de>>(
 }
 
 // ── Tool parameter types ────────────────────────────────────────────
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct ArchiveJournalParams {
+    /// Journal name to archive
+    pub name: String,
+    /// Store name from `hello` stores list — required
+    #[serde(default)]
+    #[schemars(required)]
+    pub store: Option<String>,
+    /// Nuance token from `hello` — must match current server nuance
+    #[serde(default)]
+    #[schemars(required)]
+    pub nuance: Option<String>,
+}
+
+#[derive(Debug, Deserialize, JsonSchema)]
+#[serde(deny_unknown_fields)]
+pub struct UnarchiveJournalParams {
+    /// Journal name to unarchive
+    pub name: String,
+    /// Store name from `hello` stores list — required
+    #[serde(default)]
+    #[schemars(required)]
+    pub store: Option<String>,
+    /// Nuance token from `hello` — must match current server nuance
+    #[serde(default)]
+    #[schemars(required)]
+    pub nuance: Option<String>,
+}
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
@@ -111,6 +142,9 @@ pub struct ListJournalsParams {
     /// Number of journals to skip
     #[serde(default)]
     pub offset: Option<usize>,
+    /// List archived journals instead of active ones
+    #[serde(default)]
+    pub archived: bool,
     /// Store name from `hello` stores list — required
     #[serde(default)]
     #[schemars(required)]
@@ -146,6 +180,7 @@ struct OpenJournalResponse {
 
 #[derive(Serialize)]
 struct SyncJournalResponse {
+    id: String,
     name: String,
     title: Option<String>,
     items: Vec<serde_json::Value>,
@@ -272,6 +307,16 @@ impl ForayServer {
                     serde_json::json!({ "hint": "call 'list_journals' to see available journals" }),
                 ),
             ),
+            StoreError::AlreadyExists(name) => ErrorData::invalid_params(
+                format!("journal already exists: {name}"),
+                Some(
+                    serde_json::json!({ "hint": "use a different name or load the existing journal" }),
+                ),
+            ),
+            StoreError::Archived(name) => ErrorData::invalid_params(
+                format!("journal is archived: {name}"),
+                Some(serde_json::json!({ "hint": "call 'unarchive_journal' to restore it" })),
+            ),
             other => ErrorData::internal_error(other.to_string(), None),
         }
     }
@@ -341,7 +386,7 @@ impl ForayServer {
         validate_name(&args.name).map_err(|e| ErrorData::invalid_params(e, None))?;
         let store = self.resolve_store(args.store.as_deref())?;
 
-        let exists = store.exists(&args.name).map_err(Self::store_err)?;
+        let exists = store.exists(&args.name).await.map_err(Self::store_err)?;
 
         match (exists, &args.fork) {
             (false, None) => {
@@ -359,9 +404,9 @@ impl ForayServer {
                 }
                 validate_meta(&args.meta)?;
                 let journal = JournalFile::new(&args.name, Some(title), args.meta);
-                store.create(journal).map_err(Self::store_err)?;
+                store.create(journal).await.map_err(Self::store_err)?;
                 let p = Pagination::default();
-                let (j, _) = store.load(&args.name, &p).map_err(Self::store_err)?;
+                let (j, _) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
                 let resp = OpenJournalResponse {
                     name: j.name,
                     title: j.title,
@@ -387,6 +432,7 @@ impl ForayServer {
                 }
                 validate_meta(&args.meta)?;
                 let forked = fork_journal(store.as_ref(), source, &args.name, title, args.meta)
+                    .await
                     .map_err(Self::store_err)?;
                 let resp = OpenJournalResponse {
                     name: forked.name,
@@ -400,7 +446,7 @@ impl ForayServer {
             }
             (true, None) => {
                 let p = Pagination::default();
-                let (j, total) = store.load(&args.name, &p).map_err(Self::store_err)?;
+                let (j, total) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
                 let resp = OpenJournalResponse {
                     name: j.name,
                     title: j.title,
@@ -413,7 +459,7 @@ impl ForayServer {
             }
             (true, Some(source)) if *source == args.name => {
                 let p = Pagination::default();
-                let (j, total) = store.load(&args.name, &p).map_err(Self::store_err)?;
+                let (j, total) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
                 let resp = OpenJournalResponse {
                     name: j.name,
                     title: j.title,
@@ -479,12 +525,16 @@ impl ForayServer {
             }
             store
                 .add_items(&args.name, items_to_add)
+                .await
                 .map_err(Self::store_err)?;
         }
 
         // Load journal and apply cursor
         let all = Pagination::default();
-        let (journal, total) = store.load(&args.name, &all).map_err(Self::store_err)?;
+        let (journal, total) = store
+            .load(&args.name, &all)
+            .await
+            .map_err(Self::store_err)?;
 
         let after = args.cursor.unwrap_or(0);
         let items_slice = if after < journal.items.len() {
@@ -503,6 +553,7 @@ impl ForayServer {
         let cursor = after + items.len();
 
         let resp = SyncJournalResponse {
+            id: journal.id,
             name: journal.name,
             title: journal.title,
             items,
@@ -517,7 +568,7 @@ impl ForayServer {
 
     #[tool(
         name = "list_journals",
-        description = "List active journals. Paginated: defaults to first 500."
+        description = "List journals. Pass `archived: true` to list archived journals instead of active ones. Paginated: defaults to first 500."
     )]
     async fn list_journals(
         &self,
@@ -529,7 +580,10 @@ impl ForayServer {
             limit: Some(args.limit.unwrap_or(MAX_LIMIT).min(MAX_LIMIT)),
             offset: args.offset,
         };
-        let (summaries, total) = store.list(&pagination, false).map_err(Self::store_err)?;
+        let (summaries, total) = store
+            .list(&pagination, args.archived)
+            .await
+            .map_err(Self::store_err)?;
 
         let journals: Vec<serde_json::Value> = summaries
             .iter()
@@ -544,6 +598,41 @@ impl ForayServer {
         };
         Ok(CallToolResult::success(vec![Content::text(
             serde_json::to_string(&resp).unwrap(),
+        )]))
+    }
+
+    #[tool(
+        name = "archive_journal",
+        description = "Archive a journal. Archived journals are readable but not writable. Use `unarchive_journal` to restore."
+    )]
+    async fn archive_journal(
+        &self,
+        Parameters(args): Parameters<ArchiveJournalParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        self.preflight(args.nuance.as_deref())?;
+        validate_name(&args.name).map_err(|e| ErrorData::invalid_params(e, None))?;
+        let store = self.resolve_store(args.store.as_deref())?;
+        let id = store.archive(&args.name).await.map_err(Self::store_err)?;
+        Ok(CallToolResult::success(vec![Content::text(
+            serde_json::to_string(&serde_json::json!({ "archived": args.name, "id": id })).unwrap(),
+        )]))
+    }
+
+    #[tool(
+        name = "unarchive_journal",
+        description = "Unarchive a previously archived journal, making it writable again."
+    )]
+    async fn unarchive_journal(
+        &self,
+        Parameters(args): Parameters<UnarchiveJournalParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        self.preflight(args.nuance.as_deref())?;
+        validate_name(&args.name).map_err(|e| ErrorData::invalid_params(e, None))?;
+        let store = self.resolve_store(args.store.as_deref())?;
+        let id = store.unarchive(&args.name).await.map_err(Self::store_err)?;
+        Ok(CallToolResult::success(vec![Content::text(
+            serde_json::to_string(&serde_json::json!({ "unarchived": args.name, "id": id }))
+                .unwrap(),
         )]))
     }
 }
@@ -740,6 +829,124 @@ mod tests {
         assert_eq!(hint, Some("call 'list_journals' to see available journals"));
     }
 
+    #[test]
+    fn store_err_archived_is_invalid_params() {
+        let err = ForayServer::store_err(StoreError::Archived("my-journal".into()));
+        assert!(
+            err.message.contains("archived"),
+            "expected 'archived' in message, got: {}",
+            err.message
+        );
+        let hint = err.data.as_ref().and_then(|d| d["hint"].as_str());
+        assert_eq!(hint, Some("call 'unarchive_journal' to restore it"));
+    }
+
+    #[test]
+    fn store_err_already_exists_is_invalid_params() {
+        let err = ForayServer::store_err(StoreError::AlreadyExists("my-journal".into()));
+        assert!(
+            err.message.contains("already exists"),
+            "expected 'already exists' in message, got: {}",
+            err.message
+        );
+    }
+
+    // ── archive_journal / unarchive_journal ────────────────────────
+
+    #[test]
+    fn archive_journal_invalid_name_returns_error() {
+        // validate_name should reject path-traversal names before any store call
+        let result = crate::types::validate_name("../etc/passwd");
+        assert!(
+            result.is_err(),
+            "expected validate_name to reject traversal"
+        );
+    }
+
+    #[tokio::test]
+    async fn archive_and_unarchive_journal_roundtrip() {
+        let server = test_server();
+        let nuance = server.registry.nuance.clone();
+        let store = server.resolve_store(Some("local")).unwrap();
+
+        // Create a journal directly via the store.
+        store
+            .create(crate::types::JournalFile::new(
+                "arc-test",
+                Some("Arc Test".into()),
+                None,
+            ))
+            .await
+            .unwrap();
+
+        // Archive it.
+        let archive_args = Parameters(ArchiveJournalParams {
+            name: "arc-test".into(),
+            store: Some("local".into()),
+            nuance: Some(nuance.clone()),
+        });
+        let result = server.archive_journal(archive_args).await;
+        assert!(result.is_ok(), "archive_journal failed: {:?}", result.err());
+        let text = result.unwrap().content[0].as_text().unwrap().text.clone();
+        let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(json["archived"], "arc-test");
+        assert!(json["id"].as_str().is_some());
+
+        // Verify active list no longer contains it.
+        let (active, _) = store
+            .list(&crate::types::Pagination::default(), false)
+            .await
+            .unwrap();
+        assert!(!active.iter().any(|s| s.name == "arc-test"));
+
+        // Verify archived list contains it.
+        let (archived, _) = store
+            .list(&crate::types::Pagination::default(), true)
+            .await
+            .unwrap();
+        assert!(archived.iter().any(|s| s.name == "arc-test"));
+
+        // Unarchive it.
+        let unarchive_args = Parameters(UnarchiveJournalParams {
+            name: "arc-test".into(),
+            store: Some("local".into()),
+            nuance: Some(nuance.clone()),
+        });
+        let result = server.unarchive_journal(unarchive_args).await;
+        assert!(
+            result.is_ok(),
+            "unarchive_journal failed: {:?}",
+            result.err()
+        );
+        let text = result.unwrap().content[0].as_text().unwrap().text.clone();
+        let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+        assert_eq!(json["unarchived"], "arc-test");
+
+        // Verify it is active again.
+        let (active, _) = store
+            .list(&crate::types::Pagination::default(), false)
+            .await
+            .unwrap();
+        assert!(active.iter().any(|s| s.name == "arc-test"));
+    }
+
+    #[tokio::test]
+    async fn archive_nonexistent_journal_returns_store_err() {
+        let server = test_server();
+        let nuance = server.registry.nuance.clone();
+        let args = Parameters(ArchiveJournalParams {
+            name: "no-such-journal".into(),
+            store: Some("local".into()),
+            nuance: Some(nuance),
+        });
+        let result = server.archive_journal(args).await;
+        assert!(result.is_err());
+        assert!(
+            result.unwrap_err().message.contains("not found"),
+            "expected 'not found' error"
+        );
+    }
+
     // ── HelloResponse serialization ────────────────────────────────
 
     #[test]
@@ -843,6 +1050,7 @@ mod tests {
     #[test]
     fn sync_response_cursor_and_added_ids_present() {
         let resp = SyncJournalResponse {
+            id: "test-id-1234".into(),
             name: "my-journal".into(),
             title: Some("My Journal".into()),
             items: vec![],
@@ -851,6 +1059,7 @@ mod tests {
             total: 7,
         };
         let json: serde_json::Value = serde_json::to_value(&resp).unwrap();
+        assert!(json["id"].as_str().is_some());
         assert_eq!(json["cursor"], 7);
         assert_eq!(json["added_ids"], serde_json::json!(["abc-123"]));
     }

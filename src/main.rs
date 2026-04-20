@@ -1,15 +1,15 @@
 use clap::Parser;
-use foray::cli::{Cli, Commands};
+use foray::cli::{Cli, Commands, resolve_store};
 use foray::config::StoreRegistry;
 use foray::server::ForayServer;
-use foray::store::JsonFileStore;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
     let cli = Cli::parse();
 
+    let registry = StoreRegistry::load()?;
+
     if matches!(cli.command, Commands::Serve) {
-        let registry = StoreRegistry::load()?;
         let server = ForayServer::new(registry);
         let transport = rmcp::transport::io::stdio();
         let service = rmcp::serve_server(server, transport).await?;
@@ -17,7 +17,7 @@ async fn main() -> anyhow::Result<()> {
         return Ok(());
     }
 
-    let store = JsonFileStore::new(JsonFileStore::default_dir()?);
-    foray::cli::run(&cli, &store)?;
+    let store = resolve_store(&registry, cli.store.as_deref())?;
+    foray::cli::run(&cli, store).await?;
     Ok(())
 }
