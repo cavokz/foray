@@ -2,7 +2,7 @@ use clap::Parser;
 use foray::cli::{Cli, Commands};
 use foray::config::StoreRegistry;
 use foray::server::ForayServer;
-use foray::store::JsonFileStore;
+use foray::store_json::JsonFileStore;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {

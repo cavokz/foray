@@ -1,4 +1,5 @@
-use crate::store::{Store, fork_journal};
+use crate::store::Store;
+use crate::store_json::fork_journal;
 use crate::tree::{build_tree, extract_fork_infos};
 use crate::types::{ItemType, JournalFile, JournalItem, Pagination, item_id, validate_name};
 use chrono::Utc;

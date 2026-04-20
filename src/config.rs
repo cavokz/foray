@@ -1,4 +1,5 @@
-use crate::store::{JsonFileStore, Store, StoreError};
+use crate::store::{Store, StoreError};
+use crate::store_json::JsonFileStore;
 use serde::Deserialize;
 use std::collections::BTreeMap;
 use std::path::PathBuf;

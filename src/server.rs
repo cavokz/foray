@@ -1,5 +1,6 @@
 use crate::config::StoreRegistry;
-use crate::store::{Store, StoreError, fork_journal};
+use crate::store::{Store, StoreError};
+use crate::store_json::fork_journal;
 use crate::types::{ItemType, JournalFile, JournalItem, Pagination, item_id, validate_name};
 use chrono::Utc;
 use rmcp::handler::server::wrapper::Parameters;
