@@ -10,6 +10,8 @@ pub enum StoreError {
     AlreadyExists(String),
     #[error("journal is archived: {0}")]
     Archived(String),
+    #[error("journal schema {found} is too new (max supported: {max})")]
+    SchemaTooNew { found: u32, max: u32 },
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
     #[error("JSON error: {0}")]

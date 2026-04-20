@@ -1,3 +1,4 @@
+use crate::migrate;
 use chrono::{DateTime, Utc};
 use rand::Rng;
 use serde::{Deserialize, Serialize};
@@ -37,13 +38,14 @@ pub struct JournalItem {
 pub struct JournalFile {
     #[serde(skip_serializing_if = "Option::is_none")]
     pub _note: Option<String>,
+    /// Schema version. Always call [`crate::migrate::migrate`] before deserializing —
+    /// migration guarantees this field is present and at the current version.
+    pub schema: u32,
     pub id: String,
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
     pub items: Vec<JournalItem>,
-    pub created_at: DateTime<Utc>,
-    pub updated_at: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<HashMap<String, serde_json::Value>>,
 }
@@ -54,15 +56,13 @@ impl JournalFile {
         title: Option<String>,
         meta: Option<HashMap<String, serde_json::Value>>,
     ) -> Self {
-        let now = Utc::now();
         Self {
             _note: Some("Edit this file freely. Each file is self-contained.".into()),
+            schema: migrate::CURRENT_SCHEMA,
             id: journal_id(),
             name: name.to_string(),
             title,
             items: Vec::new(),
-            created_at: now,
-            updated_at: now,
             meta,
         }
     }

@@ -1,3 +1,4 @@
+use crate::migrate::{self, MigrateResult};
 use crate::store::{Store, StoreError};
 use crate::types::{
     ItemType, JournalFile, JournalItem, JournalSummary, Pagination, item_id, validate_name,
@@ -71,7 +72,20 @@ impl JsonFileStore {
 
     pub fn read_journal(&self, path: &Path) -> Result<JournalFile, StoreError> {
         let data = fs::read_to_string(path)?;
-        Ok(serde_json::from_str(&data)?)
+        let raw: serde_json::Value = serde_json::from_str(&data)?;
+        let value = match migrate::migrate(raw) {
+            MigrateResult::Current(v) | MigrateResult::Migrated(v) => v,
+            MigrateResult::TooNew { found, max } => {
+                return Err(StoreError::SchemaTooNew { found, max });
+            }
+            MigrateResult::Invalid => {
+                return Err(StoreError::Io(std::io::Error::new(
+                    std::io::ErrorKind::InvalidData,
+                    "journal file is not a JSON object",
+                )));
+            }
+        };
+        Ok(serde_json::from_value(value)?)
     }
 
     fn write_journal(&self, path: &Path, journal: &JournalFile) -> Result<(), StoreError> {
@@ -99,6 +113,12 @@ impl JsonFileStore {
             if path.extension().is_some_and(|e| e == "json") && path.is_file() {
                 match self.read_journal(&path) {
                     Ok(j) => journals.push(j),
+                    // Forward-compat: propagate schema-too-new so the caller
+                    // knows a newer-version journal exists rather than silently
+                    // omitting it from results.
+                    Err(e @ StoreError::SchemaTooNew { .. }) => return Err(e),
+                    // Other errors (corrupt JSON, permission denied, etc.) are
+                    // skipped so one bad file doesn't break the entire listing.
                     Err(_) => continue,
                 }
             }
@@ -143,7 +163,6 @@ impl Store for JsonFileStore {
         let _lock = self.with_lock(name)?;
         let mut journal = self.read_journal(&path)?;
         journal.items.extend(items);
-        journal.updated_at = Utc::now();
         let count = journal.items.len();
         self.write_journal(&path, &journal)?;
         Ok(count)
@@ -487,6 +506,137 @@ mod tests {
         let (child, _) = store.load("child", &Pagination::default()).await.unwrap();
         assert_eq!(parent.items.len(), 3);
         assert_eq!(child.items.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn read_journal_migrates_v0() {
+        let (store, dir) = make_store();
+        // Write a raw schema-0 file (no schema field, has created_at/updated_at).
+        let path = dir.path().join("legacy.json");
+        let raw = serde_json::json!({
+            "_note": "old file",
+            "id": "aaaaa-bbbbb-ccccc",
+            "name": "legacy",
+            "items": [
+                {
+                    "id": "xxxx-xxxx-xxxx-xxxx",
+                    "type": "note",
+                    "content": "old note",
+                    "added_at": "2026-01-01T00:00:00Z",
+                    "created_at": "2026-01-01T00:00:00Z"
+                }
+            ],
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-02T00:00:00Z"
+        });
+        std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
+
+        let journal = store.read_journal(&path).unwrap();
+
+        // Migration should produce a journal at the current schema version.
+        assert_eq!(journal.schema, migrate::CURRENT_SCHEMA);
+        assert_eq!(journal.name, "legacy");
+        assert_eq!(journal.items.len(), 1);
+        assert_eq!(journal.items[0].content, "old note");
+
+        // File on disk is NOT rewritten by read_journal — migration is lazy.
+        // The old fields are still present until the next add_items write.
+        let on_disk: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert!(
+            on_disk.get("schema").is_none(),
+            "file not yet healed — schema should still be absent"
+        );
+    }
+
+    #[tokio::test]
+    async fn add_items_heals_v0_journal() {
+        let (store, dir) = make_store();
+        // Write a raw schema-0 file directly into the store directory.
+        let path = dir.path().join("legacy.json");
+        let raw = serde_json::json!({
+            "id": "aaaaa-bbbbb-ccccc",
+            "name": "legacy",
+            "items": [],
+            "created_at": "2026-01-01T00:00:00Z",
+            "updated_at": "2026-01-02T00:00:00Z"
+        });
+        std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
+
+        // add_items holds the lock and rewrites the file — this is the heal path.
+        store
+            .add_items("legacy", vec![make_item("new item")])
+            .await
+            .unwrap();
+
+        let on_disk: serde_json::Value =
+            serde_json::from_str(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(
+            on_disk["schema"],
+            serde_json::json!(migrate::CURRENT_SCHEMA)
+        );
+        assert!(
+            on_disk.get("created_at").is_none(),
+            "created_at should be gone"
+        );
+        assert!(
+            on_disk.get("updated_at").is_none(),
+            "updated_at should be gone"
+        );
+        assert_eq!(on_disk["items"].as_array().unwrap().len(), 1);
+    }
+
+    #[tokio::test]
+    async fn read_journal_too_new() {
+        let (store, dir) = make_store();
+        let path = dir.path().join("future.json");
+        let raw = serde_json::json!({
+            "schema": 9999,
+            "id": "aaaaa-bbbbb-ccccc",
+            "name": "future",
+            "items": []
+        });
+        std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
+
+        let err = store.read_journal(&path).unwrap_err();
+        assert!(
+            matches!(
+                err,
+                StoreError::SchemaTooNew {
+                    found: 9999,
+                    max: 1
+                }
+            ),
+            "expected SchemaTooNew, got {err:?}"
+        );
+    }
+
+    #[tokio::test]
+    async fn list_propagates_schema_too_new() {
+        // A journal with a schema newer than CURRENT_SCHEMA must not be
+        // silently omitted from list() — it should propagate SchemaTooNew
+        // so the caller knows a newer-version file exists.
+        let (store, dir) = make_store();
+        // Create a normal journal first so there's something in the directory.
+        store
+            .create(JournalFile::new("normal", Some("Normal".into()), None))
+            .await
+            .unwrap();
+        // Drop a future-schema file directly into the journals directory.
+        let path = dir.path().join("future.json");
+        let raw = serde_json::json!({
+            "schema": 9999,
+            "id": "aaaaa-bbbbb-ccccc",
+            "name": "future",
+            "items": []
+        });
+        std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
+
+        let err = store.list(&Pagination::default(), false).await.unwrap_err();
+        assert!(
+            matches!(err, StoreError::SchemaTooNew { found: 9999, .. }),
+            "expected SchemaTooNew, got {err:?}"
+        );
     }
 
     #[tokio::test]

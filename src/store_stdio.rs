@@ -1,7 +1,6 @@
 //! Remote store backed by a foray MCP stdio server subprocess.
 
 use async_trait::async_trait;
-use chrono::Utc;
 use rmcp::model::{CallToolRequestParams, Content};
 use rmcp::service::RunningService;
 use rmcp::transport::TokioChildProcess;
@@ -11,6 +10,7 @@ use std::io;
 use tokio::process::Command;
 use tokio::sync::Mutex;
 
+use crate::migrate;
 use crate::store::{Store, StoreError};
 use crate::types::{JournalFile, JournalItem, JournalSummary, Pagination};
 
@@ -290,15 +290,13 @@ impl Store for StdioStore {
         let items: Vec<JournalItem> =
             serde_json::from_value(v["items"].clone()).map_err(|e| io_err(e.to_string()))?;
 
-        let now = Utc::now();
         let journal = JournalFile {
             _note: None,
+            schema: migrate::CURRENT_SCHEMA,
             id: v["id"].as_str().unwrap_or("unknown").to_string(),
             name: v["name"].as_str().unwrap_or(name).to_string(),
             title: v["title"].as_str().map(String::from),
             items,
-            created_at: now,
-            updated_at: now,
             meta: None,
         };
 

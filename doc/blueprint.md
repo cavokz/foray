@@ -103,6 +103,7 @@ No `.active` file. No project subdirectories. One JSON file per journal. Archive
 ```json
 {
   "_note": "Edit this file freely. Each file is self-contained.",
+  "schema": 1,
   "id": "bkrnt-wflsd-jmxvp",
   "name": "auth-deep-dive",
   "title": "Investigating auth cache race conditions in session.go",
@@ -124,13 +125,33 @@ No `.active` file. No project subdirectories. One JSON file per journal. Archive
       "meta": { "confidence": "high", "model": "claude-opus-4" }
     }
   ],
-  "created_at": "2026-04-15T10:00:00Z",
-  "updated_at": "2026-04-15T14:30:00Z",
   "meta": { "created_by": "vscode-copilot" }
 }
 ```
 
 Unknown fields are rejected (`deny_unknown_fields`). The `meta` field on both `JournalFile` and `JournalItem` is a free-form map for client-specific data (AI model, conversation ID, user annotations, etc.).
+
+### Schema Migration
+
+Runtime migration runs on raw `serde_json::Value` **before** serde deserialization (`migrate::migrate()`), so it can add, remove, or reshape fields freely. A `Current` or `Migrated` result is guaranteed to be a JSON object matching the current schema and will deserialize cleanly with `deny_unknown_fields`. A non-object input returns `Invalid`, which the caller maps to `StoreError::Io(InvalidData)`.
+
+`schema` absent in the JSON → version 0 (pre-versioning era). New journals always include `schema: CURRENT_SCHEMA`.
+
+| Change type | Mechanism | User action required |
+|-------------|-----------|----------------------|
+| New optional field | Runtime migration, self-heal rewrite | None — transparent |
+| Field removal | Runtime migration, self-heal rewrite | None — transparent |
+| Schema stamp injection | Runtime migration 0→1 | None — transparent |
+| Field rename | Offline tool (planned: `foray migrate`) | Explicit, one-time |
+| Type change | Offline tool (planned: `foray migrate`) | Explicit, one-time |
+| `schema > CURRENT_SCHEMA` | Hard error: `SchemaTooNew` | Upgrade foray binary |
+| Non-object file content | Hard error: `StoreError::Io(InvalidData)` | Fix or remove the file |
+
+**Self-healing**: migration happens lazily on write. `read_journal` migrates the value in memory but does not rewrite the file. The next `add_items` call holds the exclusive lock and rewrites the file — at that point the old fields are gone and `schema: CURRENT_SCHEMA` is persisted. This keeps migration safe: the sole writer already holds the lock, so there is no race between migration and concurrent writes.
+
+**`StdioStore`**: migration happens server-side. The remote server migrates and self-heals before responding. The local side always receives current-schema JSON — no migration needed in the client.
+
+**Rationale for strict post-migration deserialization**: keeping `deny_unknown_fields` means an older foray reading a journal written by a newer binary fails loudly rather than silently dropping unknown fields and corrupting the file on write-back.
 
 ## Tech Stack
 - **Language**: Rust
@@ -214,6 +235,7 @@ Errors may include a `data` field with a `hint` key to guide callers:
 | Journal not found | `invalid_params` | `"call 'list_journals' to see available journals"` |
 | Journal already exists | `invalid_params` | `"use a different name or load the existing journal"` |
 | Journal is archived | `invalid_params` | `"call 'unarchive_journal' to restore it"` |
+| Journal schema too new | `internal_error` | *(none)* — upgrade foray binary |
 | `store` missing | `invalid_params` | `"pass a store name from the hello response, available stores: <names>"` |
 | Unknown store name | `invalid_params` | `"available stores: <names>"` |
 | Other store errors | `internal_error` | *(none)* |
@@ -268,7 +290,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 
 ### Phase 2: Types + Store
 1. `types.rs`:
-   - `JournalFile` { `_note`, id, name, title, items, created_at, updated_at, meta } — `id` is `journal_id()`: consonant-only `xxxxx-xxxxx-xxxxx` format (15 chars, ~65 bits), generated on creation, immutable
+   - `JournalFile` { `_note`, schema, id, name, title, items, meta } — `schema` is `CURRENT_SCHEMA` (u32), always set on creation. `id` is `journal_id()`: consonant-only `xxxxx-xxxxx-xxxxx` format (15 chars, ~65 bits), generated on creation, immutable
    - `JournalItem` { id, item_type, content, file_ref, added_at, tags, meta } — `id` is `item_id()`: consonant-only `xxxx-xxxx-xxxx-xxxx` format (16 chars, ~70 bits)
    - `ItemType` enum { Finding, Decision, Snippet, Note, Fork }
    - `JournalSummary` { name, title, item_count, meta }
