@@ -1,3 +1,4 @@
+use crate::migrate;
 use crate::store::{Store, StoreError};
 use crate::store_json::JsonFileStore;
 use crate::store_stdio::StdioStore;
@@ -125,6 +126,8 @@ impl StoreRegistry {
             });
         }
 
+        fingerprints.push(format!("schema={}", migrate::CURRENT_SCHEMA));
+        fingerprints.push(format!("protocol={}", migrate::CURRENT_PROTOCOL));
         let nuance = compute_nuance(&fingerprints);
         Ok(Self { stores, nuance })
     }
@@ -134,7 +137,11 @@ impl StoreRegistry {
         let base_dir = JsonFileStore::default_dir()?;
         let path_str = base_dir.display().to_string();
         let store: Arc<dyn Store> = Arc::new(JsonFileStore::new(base_dir));
-        let nuance = compute_nuance(&[format!("local={path_str}")]);
+        let nuance = compute_nuance(&[
+            format!("local={path_str}"),
+            format!("schema={}", migrate::CURRENT_SCHEMA),
+            format!("protocol={}", migrate::CURRENT_PROTOCOL),
+        ]);
         Ok(Self {
             stores: vec![StoreEntry {
                 name: "local".to_string(),
@@ -151,7 +158,11 @@ impl StoreRegistry {
     pub fn for_test(base_dir: std::path::PathBuf) -> Self {
         let path_str = base_dir.display().to_string();
         let store: Arc<dyn Store> = Arc::new(JsonFileStore::new(base_dir));
-        let nuance = compute_nuance(&[format!("local={path_str}")]);
+        let nuance = compute_nuance(&[
+            format!("local={path_str}"),
+            format!("schema={}", migrate::CURRENT_SCHEMA),
+            format!("protocol={}", migrate::CURRENT_PROTOCOL),
+        ]);
         Self {
             stores: vec![StoreEntry {
                 name: "local".to_string(),
@@ -170,6 +181,8 @@ impl StoreRegistry {
         let nuance = compute_nuance(&[
             format!("store1={}", base_dir1.display()),
             format!("store2={}", base_dir2.display()),
+            format!("schema={}", migrate::CURRENT_SCHEMA),
+            format!("protocol={}", migrate::CURRENT_PROTOCOL),
         ]);
         Self {
             stores: vec![
@@ -268,6 +281,38 @@ mod tests {
     fn nuance_differs_on_change() {
         let a = compute_nuance(&["local=/home/user/.foray/journals".to_string()]);
         let b = compute_nuance(&["work=/home/user/.foray/work".to_string()]);
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn nuance_differs_on_schema_change() {
+        // Same config, different schema version — nuance must differ so
+        // clients re-handshake after a binary upgrade that bumps the schema.
+        let a = compute_nuance(&[
+            "local=/home/user/.foray/journals".to_string(),
+            "schema=1".to_string(),
+        ]);
+        let b = compute_nuance(&[
+            "local=/home/user/.foray/journals".to_string(),
+            "schema=2".to_string(),
+        ]);
+        assert_ne!(a, b);
+    }
+
+    #[test]
+    fn nuance_differs_on_protocol_change() {
+        // Same config and schema, different protocol version — nuance must differ
+        // so clients re-handshake after a binary upgrade that bumps the protocol.
+        let a = compute_nuance(&[
+            "local=/home/user/.foray/journals".to_string(),
+            "schema=1".to_string(),
+            "protocol=1".to_string(),
+        ]);
+        let b = compute_nuance(&[
+            "local=/home/user/.foray/journals".to_string(),
+            "schema=1".to_string(),
+            "protocol=2".to_string(),
+        ]);
         assert_ne!(a, b);
     }
 

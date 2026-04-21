@@ -225,9 +225,9 @@ All tools return JSON. No in-memory state. Every tool that operates on a journal
 
 ### Nuance + Preflight
 
-The `nuance` parameter is a deterministic fingerprint of the server's current configuration, derived from sorted `"name=path"` fingerprints for each store — whether configured via `~/.foray/config.toml` or the implicit local store. The client must obtain it from `hello` and pass it on every subsequent tool call. If the config changes (stores added/removed/moved), `nuance` changes, automatically invalidating stale sessions. If the nuance is missing or wrong, the tool returns an error with `data: { hint: "call 'hello' to get the current nuance" }`.
+The `nuance` parameter is a session epoch token — a deterministic fingerprint of everything that would make a cached client session stale. Current inputs: sorted store identity fingerprints (`"name=path"` for json_file, `"name=command arg0 …"` for foray_stdio) plus `"schema=N"` for the current storage schema version and `"protocol=N"` for the current wire protocol version. All inputs are hashed with FNV-1a 64-bit. The client must obtain it from `hello` and pass it on every subsequent tool call. If the config changes (stores added/removed/moved) or the binary is upgraded to a new schema or protocol version, `nuance` changes, automatically invalidating stale sessions. If the nuance is missing or wrong, the tool returns an error with `data: { hint: "call 'hello' to get the current nuance" }`.
 
-**Purpose**: forces the client to call `hello` first; config changes auto-invalidate sessions; future binary changes can also change the nuance to force re-handshake.
+**Purpose**: forces the client to call `hello` first; any server-side change that would make a cached session incorrect changes the nuance and triggers re-handshake.
 
 ### Error Structure (`data` field)
 
