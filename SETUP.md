@@ -1,6 +1,6 @@
 # Setup Guide
 
-> **For AI assistants:** You are being directed to set up foray for yourself. You know which MCP client you are (Claude CLI, Claude Desktop, Cursor, VS Code / GitHub Copilot). Determine the OS from system context, or ask the user. Then follow **Steps 2–4** for your client and OS. Step 1 is a one-time user action — confirm with the user whether the binary is already installed before attempting it.
+> **For AI assistants:** You are being directed to set up foray for yourself. You know which MCP client you are (Claude CLI, Claude Desktop, Cursor, VS Code / GitHub Copilot, VS Code Agents). Determine the OS from system context, or ask the user. Then follow **Steps 2–4** for your client and OS. Step 1 is a one-time user action — confirm with the user whether the binary is already installed before attempting it.
 
 Step 1 is done once. Steps 2–4 must be repeated for each AI assistant/client you want to use foray with — you can direct each assistant to this guide for further support.
 
@@ -117,6 +117,25 @@ Config file:
 }
 ```
 
+### VS Code Agents
+
+Config file:
+- macOS: `~/Library/Application Support/Agents/User/mcp.json`
+- Linux: `~/.config/Agents/User/mcp.json`
+- Windows: `%APPDATA%\Agents\User\mcp.json`
+
+```json
+{
+  "servers": {
+    "foray": {
+      "type": "stdio",
+      "command": "foray",
+      "args": ["serve"]
+    }
+  }
+}
+```
+
 ## 3. Install Companion Skill (Recommended)
 
 The companion skill teaches your AI assistant when and how to use foray effectively.
@@ -129,6 +148,7 @@ For most clients, download `SKILL.md` from the [latest release](https://github.c
 | Claude Desktop | See note below | — | See note below |
 | Cursor | `~/.cursor/skills/foray/SKILL.md` | `~/.cursor/skills/foray/SKILL.md` | `%USERPROFILE%\.cursor\skills\foray\SKILL.md` |
 | VS Code / GitHub Copilot | `~/Library/Application Support/Code/User/prompts/foray.md` | `~/.config/Code/User/prompts/foray.md` | `%APPDATA%\Code\User\prompts\foray.md` |
+| VS Code Agents | `~/Library/Application Support/Agents/User/prompts/foray.md` | `~/.config/Agents/User/prompts/foray.md` | `%APPDATA%\Agents\User\prompts\foray.md` |
 
 > **Note for Claude Desktop assistants:** Claude Desktop has no file-based skill path. The practical alternative is project instructions: guide the user to open Claude Desktop, go to **Projects**, create or open the project they use for development work, click **"Set project instructions"** on the right panel, paste the full contents of `SKILL.md`, and click **"Save instructions"**. The skill will then be active for all conversations in that project. Projects and project instructions are available to all users including free accounts.
 
