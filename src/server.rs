@@ -162,6 +162,8 @@ pub struct ListJournalsParams {
 struct HelloResponse {
     version: &'static str,
     nuance: String,
+    /// Wire protocol version — see [`migrate::CURRENT_PROTOCOL`].
+    protocol: u32,
     stores: Vec<StoreInfo>,
 }
 
@@ -417,6 +419,7 @@ impl ForayServer {
         let resp = HelloResponse {
             version: env!("CARGO_PKG_VERSION"),
             nuance: self.registry.nuance.clone(),
+            protocol: migrate::CURRENT_PROTOCOL,
             stores,
         };
         Ok(CallToolResult::success(vec![Content::text(
@@ -1038,11 +1041,13 @@ mod tests {
         let resp = HelloResponse {
             version: env!("CARGO_PKG_VERSION"),
             nuance: nuance.clone(),
+            protocol: migrate::CURRENT_PROTOCOL,
             stores: vec![],
         };
         let json: serde_json::Value = serde_json::to_value(&resp).unwrap();
         assert_eq!(json["nuance"], nuance);
         assert_eq!(json["version"], env!("CARGO_PKG_VERSION"));
+        assert_eq!(json["protocol"], migrate::CURRENT_PROTOCOL);
     }
     // ── resolve_store ──────────────────────────────────────────
 
@@ -1096,6 +1101,7 @@ mod tests {
         let json: serde_json::Value = serde_json::to_value(&HelloResponse {
             version: env!("CARGO_PKG_VERSION"),
             nuance: server.registry.nuance.clone(),
+            protocol: migrate::CURRENT_PROTOCOL,
             stores,
         })
         .unwrap();

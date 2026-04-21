@@ -16,6 +16,8 @@ pub enum StoreError {
         max: u32,
         origin: SchemaOrigin,
     },
+    #[error("wire protocol {found} is too new (max supported: {max})")]
+    ProtocolTooNew { found: u32, max: u32 },
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
     #[error("JSON error: {0}")]

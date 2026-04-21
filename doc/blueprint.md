@@ -201,7 +201,7 @@ Prompts are the fallback for LLMs without the companion skill. They provide just
 
 | Tool | Params | Description |
 |------|--------|-------------|
-| `hello` | *(none)* | Establish handshake. Returns `{ version, nuance, stores }`. Always call first — every session — then pass `nuance` and `store` on subsequent calls. |
+| `hello` | *(none)* | Establish handshake. Returns `{ version, nuance, protocol, stores }`. Always call first — every session — then pass `nuance` and `store` on subsequent calls. |
 | `open_journal` | `name`, `title?`, `fork?`, `meta?`, `store`, `nuance` | Create, fork, or reopen a journal. `title` is required when creating or forking (error if missing), ignored when reopening. `fork` specifies source journal name. Idempotent if exists without `fork`. `meta` sets journal-level metadata. `store` must be a name from the `hello` response. |
 | `sync_journal` | `name`, `cursor?`, `limit?`, `items?`, `store`, `nuance` | Read and write journal items in one call. Returns items since cursor position. `cursor` is the position from the previous sync (omit for full read). `items` is an array of `{ content, item_type?, ref?, tags?, meta? }`. `limit` caps returned items (does not affect additions). Returns `cursor` for the next call and `added_ids` for items added by this call. `store` must be a name from the `hello` response. |
 | `list_journals` | `limit?`, `offset?`, `archived?`, `store`, `nuance` | List journals in the selected store. Pass `archived: true` to list archived journals instead of active ones. Paginated: defaults to all. |
@@ -247,7 +247,7 @@ Errors include a structured `data` object with machine-readable fields for progr
 **AI assistant guidance**: inspect `data.type` for programmatic dispatch; surface `data.hint` verbatim to the user; if `data.remedy` is present, act on it (e.g. `"upgrade_foray"` → tell the user to upgrade the foray binary they are using as the MCP server). Old servers (pre-structured-errors) omit `data.type`; `classify_mcp_error` falls back to message-prefix matching.
 
 ### Tool response formats
-- `hello` → `{ version, nuance, stores: [{name, description}] }` (e.g. `{ "version": "1.2.3", "nuance": "abc123", "stores": [{"name": "local", "description": "Default local journal store"}] }`)
+- `hello` → `{ version, nuance, protocol, stores: [{name, description}] }` (e.g. `{ "version": "1.2.3", "nuance": "abc123", "protocol": 1, "stores": [{"name": "local", "description": "Default local journal store"}] }`)
 - `open_journal` → `{ name, title, item_count, created }` (`created: bool` — true if new)
 - `sync_journal` → `{ schema, id, name, title, items: [...], added_ids: [...], cursor, total }` (`schema` is the wire protocol schema version; `id` is the journal's immutable ID; `cursor` is the position for the next call; `added_ids` lists IDs assigned to items added by this call in order)
 - `list_journals` → `{ journals: [{ name, title, item_count, meta }], total, limit, offset }` (pass `archived: true` to list archived journals)
@@ -322,7 +322,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
    - `nuance` is a FNV-1a hash of sorted fingerprints (`"name=path"` for json_file, `"name=command arg0 …"` for foray_stdio) plus `"schema=N"` and `"protocol=N"` — deterministic, stable across restarts, changes when config, schema, or protocol version changes
    - `StoreRegistry::get(name)` — look up by name; `default_store()` — first entry; `names_hint()` — comma-joined names for error messages
    - `StoreRegistry::load()` — public constructor; `StoreRegistry::implicit_local()` — fallback constructor
-5. `store_stdio.rs` — `StdioStore`: spawns subprocess via rmcp `TokioChildProcess`, performs MCP `initialize` handshake via `serve_client`, caches remote `nuance` + `store_name` obtained from `hello`. All `Store` trait methods map to MCP tool calls (`open_journal`, `sync_journal`, `list_journals`, `archive_journal`, `unarchive_journal`). Connection is lazily established and cached in `Mutex<Option<Connection>>`; `Peer<RoleClient>` is cloned out before `.await` to avoid holding the lock across the await point.
+5. `store_stdio.rs` — `StdioStore`: spawns subprocess via rmcp `TokioChildProcess`, performs MCP `initialize` handshake via `serve_client`, caches remote `nuance` + `store_name` obtained from `hello`. Checks `hello.protocol` against `migrate::CURRENT_PROTOCOL` at connect time — returns `StoreError::ProtocolTooNew` if the server's protocol is newer (old servers omitting the field are treated as protocol 1). All `Store` trait methods map to MCP tool calls (`open_journal`, `sync_journal`, `list_journals`, `archive_journal`, `unarchive_journal`). Connection is lazily established and cached in `Mutex<Option<Connection>>`; `Peer<RoleClient>` is cloned out before `.await` to avoid holding the lock across the await point.
 
 ### Phase 3: Tree
 1. `tree.rs` — `build_tree(journals) -> String` — ASCII tree for CLI `--tree` flag. Scans items for `type: fork` with `foray:` refs to determine lineage.

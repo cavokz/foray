@@ -19,6 +19,25 @@ use serde_json::{Map, Value};
 /// The schema version produced by this build.
 pub const CURRENT_SCHEMA: u32 = 1;
 
+/// The wire protocol version produced by this build.
+///
+/// Tracks envelope-level changes to `SyncJournalResponse` (fields like
+/// `cursor`, `added_ids`, etc.) that are independent of `CURRENT_SCHEMA`.
+/// `StdioStore` checks this at connect time and returns
+/// [`StoreError::ProtocolTooNew`] if the server's protocol is newer.
+pub const CURRENT_PROTOCOL: u32 = 1;
+
+/// Synthetic store name injected into `hello` responses from protocol 0
+/// servers that do not emit a `stores` list. `adapt_send` strips the `store`
+/// param when it matches this value, since protocol 0 servers do not accept
+/// a `store` argument.
+pub const PROTOCOL_0_IMPLICIT_STORE: &str = "local";
+
+/// Synthetic journal ID inserted into `sync_journal` responses from protocol 0
+/// servers that did not emit an `id` field. Visually distinct so it is
+/// obvious in logs or debug output that the value was synthesised.
+pub const PROTOCOL_0_IMPLICIT_ID: &str = "<unknown>";
+
 /// Result of running [`migrate`].
 pub enum MigrateResult {
     /// The value was already at the current schema — returned unchanged.
@@ -83,6 +102,138 @@ fn v0_to_v1(mut obj: Map<String, Value>) -> Map<String, Value> {
 
     obj.insert("schema".to_string(), Value::from(1u32));
     obj
+}
+
+/// Adapt outbound request arguments before sending to a remote server with an
+/// older protocol version.
+///
+/// Each `if server_protocol < N` block documents every field that was added or
+/// changed at that protocol boundary, stripping or transforming anything the
+/// old server does not understand. Wire structs use `deny_unknown_fields`, so
+/// an unhandled protocol gap here will surface as a deserialization failure at
+/// the call site rather than silent misbehaviour.
+///
+/// Returns `Err(String)` if a required adaptation cannot be performed.
+pub fn adapt_send(server_protocol: u32, tool: &str, mut args: Value) -> Result<Value, String> {
+    // Protocol 0 → 1: several params were added that old servers reject via
+    // `deny_unknown_fields`:
+    //   all tools:          `store` (protocol 0 servers have a single implicit store)
+    //   list_journals:      `archived` (archive feature did not exist)
+    //   archive_journal:    entire tool did not exist
+    //   unarchive_journal:  entire tool did not exist
+    if server_protocol < 1 {
+        match tool {
+            "archive_journal" | "unarchive_journal" => {
+                return Err(format!(
+                    "'{tool}' is not supported by protocol 0 server; upgrade the remote foray"
+                ));
+            }
+            _ => {}
+        }
+        if let Value::Object(ref mut obj) = args {
+            // Strip or validate `store`.
+            match obj.remove("store") {
+                Some(Value::String(ref s)) if s == PROTOCOL_0_IMPLICIT_STORE => {
+                    // expected — strip silently
+                }
+                Some(Value::String(s)) => {
+                    return Err(format!(
+                        "store '{s}' not found: protocol 0 server exposes a single implicit \
+                         store '{PROTOCOL_0_IMPLICIT_STORE}'; remove the `store` field from \
+                         the config entry or upgrade the remote foray"
+                    ));
+                }
+                _ => {
+                    // absent or non-string — pass through
+                }
+            }
+            if tool == "list_journals" {
+                match obj.get("archived").and_then(Value::as_bool) {
+                    Some(true) => {
+                        return Err("archived journals not supported by protocol 0 server; \
+                             upgrade the remote foray"
+                            .to_string());
+                    }
+                    _ => {
+                        obj.remove("archived");
+                    }
+                }
+            }
+        }
+    }
+    Ok(args)
+}
+
+/// Adapt an inbound response received from a remote server with an older
+/// protocol version, normalising it to the current wire shape before typed
+/// deserialization.
+///
+/// Each `if server_protocol < N` block documents every field that was added or
+/// changed at that protocol boundary, inserting synthesised defaults for fields
+/// that old servers did not emit. Wire structs use `deny_unknown_fields`, so
+/// every field the server might send must be explicitly declared in the struct,
+/// and every field the struct requires must be inserted here for old servers.
+///
+/// Returns `Err(String)` if the response is not a JSON object (adaptation is
+/// not possible) or if a required field cannot be synthesised.
+pub fn adapt_receive(
+    server_protocol: u32,
+    tool: &str,
+    mut response: Value,
+) -> Result<Value, String> {
+    // Protocol 0 → 1: the following fields were added in this transition:
+    //   hello:            `protocol`, `stores`  (version was already present)
+    //   sync_journal:     `schema`, `id`
+    //   open_journal:     `name`, `title`, `item_count`
+    //   list_journals:    `limit`, `offset`
+    //   archive_journal:  `archived`
+    //   unarchive_journal:`unarchived`
+    if server_protocol < 1 {
+        let obj = response
+            .as_object_mut()
+            .ok_or_else(|| format!("adapt_receive({tool}): response is not a JSON object"))?;
+        match tool {
+            "hello" => {
+                obj.entry("version")
+                    .or_insert_with(|| Value::String(String::new()));
+                obj.entry("protocol").or_insert_with(|| Value::from(0u32));
+                // Synthesise a single implicit store so the client can select
+                // it as `store_name`. `adapt_send` strips it before sending.
+                obj.entry("stores").or_insert_with(|| {
+                    serde_json::json!([
+                        {"name": PROTOCOL_0_IMPLICIT_STORE,
+                         "description": "implicit store (protocol 0 server)"}
+                    ])
+                });
+            }
+            "sync_journal" => {
+                obj.entry("schema").or_insert_with(|| Value::from(0u32));
+                obj.entry("id")
+                    .or_insert_with(|| Value::String(PROTOCOL_0_IMPLICIT_ID.to_string()));
+            }
+            "open_journal" => {
+                obj.entry("name")
+                    .or_insert_with(|| Value::String(String::new()));
+                obj.entry("title").or_insert(Value::Null);
+                obj.entry("item_count")
+                    .or_insert_with(|| Value::from(0usize));
+            }
+            "list_journals" => {
+                obj.entry("limit").or_insert(Value::Null);
+                obj.entry("offset").or_insert(Value::Null);
+            }
+            "archive_journal" => {
+                obj.entry("archived")
+                    .or_insert_with(|| Value::String(String::new()));
+            }
+            "unarchive_journal" => {
+                obj.entry("unarchived")
+                    .or_insert_with(|| Value::String(String::new()));
+            }
+            _ => {}
+        }
+    }
+    Ok(response)
 }
 
 #[cfg(test)]
@@ -189,5 +340,135 @@ mod tests {
                 "expected Invalid for non-object input"
             );
         }
+    }
+
+    // ── adapt_send ────────────────────────────────────────────────────
+
+    #[test]
+    fn adapt_send_strips_store_and_archived_false_for_protocol_0() {
+        let args = json!({ "store": PROTOCOL_0_IMPLICIT_STORE, "limit": 10, "archived": false });
+        let result = adapt_send(0, "list_journals", args).unwrap();
+        assert!(result.get("store").is_none(), "store should be stripped");
+        assert!(
+            result.get("archived").is_none(),
+            "archived false should be stripped"
+        );
+        assert_eq!(result["limit"], json!(10));
+    }
+
+    #[test]
+    fn adapt_send_errors_on_archived_true_for_protocol_0() {
+        let args = json!({ "store": PROTOCOL_0_IMPLICIT_STORE, "archived": true });
+        let err = adapt_send(0, "list_journals", args).unwrap_err();
+        assert!(
+            err.contains("archived journals not supported"),
+            "got: {err}"
+        );
+    }
+
+    #[test]
+    fn adapt_send_errors_on_unknown_store_for_protocol_0() {
+        let args = json!({ "store": "remote", "name": "j" });
+        let err = adapt_send(0, "open_journal", args).unwrap_err();
+        assert!(err.contains("store 'remote' not found"), "got: {err}");
+    }
+
+    #[test]
+    fn adapt_send_errors_on_archive_journal_for_protocol_0() {
+        let args = json!({ "store": PROTOCOL_0_IMPLICIT_STORE, "name": "j" });
+        let err = adapt_send(0, "archive_journal", args).unwrap_err();
+        assert!(err.contains("archive_journal"), "got: {err}");
+        assert!(err.contains("not supported"), "got: {err}");
+    }
+
+    #[test]
+    fn adapt_send_errors_on_unarchive_journal_for_protocol_0() {
+        let args = json!({ "store": PROTOCOL_0_IMPLICIT_STORE, "name": "j" });
+        let err = adapt_send(0, "unarchive_journal", args).unwrap_err();
+        assert!(err.contains("unarchive_journal"), "got: {err}");
+        assert!(err.contains("not supported"), "got: {err}");
+    }
+
+    #[test]
+    fn adapt_send_keeps_archived_for_protocol_1() {
+        let args = json!({ "limit": 10, "archived": true });
+        let result = adapt_send(1, "list_journals", args).unwrap();
+        assert_eq!(result["archived"], json!(true));
+    }
+
+    #[test]
+    fn adapt_send_noop_for_protocol_0_open_journal_with_implicit_store() {
+        let args = json!({ "store": PROTOCOL_0_IMPLICIT_STORE, "name": "foo" });
+        let result = adapt_send(0, "open_journal", args).unwrap();
+        assert!(result.get("store").is_none(), "store should be stripped");
+        assert_eq!(result["name"], json!("foo"));
+    }
+
+    // ── adapt_receive ─────────────────────────────────────────────────
+
+    #[test]
+    fn adapt_receive_hello_inserts_synthetic_store_for_protocol_0() {
+        let raw = json!({ "version": "0.2.0", "nuance": "abc" });
+        let result = adapt_receive(0, "hello", raw).unwrap();
+        assert_eq!(result["protocol"], json!(0));
+        assert_eq!(
+            result["stores"][0]["name"],
+            json!(PROTOCOL_0_IMPLICIT_STORE)
+        );
+        assert!(result["stores"][0]["description"].is_string());
+        assert_eq!(result["nuance"], json!("abc"));
+    }
+
+    #[test]
+    fn adapt_receive_hello_preserves_existing_stores_for_protocol_0() {
+        // If server somehow sends stores already, do not overwrite them.
+        let raw = json!({ "nuance": "abc", "stores": [{"name": "x", "description": "y"}] });
+        let result = adapt_receive(0, "hello", raw).unwrap();
+        assert_eq!(result["stores"][0]["name"], json!("x"));
+    }
+
+    #[test]
+    fn adapt_receive_hello_passthrough_for_protocol_1() {
+        let raw = json!({
+            "version": "1.0",
+            "nuance": "abc",
+            "protocol": 1,
+            "stores": [{"name": "local", "description": "Local store"}]
+        });
+        let result = adapt_receive(1, "hello", raw.clone()).unwrap();
+        assert_eq!(result, raw);
+    }
+
+    #[test]
+    fn adapt_receive_sync_journal_inserts_id_and_schema_for_protocol_0() {
+        // v0.2.0 sync_journal response has no `id` or `schema`.
+        let raw = json!({
+            "name": "j", "title": null,
+            "items": [], "added_ids": [], "cursor": 0, "total": 0
+        });
+        let result = adapt_receive(0, "sync_journal", raw).unwrap();
+        assert_eq!(result["schema"], json!(0));
+        assert_eq!(result["id"], json!(PROTOCOL_0_IMPLICIT_ID));
+    }
+
+    #[test]
+    fn adapt_receive_list_journals_inserts_pagination_for_protocol_0() {
+        let raw = json!({ "journals": [], "total": 0 });
+        let result = adapt_receive(0, "list_journals", raw).unwrap();
+        assert!(result["limit"].is_null());
+        assert!(result["offset"].is_null());
+    }
+
+    #[test]
+    fn adapt_receive_unknown_tool_is_noop() {
+        let raw = json!({ "foo": "bar" });
+        let result = adapt_receive(0, "some_future_tool", raw.clone()).unwrap();
+        assert_eq!(result, raw);
+    }
+
+    #[test]
+    fn adapt_receive_non_object_returns_err() {
+        let raw = json!([1, 2, 3]);
+        assert!(adapt_receive(0, "hello", raw).is_err());
     }
 }

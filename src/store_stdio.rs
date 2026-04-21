@@ -122,6 +122,20 @@ impl StdioStore {
             .ok_or_else(|| io_err("missing nuance in hello response"))?
             .to_string();
 
+        // Protocol version check: abort early if the server's wire protocol is
+        // newer than this client supports.  Old servers omit the field; they
+        // implicitly speak protocol 1, which is always compatible.
+        let protocol = hello["protocol"]
+            .as_u64()
+            .map(|n| u32::try_from(n).unwrap_or(u32::MAX))
+            .unwrap_or(1);
+        if protocol > migrate::CURRENT_PROTOCOL {
+            return Err(StoreError::ProtocolTooNew {
+                found: protocol,
+                max: migrate::CURRENT_PROTOCOL,
+            });
+        }
+
         let store_name = self
             .store_hint
             .clone()
