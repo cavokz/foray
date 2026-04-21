@@ -76,7 +76,11 @@ impl JsonFileStore {
         let value = match migrate::migrate(raw) {
             MigrateResult::Current(v) | MigrateResult::Migrated(v) => v,
             MigrateResult::TooNew { found, max } => {
-                return Err(StoreError::SchemaTooNew { found, max });
+                return Err(StoreError::SchemaTooNew {
+                    found,
+                    max,
+                    origin: crate::store::SchemaOrigin::Storage,
+                });
             }
             MigrateResult::Invalid => {
                 return Err(StoreError::Io(std::io::Error::new(
@@ -604,7 +608,8 @@ mod tests {
                 err,
                 StoreError::SchemaTooNew {
                     found: 9999,
-                    max: 1
+                    max: migrate::CURRENT_SCHEMA,
+                    origin: crate::store::SchemaOrigin::Storage,
                 }
             ),
             "expected SchemaTooNew, got {err:?}"

@@ -11,11 +11,24 @@ pub enum StoreError {
     #[error("journal is archived: {0}")]
     Archived(String),
     #[error("journal schema {found} is too new (max supported: {max})")]
-    SchemaTooNew { found: u32, max: u32 },
+    SchemaTooNew {
+        found: u32,
+        max: u32,
+        origin: SchemaOrigin,
+    },
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
     #[error("JSON error: {0}")]
     Json(#[from] serde_json::Error),
+}
+
+/// Where a schema-too-new condition was detected.
+#[derive(Debug, Clone, Copy)]
+pub enum SchemaOrigin {
+    /// Detected reading a storage file (server binary is older than the file).
+    Storage,
+    /// Detected reading a wire response (client binary is older than the server).
+    Wire,
 }
 
 /// Backend-agnostic journal storage.

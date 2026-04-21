@@ -1,4 +1,5 @@
 use crate::config::StoreRegistry;
+use crate::migrate;
 use crate::store::{Store, StoreError};
 use crate::store_json::fork_journal;
 use crate::types::{ItemType, JournalFile, JournalItem, Pagination, item_id, validate_name};
@@ -180,6 +181,8 @@ struct OpenJournalResponse {
 
 #[derive(Serialize)]
 struct SyncJournalResponse {
+    /// Wire protocol schema version — always set to [`migrate::CURRENT_SCHEMA`].
+    schema: u32,
     id: String,
     name: String,
     title: Option<String>,
@@ -300,22 +303,70 @@ impl ForayServer {
     }
 
     fn store_err(e: StoreError) -> ErrorData {
+        use crate::store::SchemaOrigin;
         match e {
             StoreError::NotFound(name) => ErrorData::invalid_params(
                 format!("journal not found: {name}"),
-                Some(
-                    serde_json::json!({ "hint": "call 'list_journals' to see available journals" }),
-                ),
+                Some(serde_json::json!({
+                    "type": "journal_not_found",
+                    "name": name,
+                    "hint": "Call 'list_journals' to see available journals.",
+                })),
             ),
             StoreError::AlreadyExists(name) => ErrorData::invalid_params(
                 format!("journal already exists: {name}"),
-                Some(
-                    serde_json::json!({ "hint": "use a different name or load the existing journal" }),
-                ),
+                Some(serde_json::json!({
+                    "type": "journal_already_exists",
+                    "name": name,
+                    "hint": "Use a different name or load the existing journal.",
+                })),
             ),
             StoreError::Archived(name) => ErrorData::invalid_params(
                 format!("journal is archived: {name}"),
-                Some(serde_json::json!({ "hint": "call 'unarchive_journal' to restore it" })),
+                Some(serde_json::json!({
+                    "type": "journal_archived",
+                    "name": name,
+                    "remedy": "call_unarchive_journal",
+                    "hint": "Call 'unarchive_journal' to restore it.",
+                })),
+            ),
+            StoreError::SchemaTooNew { found, max, origin } => {
+                let hint = match origin {
+                    SchemaOrigin::Storage => format!(
+                        "A journal file uses schema {found} but the connected foray only supports \
+                         schema {max}. Ask the user to upgrade the foray instance they are using \
+                         as an MCP server."
+                    ),
+                    SchemaOrigin::Wire => format!(
+                        "The upstream foray server uses schema {found} but the connected foray \
+                         only supports schema {max}. Ask the user to upgrade the foray instance \
+                         they are using as an MCP server."
+                    ),
+                };
+                ErrorData::internal_error(
+                    format!("journal schema {found} is too new (max supported: {max})"),
+                    Some(serde_json::json!({
+                        "type": "schema_too_new",
+                        "found": found,
+                        "max": max,
+                        "remedy": "upgrade_foray",
+                        "hint": hint,
+                    })),
+                )
+            }
+            StoreError::ProtocolTooNew { found, max } => ErrorData::internal_error(
+                format!("wire protocol {found} is too new (max supported: {max})"),
+                Some(serde_json::json!({
+                    "type": "protocol_too_new",
+                    "found": found,
+                    "max": max,
+                    "remedy": "upgrade_foray",
+                    "hint": format!(
+                        "The upstream foray server uses protocol version {found} but the \
+                         connected foray only supports version {max}. Ask the user to \
+                         upgrade the foray instance they are using as an MCP server."
+                    ),
+                })),
             ),
             other => ErrorData::internal_error(other.to_string(), None),
         }
@@ -553,6 +604,7 @@ impl ForayServer {
         let cursor = after + items.len();
 
         let resp = SyncJournalResponse {
+            schema: migrate::CURRENT_SCHEMA,
             id: journal.id,
             name: journal.name,
             title: journal.title,
@@ -825,8 +877,15 @@ mod tests {
     #[test]
     fn store_err_not_found_has_hint() {
         let err = ForayServer::store_err(StoreError::NotFound("my-journal".into()));
-        let hint = err.data.as_ref().and_then(|d| d["hint"].as_str());
-        assert_eq!(hint, Some("call 'list_journals' to see available journals"));
+        assert_eq!(
+            err.data.as_ref().and_then(|d| d["type"].as_str()),
+            Some("journal_not_found")
+        );
+        assert_eq!(
+            err.data.as_ref().and_then(|d| d["name"].as_str()),
+            Some("my-journal")
+        );
+        assert!(err.data.as_ref().and_then(|d| d["hint"].as_str()).is_some());
     }
 
     #[test]
@@ -837,8 +896,15 @@ mod tests {
             "expected 'archived' in message, got: {}",
             err.message
         );
-        let hint = err.data.as_ref().and_then(|d| d["hint"].as_str());
-        assert_eq!(hint, Some("call 'unarchive_journal' to restore it"));
+        assert_eq!(
+            err.data.as_ref().and_then(|d| d["type"].as_str()),
+            Some("journal_archived")
+        );
+        assert_eq!(
+            err.data.as_ref().and_then(|d| d["remedy"].as_str()),
+            Some("call_unarchive_journal")
+        );
+        assert!(err.data.as_ref().and_then(|d| d["hint"].as_str()).is_some());
     }
 
     #[test]
@@ -849,6 +915,22 @@ mod tests {
             "expected 'already exists' in message, got: {}",
             err.message
         );
+    }
+
+    #[test]
+    fn store_err_protocol_too_new_has_structured_data() {
+        let err = ForayServer::store_err(StoreError::ProtocolTooNew { found: 5, max: 1 });
+        assert_eq!(
+            err.data.as_ref().and_then(|d| d["type"].as_str()),
+            Some("protocol_too_new")
+        );
+        assert_eq!(err.data.as_ref().and_then(|d| d["found"].as_u64()), Some(5));
+        assert_eq!(err.data.as_ref().and_then(|d| d["max"].as_u64()), Some(1));
+        assert_eq!(
+            err.data.as_ref().and_then(|d| d["remedy"].as_str()),
+            Some("upgrade_foray")
+        );
+        assert!(err.data.as_ref().and_then(|d| d["hint"].as_str()).is_some());
     }
 
     // ── archive_journal / unarchive_journal ────────────────────────
@@ -1050,6 +1132,7 @@ mod tests {
     #[test]
     fn sync_response_cursor_and_added_ids_present() {
         let resp = SyncJournalResponse {
+            schema: migrate::CURRENT_SCHEMA,
             id: "test-id-1234".into(),
             name: "my-journal".into(),
             title: Some("My Journal".into()),

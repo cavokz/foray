@@ -1,7 +1,7 @@
 //! Remote store backed by a foray MCP stdio server subprocess.
 
 use async_trait::async_trait;
-use rmcp::model::{CallToolRequestParams, Content};
+use rmcp::model::{CallToolRequestParams, Content, ErrorData};
 use rmcp::service::RunningService;
 use rmcp::transport::TokioChildProcess;
 use rmcp::{Peer, RoleClient, ServiceError, serve_client};
@@ -10,7 +10,7 @@ use std::io;
 use tokio::process::Command;
 use tokio::sync::Mutex;
 
-use crate::migrate;
+use crate::migrate::{self, MigrateResult};
 use crate::store::{Store, StoreError};
 use crate::types::{JournalFile, JournalItem, JournalSummary, Pagination};
 
@@ -182,11 +182,11 @@ impl StdioStore {
                 serde_json::from_str(text).map_err(|e| io_err(e.to_string()))
             }
             Err(ServiceError::McpError(e)) => {
-                let err = classify_mcp_error(e.message.as_ref());
+                let err = classify_mcp_error(&e);
                 // Nuance mismatch means the remote server restarted or was
                 // reconfigured — clear the connection so the next call
                 // reconnects and fetches a fresh nuance.
-                if is_nuance_mismatch(e.message.as_ref()) {
+                if is_nuance_mismatch(&e.message) {
                     *self.conn.lock().await = None;
                 }
                 Err(err)
@@ -232,8 +232,66 @@ fn is_nuance_mismatch(msg: &str) -> bool {
     msg.contains("call 'hello' to get the current nuance")
 }
 
-/// Map a foray server error message to the appropriate `StoreError` variant.
-fn classify_mcp_error(msg: &str) -> StoreError {
+/// Map a foray server error to the appropriate `StoreError` variant.
+///
+/// Branches on `data["type"]` first (structured errors from schema-aware
+/// servers), then falls back to message-prefix matching for older servers.
+fn classify_mcp_error(e: &ErrorData) -> StoreError {
+    use crate::store::SchemaOrigin;
+    // Structured path: check data["type"] first.
+    if let Some(t) = e.data.as_ref().and_then(|d| d["type"].as_str()) {
+        match t {
+            "journal_not_found" => {
+                let name = e
+                    .data
+                    .as_ref()
+                    .and_then(|d| d["name"].as_str())
+                    .unwrap_or("")
+                    .to_string();
+                return StoreError::NotFound(name);
+            }
+            "journal_already_exists" => {
+                let name = e
+                    .data
+                    .as_ref()
+                    .and_then(|d| d["name"].as_str())
+                    .unwrap_or("")
+                    .to_string();
+                return StoreError::AlreadyExists(name);
+            }
+            "journal_archived" => {
+                let name = e
+                    .data
+                    .as_ref()
+                    .and_then(|d| d["name"].as_str())
+                    .unwrap_or("")
+                    .to_string();
+                return StoreError::Archived(name);
+            }
+            "schema_too_new" => {
+                let found = e
+                    .data
+                    .as_ref()
+                    .and_then(|d| d["found"].as_u64())
+                    .map(|n| u32::try_from(n).unwrap_or(u32::MAX))
+                    .unwrap_or(u32::MAX);
+                let max = e
+                    .data
+                    .as_ref()
+                    .and_then(|d| d["max"].as_u64())
+                    .map(|n| u32::try_from(n).unwrap_or(u32::MAX))
+                    .unwrap_or(0);
+                return StoreError::SchemaTooNew {
+                    found,
+                    max,
+                    origin: SchemaOrigin::Storage,
+                };
+            }
+            _ => {}
+        }
+    }
+    // Fallback: message-prefix matching for pre-structured-errors servers.
+    let msg = &e.message;
     if let Some(rest) = msg.strip_prefix("journal not found:") {
         return StoreError::NotFound(rest.trim().to_string());
     }
@@ -287,15 +345,39 @@ impl Store for StdioStore {
         let v = self.call_mcp("sync_journal", args).await?;
 
         let total = v["total"].as_u64().unwrap_or(0) as usize;
+
+        // Run migrate() on the wire response to handle version mismatches.
+        // Construct a JournalFile-shaped Value so the migration chain can
+        // inspect and transform the items array.
+        let wire = serde_json::json!({
+            "schema": v["schema"],
+            "id":     v["id"],
+            "name":   v["name"],
+            "title":  v["title"],
+            "items":  v["items"],
+            "_note":  null,
+            "meta":   null,
+        });
+        let migrated = match migrate::migrate(wire) {
+            MigrateResult::Current(v) | MigrateResult::Migrated(v) => v,
+            MigrateResult::TooNew { found, max } => {
+                return Err(StoreError::SchemaTooNew {
+                    found,
+                    max,
+                    origin: crate::store::SchemaOrigin::Wire,
+                });
+            }
+        };
+
         let items: Vec<JournalItem> =
-            serde_json::from_value(v["items"].clone()).map_err(|e| io_err(e.to_string()))?;
+            serde_json::from_value(migrated["items"].clone()).map_err(|e| io_err(e.to_string()))?;
 
         let journal = JournalFile {
             _note: None,
             schema: migrate::CURRENT_SCHEMA,
-            id: v["id"].as_str().unwrap_or("unknown").to_string(),
-            name: v["name"].as_str().unwrap_or(name).to_string(),
-            title: v["title"].as_str().map(String::from),
+            id: migrated["id"].as_str().unwrap_or("unknown").to_string(),
+            name: migrated["name"].as_str().unwrap_or(name).to_string(),
+            title: migrated["title"].as_str().map(String::from),
             items,
             meta: None,
         };
