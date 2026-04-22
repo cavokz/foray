@@ -160,7 +160,7 @@ Runtime migration runs on raw `serde_json::Value` **before** serde deserializati
 ## Tech Stack
 - **Language**: Rust
 - **MCP SDK**: `rmcp` v1.4.0 (server, client, macros, transport-io, transport-child-process)
-- **Deps**: tokio (rt, macros, sync, time — current_thread flavor), serde/serde_json, rand, chrono, dirs 6, fs2, anyhow, thiserror 2, clap (derive), toml, async-trait
+- **Deps**: tokio (rt, macros, sync, time — current_thread flavor), serde/serde_json, rand, chrono, dirs 6, fs2, anyhow, thiserror 2, clap (derive), clap_complete, toml, async-trait
 - **Dev deps**: tempfile
 - `async-trait` used on `trait Store` for `dyn Store` object safety with async methods. `rmcp` client + transport-child-process features enable `StdioStore` to act as an MCP client that tunnels over a subprocess stdio channel.
 
@@ -280,7 +280,17 @@ foray archive <name>                   # Archive a journal
 foray unarchive <name>                 # Unarchive a journal
 foray export <name> [--file PATH]       # Export journal JSON to stdout (or file)
 foray import [--file PATH]              # Import journal JSON from stdin (or file)
+foray completions <shell>               # Print shell completion script (bash, zsh, fish, elvish, powershell)
 ```
+
+Global options: `--journal <name>` and `--store <name>` on all commands (override env + .forayrc).
+
+`completions` prints a shell completion script to stdout. Pipe it to your shell's completion loader, e.g.:
+- `foray completions zsh > ~/.zfunc/_foray` (then `fpath+=~/.zfunc` and `autoload -Uz compinit`)
+- `foray completions bash > /etc/bash_completion.d/foray`
+- `foray completions fish > ~/.config/fish/completions/foray.fish`
+
+Note: completion covers subcommands and flags only. Store names and journal names are runtime data and require dynamic completion (not yet implemented).
 
 Global options: `--journal <name>` and `--store <name>` on all commands (override env + .forayrc).
 

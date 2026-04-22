@@ -6,6 +6,7 @@ use crate::tree::{build_tree, extract_fork_infos};
 use crate::types::{ItemType, JournalFile, JournalItem, Pagination, item_id, validate_name};
 use chrono::Utc;
 use clap::{Parser, Subcommand};
+use clap_complete::Shell;
 use std::collections::HashMap;
 use std::io::Read;
 use std::path::PathBuf;
@@ -122,6 +123,29 @@ pub enum Commands {
         /// Input file (default: stdin)
         #[arg(long)]
         file: Option<PathBuf>,
+    },
+    /// Generate shell completion script
+    #[command(after_help = "\
+ACTIVATION:
+  bash:       foray completions bash >> ~/.bash_completion
+              # or system-wide: foray completions bash > /etc/bash_completion.d/foray
+
+  zsh:        foray completions zsh > ~/.zfunc/_foray
+              # then ensure ~/.zshrc contains:
+              #   fpath+=~/.zfunc
+              #   autoload -Uz compinit && compinit
+
+  fish:       foray completions fish > ~/.config/fish/completions/foray.fish
+
+  powershell: foray completions powershell >> $PROFILE
+
+  elvish:     foray completions elvish > ~/.config/elvish/lib/foray.elv
+              # then add to ~/.config/elvish/rc.elv:
+              #   use foray
+")]
+    Completions {
+        /// Shell to generate completions for
+        shell: Shell,
     },
 }
 
@@ -297,6 +321,9 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
     match &cli.command {
         Commands::Serve => {
             unreachable!("serve is handled in main")
+        }
+        Commands::Completions { .. } => {
+            unreachable!("completions is handled in main")
         }
         Commands::Show {
             name,
