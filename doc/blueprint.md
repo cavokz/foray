@@ -103,6 +103,7 @@ No `.active` file. No project subdirectories. One JSON file per journal. Archive
 ```json
 {
   "_note": "Edit this file freely. Each file is self-contained.",
+  "schema": 1,
   "id": "bkrnt-wflsd-jmxvp",
   "name": "auth-deep-dive",
   "title": "Investigating auth cache race conditions in session.go",
@@ -124,13 +125,37 @@ No `.active` file. No project subdirectories. One JSON file per journal. Archive
       "meta": { "confidence": "high", "model": "claude-opus-4" }
     }
   ],
-  "created_at": "2026-04-15T10:00:00Z",
-  "updated_at": "2026-04-15T14:30:00Z",
   "meta": { "created_by": "vscode-copilot" }
 }
 ```
 
 Unknown fields are rejected (`deny_unknown_fields`). The `meta` field on both `JournalFile` and `JournalItem` is a free-form map for client-specific data (AI model, conversation ID, user annotations, etc.).
+
+### Schema Migration
+
+Runtime migration runs on raw `serde_json::Value` **before** serde deserialization (`migrate::migrate()`), so it can add, remove, or reshape fields freely. A `Current` or `Migrated` result is guaranteed to be a JSON object matching the current schema and will deserialize cleanly with `deny_unknown_fields`. A non-object input returns `Invalid`, which the caller maps to `StoreError::Io(InvalidData)`.
+
+`schema` absent in the JSON → version 0 (pre-versioning era). New journals always include `schema: CURRENT_SCHEMA`.
+
+| Change type | Mechanism | User action required |
+|-------------|-----------|----------------------|
+| New optional field | Runtime migration, self-heal rewrite | None — transparent |
+| Field removal | Runtime migration, self-heal rewrite | None — transparent |
+| Schema stamp injection | Runtime migration 0→1 | None — transparent |
+| Field rename | Offline tool (planned: `foray migrate`) | Explicit, one-time |
+| Type change | Offline tool (planned: `foray migrate`) | Explicit, one-time |
+| `schema > CURRENT_SCHEMA` | Hard error: `SchemaTooNew` | Upgrade foray binary |
+| Non-object file content | Hard error: `StoreError::Io(InvalidData)` | Fix or remove the file |
+
+**Self-healing**: migration happens lazily on write. `read_journal` migrates the value in memory but does not rewrite the file. The next `add_items` call holds the exclusive lock and rewrites the file — at that point the old fields are gone and `schema: CURRENT_SCHEMA` is persisted. This keeps migration safe: the sole writer already holds the lock, so there is no race between migration and concurrent writes.
+
+**`StdioStore`**: the `sync_journal` response carries a `schema` field (the wire protocol schema version). `StdioStore::load` runs `migrate()` on the received data before deserializing items. If the server is newer than the client (`schema > CURRENT_SCHEMA`), `load` returns `StoreError::SchemaTooNew { origin: Wire }` — the same hard error as storage-side, with a hint naming the connected foray binary as the one to upgrade.
+
+**Wire protocol adaptation**: `migrate::adapt_send(server_protocol, tool, args)` strips or transforms outbound request fields that old servers don't accept (e.g. `archived` in `list_journals` added at protocol 1). `migrate::adapt_receive(server_protocol, tool, response)` inserts synthesised defaults for response fields that old servers don't emit (e.g. `stores`, `protocol` in `hello` added at protocol 1). Each function contains an explicit `if server_protocol < N { match tool { … } }` block per protocol boundary. Wire structs use `deny_unknown_fields`, so any field added in a future protocol must be declared in the struct *and* synthesised by `adapt_receive` for old servers — making an incomplete adaptation a loud failure rather than silent misbehaviour.
+
+**Dual role of `schema` and `CURRENT_SCHEMA`**: for `JsonFileStore`, the storage schema and wire schema are the same constant. For alternative store implementations (e.g. Elasticsearch), the internal on-disk representation may differ, but `sync_journal` responses must always carry `schema: CURRENT_SCHEMA` and serialize `JournalItem` fields in the current wire format. A storage-internal change must not bump `CURRENT_SCHEMA`; only changes to the `JournalItem` wire format do.
+
+**Rationale for strict post-migration deserialization**: keeping `deny_unknown_fields` means an older foray reading a journal written by a newer binary fails loudly rather than silently dropping unknown fields and corrupting the file on write-back.
 
 ## Tech Stack
 - **Language**: Rust
@@ -178,7 +203,7 @@ Prompts are the fallback for LLMs without the companion skill. They provide just
 
 | Tool | Params | Description |
 |------|--------|-------------|
-| `hello` | *(none)* | Establish handshake. Returns `{ version, nuance, stores }`. Always call first — every session — then pass `nuance` and `store` on subsequent calls. |
+| `hello` | *(none)* | Establish handshake. Returns `{ version, nuance, protocol, stores }`. Always call first — every session — then pass `nuance` and `store` on subsequent calls. |
 | `open_journal` | `name`, `title?`, `fork?`, `meta?`, `store`, `nuance` | Create, fork, or reopen a journal. `title` is required when creating or forking (error if missing), ignored when reopening. `fork` specifies source journal name. Idempotent if exists without `fork`. `meta` sets journal-level metadata. `store` must be a name from the `hello` response. |
 | `sync_journal` | `name`, `cursor?`, `limit?`, `items?`, `store`, `nuance` | Read and write journal items in one call. Returns items since cursor position. `cursor` is the position from the previous sync (omit for full read). `items` is an array of `{ content, item_type?, ref?, tags?, meta? }`. `limit` caps returned items (does not affect additions). Returns `cursor` for the next call and `added_ids` for items added by this call. `store` must be a name from the `hello` response. |
 | `list_journals` | `limit?`, `offset?`, `archived?`, `store`, `nuance` | List journals in the selected store. Pass `archived: true` to list archived journals instead of active ones. Paginated: defaults to all. |
@@ -200,28 +225,33 @@ All tools return JSON. No in-memory state. Every tool that operates on a journal
 
 ### Nuance + Preflight
 
-The `nuance` parameter is a deterministic fingerprint of the server's current configuration, derived from sorted `"name=path"` fingerprints for each store — whether configured via `~/.foray/config.toml` or the implicit local store. The client must obtain it from `hello` and pass it on every subsequent tool call. If the config changes (stores added/removed/moved), `nuance` changes, automatically invalidating stale sessions. If the nuance is missing or wrong, the tool returns an error with `data: { hint: "call 'hello' to get the current nuance" }`.
+The `nuance` parameter is a session epoch token — a deterministic fingerprint of everything that would make a cached client session stale. Current inputs: sorted store identity fingerprints (`"name=path"` for json_file, `"name=command arg0 …"` for foray_stdio) plus `"schema=N"` for the current storage schema version and `"protocol=N"` for the current wire protocol version. All inputs are hashed with FNV-1a 64-bit. The client must obtain it from `hello` and pass it on every subsequent tool call. If the config changes (stores added/removed/moved) or the binary is upgraded to a new schema or protocol version, `nuance` changes, automatically invalidating stale sessions. If the nuance is missing or wrong, the tool returns an error with `data: { hint: "call 'hello' to get the current nuance" }`.
 
-**Purpose**: forces the client to call `hello` first; config changes auto-invalidate sessions; future binary changes can also change the nuance to force re-handshake.
+**Purpose**: forces the client to call `hello` first; any server-side change that would make a cached session incorrect changes the nuance and triggers re-handshake.
 
-### Error Hints (`data` field)
+### Error Structure (`data` field)
 
-Errors may include a `data` field with a `hint` key to guide callers:
+Errors include a structured `data` object with machine-readable fields for programmatic dispatch and AI assistant guidance:
 
-| Condition | Error code | `data.hint` |
-|-----------|-----------|-------------|
-| `nuance` missing or wrong | `invalid_params` | `"call 'hello' to get the current nuance"` |
-| Journal not found | `invalid_params` | `"call 'list_journals' to see available journals"` |
-| Journal already exists | `invalid_params` | `"use a different name or load the existing journal"` |
-| Journal is archived | `invalid_params` | `"call 'unarchive_journal' to restore it"` |
-| `store` missing | `invalid_params` | `"pass a store name from the hello response, available stores: <names>"` |
-| Unknown store name | `invalid_params` | `"available stores: <names>"` |
-| Other store errors | `internal_error` | *(none)* |
+| Condition | Error code | `data.type` | Extra fields | `data.remedy` | `data.hint` |
+|-----------|-----------|-------------|--------------|---------------|-------------|
+| `nuance` missing or wrong | `invalid_params` | *(none)* | — | — | `"call 'hello' to get the current nuance"` |
+| Journal not found | `invalid_params` | `"journal_not_found"` | `name` | — | Call `list_journals` hint |
+| Journal already exists | `invalid_params` | `"journal_already_exists"` | `name` | — | Use different name hint |
+| Journal is archived | `invalid_params` | `"journal_archived"` | `name` | `"call_unarchive_journal"` | Call `unarchive_journal` hint |
+| Schema too new (storage) | `internal_error` | `"schema_too_new"` | `found`, `max` | `"upgrade_foray"` | Upgrade the connected foray MCP server |
+| Schema too new (wire) | `internal_error` | `"schema_too_new"` | `found`, `max` | `"upgrade_foray"` | Upgrade the connected foray MCP server |
+| Protocol too new (wire) | `internal_error` | `"protocol_too_new"` | `found`, `max` | `"upgrade_foray"` | Upgrade the connected foray MCP server |
+| `store` missing | `invalid_params` | *(none)* | — | — | Store names hint |
+| Unknown store name | `invalid_params` | *(none)* | — | — | Available stores hint |
+| Other store errors | `internal_error` | *(none)* | — | — | *(none)* |
+
+**AI assistant guidance**: inspect `data.type` for programmatic dispatch; surface `data.hint` verbatim to the user; if `data.remedy` is present, act on it (e.g. `"upgrade_foray"` → tell the user to upgrade the foray binary they are using as the MCP server). Old servers (pre-structured-errors) omit `data.type`; `classify_mcp_error` falls back to message-prefix matching.
 
 ### Tool response formats
-- `hello` → `{ version, nuance, stores: [{name, description}] }` (e.g. `{ "version": "1.2.3", "nuance": "abc123", "stores": [{"name": "local", "description": "Default local journal store"}] }`)
+- `hello` → `{ version, nuance, protocol, stores: [{name, description}] }` (e.g. `{ "version": "1.2.3", "nuance": "abc123", "protocol": 1, "stores": [{"name": "local", "description": "Default local journal store"}] }`)
 - `open_journal` → `{ name, title, item_count, created }` (`created: bool` — true if new)
-- `sync_journal` → `{ id, name, title, items: [...], added_ids: [...], cursor, total }` (`id` is the journal's immutable ID, `cursor` is the position for the next call, `added_ids` lists IDs assigned to items added by this call in order)
+- `sync_journal` → `{ schema, id, name, title, items: [...], added_ids: [...], cursor, total }` (`schema` is the wire protocol schema version; `id` is the journal's immutable ID; `cursor` is the position for the next call; `added_ids` lists IDs assigned to items added by this call in order)
 - `list_journals` → `{ journals: [{ name, title, item_count, meta }], total, limit, offset }` (pass `archived: true` to list archived journals)
 - `archive_journal` → `{ archived: "<name>", id: "<id>" }`
 - `unarchive_journal` → `{ unarchived: "<name>", id: "<id>" }`
@@ -268,7 +298,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 
 ### Phase 2: Types + Store
 1. `types.rs`:
-   - `JournalFile` { `_note`, id, name, title, items, created_at, updated_at, meta } — `id` is `journal_id()`: consonant-only `xxxxx-xxxxx-xxxxx` format (15 chars, ~65 bits), generated on creation, immutable
+   - `JournalFile` { `_note`, schema, id, name, title, items, meta } — `schema` is `CURRENT_SCHEMA` (u32), always set on creation. `id` is `journal_id()`: consonant-only `xxxxx-xxxxx-xxxxx` format (15 chars, ~65 bits), generated on creation, immutable
    - `JournalItem` { id, item_type, content, file_ref, added_at, tags, meta } — `id` is `item_id()`: consonant-only `xxxx-xxxx-xxxx-xxxx` format (16 chars, ~70 bits)
    - `ItemType` enum { Finding, Decision, Snippet, Note, Fork }
    - `JournalSummary` { name, title, item_count, meta }
@@ -291,10 +321,12 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
    - Parses `~/.foray/config.toml` with `[stores.<name>]` sections; two backends: `type = "json_file"` (`path`, `description`) and `type = "foray_stdio"` (`command`, `args`, `description`, `store?`). `StdioStore` always appends `serve` to the configured command, so `args` contains only transport arguments — e.g. for SSH: `command = "ssh"`, `args = ["user@host", "--", "foray"]` → spawns `ssh user@host -- foray serve`
    - Falls back to implicit `local` `JsonFileStore` at `~/.foray/journals/` when config is absent or has no stores
    - `StoreRegistry` holds a `Vec<StoreEntry>` (name, description, `Arc<dyn Store>`) and a `nuance: String`
-   - `nuance` is a FNV-1a hash of sorted fingerprints (`"name=path"` for json_file, `"name=command arg0 …"` for foray_stdio) — deterministic, stable across restarts, changes when config changes
+   - `nuance` is a FNV-1a hash of sorted fingerprints (`"name=path"` for json_file, `"name=command arg0 …"` for foray_stdio) plus `"schema=N"` and `"protocol=N"` — deterministic, stable across restarts, changes when config, schema, or protocol version changes
    - `StoreRegistry::get(name)` — look up by name; `default_store()` — first entry; `names_hint()` — comma-joined names for error messages
    - `StoreRegistry::load()` — public constructor; `StoreRegistry::implicit_local()` — fallback constructor
-5. `store_stdio.rs` — `StdioStore`: spawns subprocess via rmcp `TokioChildProcess`, performs MCP `initialize` handshake via `serve_client`, caches remote `nuance` + `store_name` obtained from `hello`. All `Store` trait methods map to MCP tool calls (`open_journal`, `sync_journal`, `list_journals`, `archive_journal`, `unarchive_journal`). Connection is lazily established and cached in `Mutex<Option<Connection>>`; `Peer<RoleClient>` is cloned out before `.await` to avoid holding the lock across the await point.
+5. `store_stdio.rs` — `StdioStore`: spawns subprocess via rmcp `TokioChildProcess`, performs MCP `initialize` handshake via `serve_client`, caches remote `nuance` + `store_name` + `protocol` obtained from `hello`. Checks `hello.protocol` against `migrate::CURRENT_PROTOCOL` at connect time — returns `StoreError::ProtocolTooNew` if the server's protocol is newer. All `Store` trait methods map to MCP tool calls via a generic `call_mcp::<T>` that wraps each outbound call with `migrate::adapt_send(server_protocol, tool, args)` and each inbound response with `migrate::adapt_receive(server_protocol, tool, raw_json)` before typed deserialization. Wire structs all use `#[serde(deny_unknown_fields)]` — this is intentional: any field added in a future protocol must be declared in the struct *and* synthesised by `adapt_receive` for old servers, guaranteeing `adapt_receive` tells the whole compatibility story. Typed wire structs: `HelloWire`, `SyncJournalWire`, `OpenJournalWire`, `ListJournalsWire`, `ArchiveWire`, `UnarchiveWire`. Connection is lazily established and cached in `Mutex<Option<Connection>>`; `Peer<RoleClient>` is cloned out before `.await` to avoid holding the lock across the await point.
+
+   **Trust model**: `StdioStore` spawns arbitrary commands from `~/.foray/config.toml` by design — this is the mechanism that enables SSH remotes and other transports. The config file must be user-controlled; its integrity is the security boundary. Foray does not sandbox or validate the spawned command. Ensure `~/.foray/config.toml` has appropriate file permissions (`chmod 600`).
 
 ### Phase 3: Tree
 1. `tree.rs` — `build_tree(journals) -> String` — ASCII tree for CLI `--tree` flag. Scans items for `type: fork` with `foray:` refs to determine lineage.

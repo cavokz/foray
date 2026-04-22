@@ -1,4 +1,5 @@
 use crate::config::StoreRegistry;
+use crate::migrate::{self, MigrateResult};
 use crate::store::Store;
 use crate::store_json::fork_journal;
 use crate::tree::{build_tree, extract_fork_infos};
@@ -488,7 +489,19 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                     buf
                 }
             };
-            let journal: JournalFile = serde_json::from_str(&data)?;
+            let raw: serde_json::Value = serde_json::from_str(&data)?;
+            let value = match migrate::migrate(raw) {
+                MigrateResult::Current(v) | MigrateResult::Migrated(v) => v,
+                MigrateResult::TooNew { found, max } => {
+                    return Err(anyhow::anyhow!(
+                        "journal schema {found} is too new (max supported: {max})"
+                    ));
+                }
+                MigrateResult::Invalid => {
+                    return Err(anyhow::anyhow!("journal file is not a JSON object"));
+                }
+            };
+            let journal: JournalFile = serde_json::from_value(value)?;
             validate_name(&journal.name).map_err(|e| anyhow::anyhow!(e))?;
             store.create(journal).await?;
             println!("Imported successfully");
