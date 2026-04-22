@@ -53,6 +53,10 @@ pub enum MigrateResult {
 /// Migrate a raw journal [`Value`] to the current schema.
 ///
 /// Consumes the value and returns a [`MigrateResult`].
+///
+/// See `doc/compatibility.md` — *Axis 1 — Schema* for detection/resolution
+/// scenarios, and *Bumping the schema version* for the checklist to follow
+/// when adding a new schema version.
 pub fn migrate(value: Value) -> MigrateResult {
     let schema = value
         .get("schema")
@@ -114,6 +118,10 @@ fn v0_to_v1(mut obj: Map<String, Value>) -> Map<String, Value> {
 /// the call site rather than silent misbehaviour.
 ///
 /// Returns `Err(String)` if a required adaptation cannot be performed.
+///
+/// See `doc/compatibility.md` — *Protocol 0 (v0.2.0 Servers)* for the
+/// current adaptation rules, and *Bumping the protocol version* for the
+/// checklist to follow when adding a new protocol version.
 pub fn adapt_send(server_protocol: u32, tool: &str, mut args: Value) -> Result<Value, String> {
     // Protocol 0 → 1: several params were added that old servers reject via
     // `deny_unknown_fields`:
@@ -173,6 +181,10 @@ pub fn adapt_send(server_protocol: u32, tool: &str, mut args: Value) -> Result<V
 /// that old servers did not emit. Wire structs use `deny_unknown_fields`, so
 /// every field the server might send must be explicitly declared in the struct,
 /// and every field the struct requires must be inserted here for old servers.
+///
+/// See `doc/compatibility.md` — *Protocol 0 (v0.2.0 Servers)* for the
+/// current adaptation rules, and *Bumping the protocol version* for the
+/// checklist to follow when adding a new protocol version.
 ///
 /// Returns `Err(String)` if the response is not a JSON object (adaptation is
 /// not possible) or if a required field cannot be synthesised.
