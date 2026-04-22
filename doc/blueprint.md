@@ -164,6 +164,18 @@ Runtime migration runs on raw `serde_json::Value` **before** serde deserializati
 - **Dev deps**: tempfile
 - `async-trait` used on `trait Store` for `dyn Store` object safety with async methods. `rmcp` client + transport-child-process features enable `StdioStore` to act as an MCP client that tunnels over a subprocess stdio channel.
 
+## Development Workflow
+
+Pre-commit hooks enforce formatting and lint checks on every commit. After cloning, activate them once:
+
+```sh
+git config core.hooksPath .githooks
+```
+
+Hooks live in `.githooks/` (committed). `core.hooksPath` is stored in the main repo's `.git/config` and is inherited by all worktrees via `commondir` — no per-worktree setup needed. Each commit runs:
+- `cargo fmt --all -- --check`
+- `cargo clippy --all-targets -- -D warnings`
+
 ## MCP Server — fully stateless
 
 ### Server Identity (initialize response)
@@ -398,7 +410,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 ### Phase 7: CI + Test + Polish
 1. `.github/workflows/ci.yml` — 3-platform matrix (ubuntu, macos, windows)
 2. Unit tests: store CRUD, fork, tree, journal resolution chain, forayrc walk-up, open_journal behavior matrix
-3. `cargo fmt --check`, `cargo clippy -- -D warnings`, `cargo test`
+3. `cargo fmt --all -- --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`
 4. Manual smoke test: CLI + MCP integration
 5. Demo video (5 min)
 

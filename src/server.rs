@@ -840,9 +840,7 @@ mod tests {
     use crate::config::StoreRegistry;
 
     fn test_server() -> ForayServer {
-        ForayServer::new(StoreRegistry::for_test(
-            tempfile::tempdir().unwrap().into_path(),
-        ))
+        ForayServer::new(StoreRegistry::for_test(tempfile::tempdir().unwrap().keep()))
     }
 
     // ── preflight ──────────────────────────────────────────────────
