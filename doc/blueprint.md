@@ -160,7 +160,7 @@ Runtime migration runs on raw `serde_json::Value` **before** serde deserializati
 ## Tech Stack
 - **Language**: Rust
 - **MCP SDK**: `rmcp` v1.4.0 (server, client, macros, transport-io, transport-child-process)
-- **Deps**: tokio (rt, macros, sync, time — current_thread flavor), serde/serde_json, rand, chrono, dirs 6, fs2, anyhow, thiserror 2, clap (derive), clap_complete, toml, async-trait
+- **Deps**: tokio (rt, macros, sync, time — current_thread flavor), serde/serde_json, rand, chrono, home, fs2, anyhow, thiserror 2, clap (derive), clap_complete, toml, async-trait
 - **Dev deps**: tempfile
 - `async-trait` used on `trait Store` for `dyn Store` object safety with async methods. `rmcp` client + transport-child-process features enable `StdioStore` to act as an MCP client that tunnels over a subprocess stdio channel.
 
@@ -275,7 +275,7 @@ foray serve                          # Start MCP stdio server
 foray show [name] [--json] [--limit N] [--offset N]  # Full journal with items
 foray add <content> [--type TYPE] [--ref FILE] [--tags CSV] [--meta KEY=VALUE]...
 foray open <name> [--title "..."] [--fork [SOURCE]] [--meta KEY=VALUE]...  # Create or fork. --title required for new/fork. --fork without SOURCE forks from active journal.
-foray list [--json] [--tree] [--archived] [--limit N] [--offset N]  # List journals. --tree shows fork lineage. --archived shows archived. --json outputs {"total": N, "journals": [...]}
+foray list [--json] [--tree] [--archived] [--limit N] [--offset N] [--completion]  # List journals. --tree shows fork lineage. --archived shows archived. --json outputs {"total": N, "journals": [...]}. --completion outputs bare journal names one per line (for shell completion scripts).
 foray archive <name>                   # Archive a journal
 foray unarchive <name>                 # Unarchive a journal
 foray export <name> [--file PATH]       # Export journal JSON to stdout (or file)
@@ -285,14 +285,11 @@ foray completions <shell>               # Print shell completion script (bash, z
 
 Global options: `--journal <name>` and `--store <name>` on all commands (override env + .forayrc).
 
-`completions` prints a shell completion script to stdout. Pipe it to your shell's completion loader, e.g.:
-- `foray completions zsh > ~/.zfunc/_foray` (then `fpath+=~/.zfunc` and `autoload -Uz compinit`)
-- `foray completions bash > /etc/bash_completion.d/foray`
-- `foray completions fish > ~/.config/fish/completions/foray.fish`
+**Shell completion** — two modes:
+- **Static** (`foray completions <shell>`): generates a baked-in script that completes subcommands and flags. Pipe to your shell's loader (see `foray completions --help` for per-shell instructions).
+- **Env-var activation** (`COMPLETE=<shell> foray`): works in both build modes. In builds **without** `--features dynamic-completion`, it falls back to emitting the same baked-in static script as `foray completions <shell>`. In builds **with** `--features dynamic-completion`, it enables dynamic completion that also completes `--store` values and journal names from the active store. The dynamic path requires building with `--features dynamic-completion`, which pulls in the `unstable-dynamic` feature of `clap_complete` (API may change). Dynamic journal completion works for all store types via subprocess: the completer calls `foray list --completion [--archived] [--store <name>]` to enumerate candidates, with a 10-second timeout to prevent blocking on slow/remote stores.
 
-Note: completion covers subcommands and flags only. Store names and journal names are runtime data and require dynamic completion (not yet implemented).
-
-Global options: `--journal <name>` and `--store <name>` on all commands (override env + .forayrc).
+`foray list --completion` outputs bare journal names one per line. Respects `--archived` and `--store`. Used internally by dynamic completion and usable independently in shell scripts. Covered by integration tests in `tests/list_completion_test.rs`.
 
 `open` creates the journal (or forks if `--fork`), writes `.forayrc` in cwd.
 - `foray open deep-dive --title "Explore DB connection pooling theory"` → create empty journal, write `.forayrc`

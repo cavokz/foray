@@ -7,7 +7,11 @@ use crate::types::{ItemType, JournalFile, JournalItem, Pagination, item_id, vali
 use chrono::Utc;
 use clap::{Parser, Subcommand};
 use clap_complete::Shell;
+#[cfg(feature = "dynamic-completion")]
+use clap_complete::engine::{ArgValueCompleter, CompletionCandidate};
 use std::collections::HashMap;
+#[cfg(feature = "dynamic-completion")]
+use std::ffi::OsStr;
 use std::io::Read;
 use std::path::PathBuf;
 
@@ -20,10 +24,12 @@ use std::path::PathBuf;
 pub struct Cli {
     /// Override journal name (skips env + .forayrc resolution)
     #[arg(long, global = true)]
+    #[cfg_attr(feature = "dynamic-completion", arg(add = ArgValueCompleter::new(complete_journal_names)))]
     pub journal: Option<String>,
 
     /// Override store name (skips env + .forayrc resolution)
     #[arg(long, global = true)]
+    #[cfg_attr(feature = "dynamic-completion", arg(add = ArgValueCompleter::new(complete_store_names)))]
     pub store: Option<String>,
 
     #[command(subcommand)]
@@ -37,6 +43,8 @@ pub enum Commands {
     /// Show a journal with all items
     Show {
         /// Journal name (optional if resolvable)
+        #[arg()]
+        #[cfg_attr(feature = "dynamic-completion", arg(add = ArgValueCompleter::new(complete_journal_names)))]
         name: Option<String>,
         /// Output as JSON
         #[arg(long)]
@@ -77,6 +85,7 @@ pub enum Commands {
         title: Option<String>,
         /// Fork from another journal. Without value: fork from active journal.
         #[arg(long, num_args = 0..=1, default_missing_value = "")]
+        #[cfg_attr(feature = "dynamic-completion", arg(add = ArgValueCompleter::new(complete_journal_names)))]
         fork: Option<String>,
         /// Metadata key=value pairs
         #[arg(long = "meta", value_name = "KEY=VALUE")]
@@ -99,20 +108,29 @@ pub enum Commands {
         /// Skip N journals
         #[arg(long)]
         offset: Option<usize>,
+        /// Output bare journal names for shell completion (one per line)
+        #[arg(long, conflicts_with_all = ["json", "tree", "limit", "offset"])]
+        completion: bool,
     },
     /// Archive a journal
     Archive {
         /// Journal name
+        #[arg()]
+        #[cfg_attr(feature = "dynamic-completion", arg(add = ArgValueCompleter::new(complete_journal_names)))]
         name: String,
     },
     /// Unarchive a journal
     Unarchive {
         /// Journal name
+        #[arg()]
+        #[cfg_attr(feature = "dynamic-completion", arg(add = ArgValueCompleter::new(complete_archived_journal_names)))]
         name: String,
     },
     /// Export journal JSON to stdout or file
     Export {
         /// Journal name
+        #[arg()]
+        #[cfg_attr(feature = "dynamic-completion", arg(add = ArgValueCompleter::new(complete_journal_names)))]
         name: String,
         /// Output file (default: stdout)
         #[arg(long)]
@@ -125,24 +143,58 @@ pub enum Commands {
         file: Option<PathBuf>,
     },
     /// Generate shell completion script
-    #[command(after_help = "\
+    #[cfg_attr(
+        not(feature = "dynamic-completion"),
+        command(after_help = "\
 ACTIVATION:
-  bash:       foray completions bash >> ~/.bash_completion
-              # or system-wide: foray completions bash > /etc/bash_completion.d/foray
+  bash:       eval \"$(COMPLETE=bash foray)\"
+              # or persist: COMPLETE=bash foray >> ~/.bash_completion
 
-  zsh:        foray completions zsh > ~/.zfunc/_foray
-              # then ensure ~/.zshrc contains:
-              #   fpath+=~/.zfunc
+  zsh:        Add to ~/.zshrc, AFTER compinit:
+                eval \"$(COMPLETE=zsh foray)\"
+              # Example ~/.zshrc order:
               #   autoload -Uz compinit && compinit
+              #   eval \"$(COMPLETE=zsh foray)\"
 
-  fish:       foray completions fish > ~/.config/fish/completions/foray.fish
+  fish:       COMPLETE=fish foray | source
+              # or persist: COMPLETE=fish foray > ~/.config/fish/completions/foray.fish
 
-  powershell: foray completions powershell >> $PROFILE
+  powershell: & { $env:COMPLETE='powershell'; foray } | Invoke-Expression
+              # or append the output to $PROFILE
 
-  elvish:     foray completions elvish > ~/.config/elvish/lib/foray.elv
-              # then add to ~/.config/elvish/rc.elv:
-              #   use foray
-")]
+  elvish:     eval (COMPLETE=elvish foray | slurp)
+              # or persist: COMPLETE=elvish foray > ~/.config/elvish/lib/foray-complete.elv
+              #   then add to rc.elv: use foray-complete
+
+NOTE: this binary completes subcommands and flags only.
+For store and journal name completion, rebuild with:
+  cargo build --features dynamic-completion
+")
+    )]
+    #[cfg_attr(
+        feature = "dynamic-completion",
+        command(after_help = "\
+ACTIVATION (completes subcommands, flags, store names and journal names):
+  bash:       eval \"$(COMPLETE=bash foray)\"
+              # or persist: COMPLETE=bash foray >> ~/.bash_completion
+
+  zsh:        Add to ~/.zshrc, AFTER compinit:
+                eval \"$(COMPLETE=zsh foray)\"
+              # Example ~/.zshrc order:
+              #   autoload -Uz compinit && compinit
+              #   eval \"$(COMPLETE=zsh foray)\"
+
+  fish:       COMPLETE=fish foray | source
+              # or persist: COMPLETE=fish foray > ~/.config/fish/completions/foray.fish
+
+  powershell: & { $env:COMPLETE='powershell'; foray } | Invoke-Expression
+              # or append the output to $PROFILE
+
+  elvish:     eval (COMPLETE=elvish foray | slurp)
+              # or persist: COMPLETE=elvish foray > ~/.config/elvish/lib/foray-complete.elv
+              #   then add to rc.elv: use foray-complete
+")
+    )]
     Completions {
         /// Shell to generate completions for
         shell: Shell,
@@ -300,6 +352,92 @@ fn parse_item_type(s: &str) -> anyhow::Result<ItemType> {
     }
 }
 
+// ── Shell completion candidates ──────────────────────────────────────
+
+#[cfg(feature = "dynamic-completion")]
+fn complete_store_names(_current: &OsStr) -> Vec<CompletionCandidate> {
+    let Ok(registry) = StoreRegistry::load() else {
+        return vec![];
+    };
+    registry
+        .entries()
+        .iter()
+        .map(|e| CompletionCandidate::new(&e.name))
+        .collect()
+}
+
+#[cfg(feature = "dynamic-completion")]
+fn complete_journal_names(_current: &OsStr) -> Vec<CompletionCandidate> {
+    journal_names_as_candidates(false)
+}
+
+#[cfg(feature = "dynamic-completion")]
+fn complete_archived_journal_names(_current: &OsStr) -> Vec<CompletionCandidate> {
+    journal_names_as_candidates(true)
+}
+
+#[cfg(feature = "dynamic-completion")]
+fn journal_names_as_candidates(archived: bool) -> Vec<CompletionCandidate> {
+    let Ok(exe) = std::env::current_exe() else {
+        return vec![];
+    };
+    let store_name = std::env::var("FORAY_STORE")
+        .ok()
+        .filter(|s| !s.is_empty())
+        .or_else(|| {
+            std::env::current_dir()
+                .ok()
+                .and_then(|d| find_store_in_forayrc(&d))
+        });
+    let mut cmd = std::process::Command::new(&exe);
+    cmd.arg("list").arg("--completion");
+    if archived {
+        cmd.arg("--archived");
+    }
+    if let Some(store) = &store_name {
+        cmd.arg("--store").arg(store);
+    }
+    // Unset COMPLETE so the subprocess runs normally rather than completing.
+    cmd.env_remove("COMPLETE");
+    cmd.stdout(std::process::Stdio::piped())
+        .stderr(std::process::Stdio::null());
+
+    let Ok(mut child) = cmd.spawn() else {
+        return vec![];
+    };
+    let stdout = child.stdout.take();
+
+    // Read stdout in a thread so we can enforce a timeout on slow/remote stores.
+    let (tx, rx) = std::sync::mpsc::channel::<Vec<u8>>();
+    std::thread::spawn(move || {
+        let mut buf = Vec::new();
+        if let Some(mut out) = stdout {
+            use std::io::Read;
+            let _ = out.read_to_end(&mut buf);
+        }
+        let _ = tx.send(buf);
+    });
+
+    let buf = match rx.recv_timeout(std::time::Duration::from_secs(10)) {
+        Ok(buf) => buf,
+        Err(_) => {
+            let _ = child.kill();
+            let _ = child.wait();
+            return vec![];
+        }
+    };
+    let _ = child.wait();
+
+    let Ok(stdout) = String::from_utf8(buf) else {
+        return vec![];
+    };
+    stdout
+        .lines()
+        .filter(|l| !l.is_empty())
+        .map(CompletionCandidate::new)
+        .collect()
+}
+
 fn print_item(item: &JournalItem) {
     let type_str = format!("{:?}", item.item_type).to_lowercase();
     println!(
@@ -455,7 +593,15 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             archived,
             limit,
             offset,
+            completion,
         } => {
+            if *completion {
+                let (summaries, _) = store.list(&Pagination::default(), *archived).await?;
+                for s in &summaries {
+                    println!("{}", s.name);
+                }
+                return Ok(());
+            }
             let pagination = Pagination {
                 limit: *limit,
                 offset: *offset,

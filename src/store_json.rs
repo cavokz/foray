@@ -22,7 +22,7 @@ impl JsonFileStore {
     }
 
     pub fn default_dir() -> Result<PathBuf, StoreError> {
-        Ok(dirs::home_dir()
+        Ok(home::home_dir()
             .ok_or_else(|| {
                 StoreError::Io(std::io::Error::new(
                     std::io::ErrorKind::NotFound,

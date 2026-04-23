@@ -11,19 +11,13 @@ use foray::types::{ItemType, JournalFile, JournalItem, Pagination, item_id};
 async fn stdio_store_create_load_list() {
     // Isolated home dir so the subprocess doesn't touch ~.
     let home = tempfile::TempDir::new().unwrap();
-
     let home_str = home.path().to_str().unwrap().to_string();
+
     #[allow(unused_mut)]
     let mut env_overrides = vec![("HOME".to_string(), home_str.clone())];
-    // On Windows, dirs::home_dir() ignores HOME and uses USERPROFILE /
-    // HOMEDRIVE+HOMEPATH instead.  Override all three so the subprocess
-    // is truly isolated regardless of platform.
+    // On Windows, home::home_dir() checks USERPROFILE, not HOME.
     #[cfg(windows)]
-    {
-        env_overrides.push(("USERPROFILE".to_string(), home_str.clone()));
-        env_overrides.push(("HOMEDRIVE".to_string(), "".to_string()));
-        env_overrides.push(("HOMEPATH".to_string(), home_str.clone()));
-    }
+    env_overrides.push(("USERPROFILE".to_string(), home_str));
 
     let store = StdioStore::new(
         env!("CARGO_BIN_EXE_foray").to_string(),
