@@ -237,7 +237,7 @@ impl StoreRegistry {
 // ── Helpers ─────────────────────────────────────────────────────────
 
 fn config_path() -> Result<PathBuf, StoreError> {
-    Ok(dirs::home_dir()
+    Ok(home::home_dir()
         .ok_or_else(|| {
             StoreError::Io(std::io::Error::new(
                 std::io::ErrorKind::NotFound,
