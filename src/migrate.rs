@@ -89,19 +89,18 @@ pub fn migrate(value: Value) -> MigrateResult {
 }
 
 /// Migration 0 → 1: remove `created_at` and `updated_at` from the journal
-/// root and from every item, then inject `"schema": 1`.
+/// root, drop any `fork` items, then inject `"schema": 1`.
 fn v0_to_v1(mut obj: Map<String, Value>) -> Map<String, Value> {
     obj.remove("created_at");
     obj.remove("updated_at");
 
-    // Strip timestamps from items array too.
     if let Some(Value::Array(items)) = obj.get_mut("items") {
-        for item in items.iter_mut() {
-            if let Value::Object(item_obj) = item {
-                item_obj.remove("created_at");
-                item_obj.remove("updated_at");
-            }
-        }
+        items.retain(|item| {
+            item.get("type")
+                .and_then(Value::as_str)
+                .map(|t| t != "fork")
+                .unwrap_or(true)
+        });
     }
 
     obj.insert("schema".to_string(), Value::from(1u32));
@@ -264,6 +263,27 @@ mod tests {
     }
 
     #[test]
+    fn migrate_v0_drops_fork_items() {
+        let v = json!({
+            "id": "abc",
+            "name": "test",
+            "items": [
+                { "id": "a", "type": "fork", "content": "Forked from parent", "added_at": "2026-01-01T00:00:00Z" },
+                { "id": "b", "type": "finding", "content": "real finding", "added_at": "2026-01-01T00:00:00Z" }
+            ]
+        });
+        match migrate(v) {
+            MigrateResult::Migrated(out) => {
+                assert_eq!(out["schema"], json!(CURRENT_SCHEMA));
+                let items = out["items"].as_array().unwrap();
+                assert_eq!(items.len(), 1, "fork item should be dropped");
+                assert_eq!(items[0]["type"], json!("finding"));
+            }
+            _ => panic!("expected Migrated"),
+        }
+    }
+
+    #[test]
     fn migrate_v0_removes_timestamps() {
         let v = json!({
             "id": "abc",
@@ -273,8 +293,7 @@ mod tests {
                     "id": "x",
                     "type": "note",
                     "content": "hi",
-                    "added_at": "2026-01-01T00:00:00Z",
-                    "created_at": "2026-01-01T00:00:00Z"
+                    "added_at": "2026-01-01T00:00:00Z"
                 }
             ],
             "created_at": "2026-01-01T00:00:00Z",
@@ -292,11 +311,6 @@ mod tests {
                 );
                 assert_eq!(out["schema"], json!(CURRENT_SCHEMA));
                 let item = &out["items"][0];
-                assert!(
-                    item.get("created_at").is_none(),
-                    "item created_at should be removed"
-                );
-                // added_at on items is kept
                 assert!(
                     item.get("added_at").is_some(),
                     "item added_at should be preserved"

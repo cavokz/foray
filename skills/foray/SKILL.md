@@ -29,7 +29,7 @@ Use foray when the conversation involves **substantive, evolving work** — not 
 |------|-----|
 | `hello` | Establish handshake and get `nuance` + available `stores` — call this first, every session |
 | `list_journals` | Check existing journals before creating |
-| `open_journal` | Create, fork, or reopen a journal |
+| `open_journal` | Create or reopen a journal |
 | `sync_journal` | Read items and/or add new ones (the workhorse) |
 | `archive_journal` | Archive a journal (readable but not writable) |
 | `unarchive_journal` | Restore an archived journal |
@@ -108,25 +108,6 @@ sync_journal(
 )
 ```
 
-## Forking a Journal
-
-When work branches into distinct directions, fork:
-
-```
-open_journal(
-  name: "db-pooling-theory",
-  title: "DB connection pooling as root cause",
-  fork: "auth-cache-race",
-  store: "local",
-  nuance: "..."
-)
-```
-
-After forking:
-- Use the **new** journal for subsequent `sync_journal` calls
-- The original journal is preserved as-is
-- A `fork` item in the new journal tracks lineage
-
 ## Cursor Tracking
 
 Every `sync_journal` response includes a `cursor`. Always capture it and pass it on the next call to the same journal. This returns only new items, keeping responses small.
@@ -156,7 +137,7 @@ When the user returns to continue:
 
 When the user asks to compare directions:
 
-1. Call `sync_journal` on each fork
+1. Call `sync_journal` on each journal being compared
 2. Compare items side by side
 3. Highlight which direction has more evidence
 
@@ -214,10 +195,9 @@ sync_journal(
 
 - Always call `list_journals` before creating a new journal
 - When opening an existing journal, omit `title`
-- When creating or forking, always provide `title`
+- When creating a new journal, always provide `title`
 - Use descriptive, lowercase, hyphenated journal names
 - Set `ref` for file paths, URLs, ticket links, PR links
-- After forking from X to Y, use Y for subsequent adds
 - Don't use foray for simple one-shot Q&A with no follow-up work
 - Track `cursor` per journal: capture it from every `sync_journal` response and pass it on the next call — never omit it after the first call within a session
 - Route tangential items to the most appropriate journal, not always the current one

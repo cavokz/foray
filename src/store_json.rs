@@ -1,12 +1,8 @@
 use crate::migrate::{self, MigrateResult};
 use crate::store::{Store, StoreError};
-use crate::types::{
-    ItemType, JournalFile, JournalItem, JournalSummary, Pagination, item_id, validate_name,
-};
+use crate::types::{JournalFile, JournalItem, JournalSummary, Pagination};
 use async_trait::async_trait;
-use chrono::Utc;
 use fs2::FileExt;
-use std::collections::HashMap;
 use std::fs;
 use std::io::Write;
 use std::path::{Path, PathBuf};
@@ -233,42 +229,11 @@ impl Store for JsonFileStore {
     }
 }
 
-/// Fork a journal: snapshot-copy items from source to a new journal.
-pub async fn fork_journal(
-    store: &dyn Store,
-    source: &str,
-    new_name: &str,
-    title: String,
-    meta: Option<HashMap<String, serde_json::Value>>,
-) -> Result<JournalFile, StoreError> {
-    validate_name(new_name)
-        .map_err(|e| StoreError::Io(std::io::Error::new(std::io::ErrorKind::InvalidInput, e)))?;
-
-    let all = Pagination::default();
-    let (source_journal, _) = store.load(source, &all).await?;
-
-    let fork_item = JournalItem {
-        id: item_id(),
-        item_type: ItemType::Fork,
-        content: format!("Forked from {source}"),
-        file_ref: Some(format!("foray:{}#{}", source, source_journal.id)),
-        tags: None,
-        added_at: Utc::now(),
-        meta: None,
-    };
-
-    let mut new_journal = JournalFile::new(new_name, Some(title), meta);
-    let mut items = vec![fork_item];
-    items.extend(source_journal.items);
-    new_journal.items = items;
-
-    store.create(new_journal.clone()).await?;
-    Ok(new_journal)
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::types::{ItemType, item_id};
+    use chrono::Utc;
 
     fn make_store() -> (JsonFileStore, tempfile::TempDir) {
         let dir = tempfile::TempDir::new().unwrap();
@@ -472,47 +437,6 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn fork_journal_works() {
-        let (store, _dir) = make_store();
-        store
-            .create(JournalFile::new("parent", Some("P".into()), None))
-            .await
-            .unwrap();
-        store
-            .add_items("parent", vec![make_item("finding-1")])
-            .await
-            .unwrap();
-        store
-            .add_items("parent", vec![make_item("finding-2")])
-            .await
-            .unwrap();
-
-        let forked = fork_journal(&store, "parent", "child", "Child Title".into(), None)
-            .await
-            .unwrap();
-        assert_eq!(forked.name, "child");
-        assert_eq!(forked.title.as_deref(), Some("Child Title"));
-        assert_eq!(forked.items.len(), 3);
-        assert_eq!(forked.items[0].item_type, ItemType::Fork);
-        assert!(
-            forked.items[0]
-                .file_ref
-                .as_ref()
-                .unwrap()
-                .starts_with("foray:parent#")
-        );
-
-        store
-            .add_items("parent", vec![make_item("finding-3")])
-            .await
-            .unwrap();
-        let (parent, _) = store.load("parent", &Pagination::default()).await.unwrap();
-        let (child, _) = store.load("child", &Pagination::default()).await.unwrap();
-        assert_eq!(parent.items.len(), 3);
-        assert_eq!(child.items.len(), 3);
-    }
-
-    #[tokio::test]
     async fn read_journal_migrates_v0() {
         let (store, dir) = make_store();
         // Write a raw schema-0 file (no schema field, has created_at/updated_at).
@@ -526,8 +450,7 @@ mod tests {
                     "id": "xxxx-xxxx-xxxx-xxxx",
                     "type": "note",
                     "content": "old note",
-                    "added_at": "2026-01-01T00:00:00Z",
-                    "created_at": "2026-01-01T00:00:00Z"
+                    "added_at": "2026-01-01T00:00:00Z"
                 }
             ],
             "created_at": "2026-01-01T00:00:00Z",
