@@ -513,7 +513,6 @@ impl Store for StdioStore {
             "name":   wire.name,
             "title":  wire.title,
             "items":  wire.items,
-            "_note":  null,
             "meta":   null,
         });
         let migrated = match migrate::migrate(migrate_input) {
@@ -533,7 +532,6 @@ impl Store for StdioStore {
             serde_json::from_value(migrated["items"].clone()).map_err(|e| io_err(e.to_string()))?;
 
         let journal = JournalFile {
-            _note: None,
             schema: migrate::CURRENT_SCHEMA,
             name: migrated["name"].as_str().unwrap_or(name).to_string(),
             title: migrated["title"].as_str().map(String::from),
