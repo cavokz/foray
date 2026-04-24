@@ -85,7 +85,8 @@ pub fn migrate(value: Value) -> MigrateResult {
 
 /// Migration 0 → 1: remove `created_at` and `updated_at` from the journal
 /// root, drop any `fork` items, move top-level `ref` on items into
-/// `meta["ref"]`, remove the top-level `id` field, then inject `"schema": 1`.
+/// `meta["ref"]`, remove the top-level `id` and `_note` fields, then inject
+/// `"schema": 1`.
 fn v0_to_v1(mut obj: Map<String, Value>) -> Map<String, Value> {
     obj.remove("created_at");
     obj.remove("updated_at");
@@ -130,6 +131,7 @@ fn v0_to_v1(mut obj: Map<String, Value>) -> Map<String, Value> {
     }
 
     obj.remove("id");
+    obj.remove("_note");
     obj.insert("schema".to_string(), Value::from(1u32));
     obj
 }

@@ -100,7 +100,6 @@ No `.active` file. No project subdirectories. One JSON file per journal. Archive
 ### Journal file format
 ```json
 {
-  "_note": "Edit this file freely. Each file is self-contained.",
   "schema": 1,
   "name": "auth-deep-dive",
   "title": "Investigating auth cache race conditions in session.go",
@@ -133,6 +132,7 @@ Runtime migration runs on raw `serde_json::Value` **before** serde deserializati
 | Schema stamp injection | Runtime migration 0→1 | None — transparent |
 | `ref` → `meta.ref` on items | Runtime migration 0→1 | None — transparent |
 | Journal-level `id` removal | Runtime migration 0→1 | None — transparent |
+| Journal-level `_note` removal | Runtime migration 0→1 | None — transparent |
 | Field rename | Offline tool (planned: `foray migrate`) | Explicit, one-time |
 | Type change | Offline tool (planned: `foray migrate`) | Explicit, one-time |
 | `schema > CURRENT_SCHEMA` | Hard error: `SchemaTooNew` | Upgrade foray binary |
@@ -302,7 +302,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 
 ### Phase 2: Types + Store
 1. `types.rs`:
-   - `JournalFile` { `_note`, schema, name, title, items, meta } — `schema` is `CURRENT_SCHEMA` (u32), always set on creation
+   - `JournalFile` { schema, name, title, items, meta } — `schema` is `CURRENT_SCHEMA` (u32), always set on creation
    - `JournalItem` { id, item_type, content, added_at, tags, meta } — `id` is `item_id()`: consonant-only `xxxx-xxxx-xxxx-xxxx` format (16 chars, ~70 bits)
    - `ItemType` enum { Finding, Decision, Snippet, Note }
    - `JournalSummary` { name, title, item_count, meta }
@@ -451,7 +451,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 - **Input limits** (server-side, write path only): content max 64KB, title max 512 chars, max 20 tags each max 64 chars, meta max 8KB serialized. Stored data is not validated on read — trust what's on disk.
 - **Pagination cap**: Server caps `limit` to 500 in both `sync_journal` and `list_journals`.
 - **`ref` in `meta`**: references (file paths, URLs, ticket/PR links, cross-journal `foray:` refs) are stored as `meta["ref"]` on the item. The CLI exposes `--ref` as a convenience flag that populates `meta.ref`. The v0→1 migration moves any top-level `ref` field on existing items into `meta.ref` automatically.
-- **Serde**: strict deserialization (`deny_unknown_fields`), `meta` field for extensibility, `_note` first in struct for JSON ordering, `Option` fields skipped when None.
+- **Serde**: strict deserialization (`deny_unknown_fields`), `meta` field for extensibility, `Option` fields skipped when None.
 - **CLI output**: plain text by default, `--json` flag on read commands.
 - **MCP responses**: JSON-serialized structs. LLM formats for the user.
 - **`rmcp` pattern**: `#[derive(Clone)]` server, `StoreRegistry` (not a bare `Arc<dyn Store>`), `Parameters<T>` for tool args, `CallToolResult::success(Content::text(...))` for returns. `serve_server()` returns a `RunningService` — must call `.waiting()` to keep the process alive. `use rmcp::schemars;` is required at module level for `#[derive(JsonSchema)]` to resolve.

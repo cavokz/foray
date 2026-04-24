@@ -33,8 +33,6 @@ pub struct JournalItem {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct JournalFile {
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub _note: Option<String>,
     /// Schema version. Always call [`crate::migrate::migrate`] before deserializing —
     /// migration guarantees this field is present and at the current version.
     pub schema: u32,
@@ -53,7 +51,6 @@ impl JournalFile {
         meta: Option<HashMap<String, serde_json::Value>>,
     ) -> Self {
         Self {
-            _note: Some("Edit this file freely. Each file is self-contained.".into()),
             schema: migrate::CURRENT_SCHEMA,
             name: name.to_string(),
             title,
