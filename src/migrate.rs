@@ -89,7 +89,8 @@ pub fn migrate(value: Value) -> MigrateResult {
 }
 
 /// Migration 0 → 1: remove `created_at` and `updated_at` from the journal
-/// root, drop any `fork` items, then inject `"schema": 1`.
+/// root, drop any `fork` items, move top-level `ref` on items into
+/// `meta["ref"]`, then inject `"schema": 1`.
 fn v0_to_v1(mut obj: Map<String, Value>) -> Map<String, Value> {
     obj.remove("created_at");
     obj.remove("updated_at");
@@ -101,6 +102,36 @@ fn v0_to_v1(mut obj: Map<String, Value>) -> Map<String, Value> {
                 .map(|t| t != "fork")
                 .unwrap_or(true)
         });
+        for item in items.iter_mut() {
+            if let Value::Object(item_obj) = item
+                && item_obj.contains_key("ref")
+            {
+                // Normalize meta to an object so ref is never silently dropped.
+                match item_obj.get_mut("meta") {
+                    Some(m) if !m.is_object() => *m = Value::Object(Map::new()),
+                    None => {
+                        item_obj.insert("meta".to_string(), Value::Object(Map::new()));
+                    }
+                    _ => {}
+                }
+
+                let should_fill = item_obj
+                    .get("meta")
+                    .and_then(Value::as_object)
+                    .map(|mo| !mo.contains_key("ref") || mo.get("ref") == Some(&Value::Null))
+                    .unwrap_or(false);
+
+                if should_fill {
+                    if let Some(ref_val) = item_obj.remove("ref")
+                        && let Some(Value::Object(meta_obj)) = item_obj.get_mut("meta")
+                    {
+                        meta_obj.insert("ref".to_string(), ref_val);
+                    }
+                } else {
+                    item_obj.remove("ref");
+                }
+            }
+        }
     }
 
     obj.insert("schema".to_string(), Value::from(1u32));
@@ -278,6 +309,109 @@ mod tests {
                 let items = out["items"].as_array().unwrap();
                 assert_eq!(items.len(), 1, "fork item should be dropped");
                 assert_eq!(items[0]["type"], json!("finding"));
+            }
+            _ => panic!("expected Migrated"),
+        }
+    }
+
+    #[test]
+    fn migrate_v0_moves_ref_to_meta() {
+        let v = json!({
+            "id": "abc",
+            "name": "test",
+            "items": [
+                {
+                    "id": "x",
+                    "type": "finding",
+                    "content": "hi",
+                    "ref": "src/auth.rs:42",
+                    "added_at": "2026-01-01T00:00:00Z"
+                },
+                {
+                    "id": "y",
+                    "type": "note",
+                    "content": "no ref",
+                    "added_at": "2026-01-01T00:00:00Z"
+                },
+                {
+                    "id": "z",
+                    "type": "decision",
+                    "content": "existing meta",
+                    "ref": "src/b.rs",
+                    "added_at": "2026-01-01T00:00:00Z",
+                    "meta": { "vcs-branch": "main" }
+                }
+            ]
+        });
+        match migrate(v) {
+            MigrateResult::Migrated(out) => {
+                assert_eq!(out["schema"], json!(CURRENT_SCHEMA));
+                let item0 = &out["items"][0];
+                assert!(
+                    item0.get("ref").is_none(),
+                    "ref should be removed from item"
+                );
+                assert_eq!(item0["meta"]["ref"], json!("src/auth.rs:42"));
+                let item1 = &out["items"][1];
+                assert!(item1.get("ref").is_none());
+                assert!(
+                    item1.get("meta").is_none(),
+                    "meta should not be created when ref absent"
+                );
+                let item2 = &out["items"][2];
+                assert!(item2.get("ref").is_none());
+                assert_eq!(item2["meta"]["ref"], json!("src/b.rs"));
+                assert_eq!(
+                    item2["meta"]["vcs-branch"],
+                    json!("main"),
+                    "existing meta preserved"
+                );
+            }
+            _ => panic!("expected Migrated"),
+        }
+    }
+
+    #[test]
+    fn migrate_v0_ref_does_not_overwrite_existing_meta_ref() {
+        let v = json!({
+            "id": "abc",
+            "name": "test",
+            "items": [{
+                "id": "x",
+                "type": "note",
+                "content": "c",
+                "ref": "old",
+                "added_at": "2026-01-01T00:00:00Z",
+                "meta": { "ref": "existing" }
+            }]
+        });
+        match migrate(v) {
+            MigrateResult::Migrated(out) => {
+                assert_eq!(out["items"][0]["meta"]["ref"], json!("existing"));
+            }
+            _ => panic!("expected Migrated"),
+        }
+    }
+
+    #[test]
+    fn migrate_v0_ref_with_null_meta() {
+        // meta: null must be normalized to an object so ref is not silently dropped.
+        let v = json!({
+            "id": "abc",
+            "name": "test",
+            "items": [{
+                "id": "x",
+                "type": "note",
+                "content": "c",
+                "ref": "src/lib.rs:1",
+                "added_at": "2026-01-01T00:00:00Z",
+                "meta": null
+            }]
+        });
+        match migrate(v) {
+            MigrateResult::Migrated(out) => {
+                assert!(out["items"][0].get("ref").is_none());
+                assert_eq!(out["items"][0]["meta"]["ref"], json!("src/lib.rs:1"));
             }
             _ => panic!("expected Migrated"),
         }

@@ -246,7 +246,6 @@ mod tests {
             id: item_id(),
             item_type: ItemType::Finding,
             content: content.into(),
-            file_ref: None,
             tags: None,
             added_at: Utc::now(),
             meta: None,

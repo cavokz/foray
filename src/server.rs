@@ -95,13 +95,10 @@ pub struct SyncItemInput {
     /// Type of item: finding, decision, snippet, note (default: note)
     #[serde(default)]
     pub item_type: Option<String>,
-    /// File reference (path, URL, ticket link, etc.)
-    #[serde(default, rename = "ref")]
-    pub file_ref: Option<String>,
     /// Tags for categorization (array or comma-separated string)
     #[serde(default, deserialize_with = "deserialize_tags")]
     pub tags: Option<Vec<String>>,
-    /// Item-level metadata (free-form key-value pairs)
+    /// Item-level metadata (free-form key-value pairs). Use `meta.ref` for file paths, URLs, ticket links, etc.
     #[serde(default)]
     pub meta: Option<HashMap<String, serde_json::Value>>,
 }
@@ -518,7 +515,6 @@ impl ForayServer {
                     id: id.clone(),
                     item_type,
                     content: input.content,
-                    file_ref: input.file_ref,
                     tags: input.tags,
                     added_at: Utc::now(),
                     meta: input.meta,
@@ -736,18 +732,17 @@ mod tests {
     // ── SyncItemInput deserialization ───────────────────────────────
 
     #[test]
-    fn sync_item_ref_field_accepted() {
+    fn sync_item_ref_via_meta_accepted() {
         let v: SyncItemInput =
-            serde_json::from_str(r#"{"content":"x","ref":"src/auth/session.go:142"}"#).unwrap();
-        assert_eq!(v.file_ref.as_deref(), Some("src/auth/session.go:142"));
-    }
-
-    #[test]
-    fn sync_item_file_ref_field_rejected() {
-        // old field name must be rejected (deny_unknown_fields)
-        let result: Result<SyncItemInput, _> =
-            serde_json::from_str(r#"{"content":"x","file_ref":"src/auth/session.go:142"}"#);
-        assert!(result.is_err());
+            serde_json::from_str(r#"{"content":"x","meta":{"ref":"src/auth/session.go:142"}}"#)
+                .unwrap();
+        assert_eq!(
+            v.meta
+                .as_ref()
+                .and_then(|m| m.get("ref"))
+                .and_then(|v| v.as_str()),
+            Some("src/auth/session.go:142")
+        );
     }
 
     #[test]

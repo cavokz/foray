@@ -110,10 +110,9 @@ No `.active` file. No project subdirectories. One JSON file per journal. Archive
       "id": "gfnd-cpht-xvmr-sjlk",
       "type": "finding",
       "content": "Race condition in auth cache",
-      "ref": "src/auth/session.go:142",
       "tags": ["auth", "race-condition"],
       "added_at": "2026-04-15T10:15:00Z",
-      "meta": { "confidence": "high", "model": "claude-opus-4" }
+      "meta": { "ref": "src/auth/session.go:142", "confidence": "high", "model": "claude-opus-4" }
     }
   ],
   "meta": { "created_by": "vscode-copilot" }
@@ -133,6 +132,7 @@ Runtime migration runs on raw `serde_json::Value` **before** serde deserializati
 | New optional field | Runtime migration, self-heal rewrite | None — transparent |
 | Field removal | Runtime migration, self-heal rewrite | None — transparent |
 | Schema stamp injection | Runtime migration 0→1 | None — transparent |
+| `ref` → `meta.ref` on items | Runtime migration 0→1 | None — transparent |
 | Field rename | Offline tool (planned: `foray migrate`) | Explicit, one-time |
 | Type change | Offline tool (planned: `foray migrate`) | Explicit, one-time |
 | `schema > CURRENT_SCHEMA` | Hard error: `SchemaTooNew` | Upgrade foray binary |
@@ -207,7 +207,7 @@ Prompts are the fallback for LLMs without the companion skill. They provide just
 |------|--------|-------------|
 | `hello` | *(none)* | Establish handshake. Returns `{ version, nuance, protocol, stores }`. Always call first — every session — then pass `nuance` and `store` on subsequent calls. |
 | `open_journal` | `name`, `title?`, `meta?`, `store`, `nuance` | Create or reopen a journal. `title` is required when creating (error if missing), ignored when reopening. Idempotent if journal exists. `meta` sets journal-level metadata. `store` must be a name from the `hello` response. |
-| `sync_journal` | `name`, `cursor?`, `limit?`, `items?`, `store`, `nuance` | Read and write journal items in one call. Returns items since cursor position. `cursor` is the position from the previous sync (omit for full read). `items` is an array of `{ content, item_type?, ref?, tags?, meta? }`. `limit` caps returned items (does not affect additions). Returns `cursor` for the next call and `added_ids` for items added by this call. `store` must be a name from the `hello` response. |
+| `sync_journal` | `name`, `cursor?`, `limit?`, `items?`, `store`, `nuance` | Read and write journal items in one call. Returns items since cursor position. `cursor` is the position from the previous sync (omit for full read). `items` is an array of `{ content, item_type?, tags?, meta? }`. Use `meta.ref` for file paths, URLs, ticket links, PR links, or cross-journal references (`foray:name`). `limit` caps returned items (does not affect additions). Returns `cursor` for the next call and `added_ids` for items added by this call. `store` must be a name from the `hello` response. |
 | `list_journals` | `limit?`, `offset?`, `archived?`, `store`, `nuance` | List journals in the selected store. Pass `archived: true` to list archived journals instead of active ones. Paginated: defaults to all. |
 | `archive_journal` | `name`, `store`, `nuance` | Archive a journal. Archived journals are readable but not writable. |
 | `unarchive_journal` | `name`, `store`, `nuance` | Restore an archived journal, making it writable again. |
@@ -303,7 +303,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 ### Phase 2: Types + Store
 1. `types.rs`:
    - `JournalFile` { `_note`, schema, id, name, title, items, meta } — `schema` is `CURRENT_SCHEMA` (u32), always set on creation. `id` is `journal_id()`: consonant-only `xxxxx-xxxxx-xxxxx` format (15 chars, ~65 bits), generated on creation, immutable
-   - `JournalItem` { id, item_type, content, file_ref, added_at, tags, meta } — `id` is `item_id()`: consonant-only `xxxx-xxxx-xxxx-xxxx` format (16 chars, ~70 bits)
+   - `JournalItem` { id, item_type, content, added_at, tags, meta } — `id` is `item_id()`: consonant-only `xxxx-xxxx-xxxx-xxxx` format (16 chars, ~70 bits)
    - `ItemType` enum { Finding, Decision, Snippet, Note }
    - `JournalSummary` { name, title, item_count, meta }
    - `Pagination` { limit: Option<usize>, offset: Option<usize> }
@@ -379,9 +379,9 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
     **Behavioral rules:**
     - Call `list_journals` before creating new journals, suggest existing ones
     - When opening an existing journal, omit `title`. When creating, always provide `title`.
-    - Use `ref` field for file paths, URLs, ticket links, PR links
-    - When adding items in a version-controlled checkout, set `meta.vcs-repo` (remote URL), `meta.vcs-branch`, and `meta.vcs-revision` (commit SHA, changelist number, etc.) on the item — anchors each `ref` to an exact codebase state
-    - To cross-reference another journal, use `ref: "foray:journal-name"` as a free-form notation
+    - Use `meta.ref` for file paths, URLs, ticket links, PR links
+    - When adding items in a version-controlled checkout, set `meta.vcs-repo` (remote URL), `meta.vcs-branch`, and `meta.vcs-revision` (commit SHA, changelist number, etc.) on the item — anchors each `meta.ref` to an exact codebase state
+    - To cross-reference another journal, use `meta.ref: "foray:journal-name"` as a free-form notation
     - When resuming, call `sync_journal` to reload findings
     - Foray is opt-in — use it when the conversation is investigative, not for quick questions
     - Skill includes its own `update-url` — LLM can fetch the latest, diff against local copy, summarize what changed, and offer to update
@@ -450,7 +450,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 - **Concurrency**: `add_items` (store method) locks a `{name}.lock` sidecar file via `fs2::lock_exclusive` during read-modify-write. Concurrent adds from multiple MCP server processes or CLI are serialized. Append-only — no conflicts.
 - **Input limits** (server-side, write path only): content max 64KB, title max 512 chars, max 20 tags each max 64 chars, meta max 8KB serialized. Stored data is not validated on read — trust what's on disk.
 - **Pagination cap**: Server caps `limit` to 500 in both `sync_journal` and `list_journals`.
-- **`ref` field**: `file_ref` in Rust, `"ref"` in JSON via serde rename. Free-form string — file paths, URLs, ticket/PR links.
+- **`ref` in `meta`**: references (file paths, URLs, ticket/PR links, cross-journal `foray:` refs) are stored as `meta["ref"]` on the item. The CLI exposes `--ref` as a convenience flag that populates `meta.ref`. The v0→1 migration moves any top-level `ref` field on existing items into `meta.ref` automatically.
 - **Serde**: strict deserialization (`deny_unknown_fields`), `meta` field for extensibility, `_note` first in struct for JSON ordering, `Option` fields skipped when None.
 - **CLI output**: plain text by default, `--json` flag on read commands.
 - **MCP responses**: JSON-serialized structs. LLM formats for the user.

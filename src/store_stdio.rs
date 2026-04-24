@@ -563,9 +563,6 @@ impl Store for StdioStore {
                     "content": item.content,
                     "item_type": type_str,
                 });
-                if let Some(r) = &item.file_ref {
-                    obj["ref"] = Value::String(r.clone());
-                }
                 if let Some(tags) = &item.tags {
                     obj["tags"] = serde_json::to_value(tags).unwrap_or_default();
                 }

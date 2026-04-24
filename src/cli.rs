@@ -433,7 +433,12 @@ fn print_item(item: &JournalItem) {
         type_str,
         item.content
     );
-    if let Some(r) = &item.file_ref {
+    if let Some(r) = item
+        .meta
+        .as_ref()
+        .and_then(|m| m.get("ref"))
+        .and_then(|v| v.as_str())
+    {
         println!("  ref: {r}");
     }
     if let Some(tags) = &item.tags {
@@ -511,14 +516,20 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                     .map(|s| s.trim().to_string())
                     .collect::<Vec<_>>()
             });
+            let mut parsed_meta = parse_meta(meta);
+            if let Some(r) = file_ref {
+                parsed_meta
+                    .get_or_insert_with(HashMap::new)
+                    .entry("ref".to_string())
+                    .or_insert_with(|| serde_json::Value::String(r.clone()));
+            }
             let item = JournalItem {
                 id: item_id(),
                 item_type: it,
                 content: content.clone(),
-                file_ref: file_ref.clone(),
                 tags: parsed_tags,
                 added_at: Utc::now(),
-                meta: parse_meta(meta),
+                meta: parsed_meta,
             };
             let count = store.add_items(&journal_name, vec![item]).await?;
             println!("Added to {journal_name} ({count} items)");
