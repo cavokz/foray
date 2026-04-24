@@ -43,7 +43,6 @@ async fn stdio_store_create_load_list() {
         id: item_id(),
         item_type: ItemType::Finding,
         content: "hello from remote".to_string(),
-        file_ref: None,
         tags: None,
         added_at: Utc::now(),
         meta: None,
