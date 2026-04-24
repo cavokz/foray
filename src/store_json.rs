@@ -526,8 +526,7 @@ mod tests {
                     "id": "xxxx-xxxx-xxxx-xxxx",
                     "type": "note",
                     "content": "old note",
-                    "added_at": "2026-01-01T00:00:00Z",
-                    "created_at": "2026-01-01T00:00:00Z"
+                    "added_at": "2026-01-01T00:00:00Z"
                 }
             ],
             "created_at": "2026-01-01T00:00:00Z",

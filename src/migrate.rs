@@ -94,16 +94,6 @@ fn v0_to_v1(mut obj: Map<String, Value>) -> Map<String, Value> {
     obj.remove("created_at");
     obj.remove("updated_at");
 
-    // Strip timestamps from items array too.
-    if let Some(Value::Array(items)) = obj.get_mut("items") {
-        for item in items.iter_mut() {
-            if let Value::Object(item_obj) = item {
-                item_obj.remove("created_at");
-                item_obj.remove("updated_at");
-            }
-        }
-    }
-
     obj.insert("schema".to_string(), Value::from(1u32));
     obj
 }
@@ -273,8 +263,7 @@ mod tests {
                     "id": "x",
                     "type": "note",
                     "content": "hi",
-                    "added_at": "2026-01-01T00:00:00Z",
-                    "created_at": "2026-01-01T00:00:00Z"
+                    "added_at": "2026-01-01T00:00:00Z"
                 }
             ],
             "created_at": "2026-01-01T00:00:00Z",
@@ -292,11 +281,6 @@ mod tests {
                 );
                 assert_eq!(out["schema"], json!(CURRENT_SCHEMA));
                 let item = &out["items"][0];
-                assert!(
-                    item.get("created_at").is_none(),
-                    "item created_at should be removed"
-                );
-                // added_at on items is kept
                 assert!(
                     item.get("added_at").is_some(),
                     "item added_at should be preserved"
