@@ -12,7 +12,6 @@ pub enum ItemType {
     Decision,
     Snippet,
     Note,
-    Fork,
 }
 
 /// A single entry inside a journal.

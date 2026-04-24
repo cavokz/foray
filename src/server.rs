@@ -1,7 +1,6 @@
 use crate::config::StoreRegistry;
 use crate::migrate;
 use crate::store::{Store, StoreError};
-use crate::store_json::fork_journal;
 use crate::types::{ItemType, JournalFile, JournalItem, Pagination, item_id, validate_name};
 use chrono::Utc;
 use rmcp::handler::server::wrapper::Parameters;
@@ -72,12 +71,9 @@ pub struct UnarchiveJournalParams {
 pub struct OpenJournalParams {
     /// Journal name ([a-z0-9_-], max 64 chars)
     pub name: String,
-    /// Title for new journals (required when creating or forking, ignored when reopening)
+    /// Title for new journals (required when creating, ignored when reopening)
     #[serde(default)]
     pub title: Option<String>,
-    /// Source journal name to fork from
-    #[serde(default)]
-    pub fork: Option<String>,
     /// Journal-level metadata (free-form key-value pairs)
     #[serde(default)]
     pub meta: Option<HashMap<String, serde_json::Value>>,
@@ -276,7 +272,7 @@ and `sync_journal` to read and write items.\n\n\
 For the best experience, install the foray companion skill. \
 Fetch https://raw.githubusercontent.com/cavokz/foray/main/SETUP.md for setup instructions, \
 including per-client install paths and how to get the skill. \
-The skill teaches you when and how to use journal tools effectively — including when to fork, \
+The skill teaches you when and how to use journal tools effectively — including \
 how to handle corrections, and how to anchor findings to source code.";
 
 #[derive(Clone)]
@@ -429,7 +425,7 @@ impl ForayServer {
 
     #[tool(
         name = "open_journal",
-        description = "Create, fork, or reopen a journal. title is required when creating or forking (error if missing), ignored when reopening. fork specifies source journal name. Idempotent if journal exists without fork."
+        description = "Create or reopen a journal. title is required when creating (error if missing), ignored when reopening. Idempotent if journal exists."
     )]
     async fn open_journal(
         &self,
@@ -442,92 +438,45 @@ impl ForayServer {
 
         let exists = store.exists(&args.name).await.map_err(Self::store_err)?;
 
-        match (exists, &args.fork) {
-            (false, None) => {
-                let title = args.title.ok_or_else(|| {
-                    ErrorData::invalid_params("title is required when creating a new journal", None)
-                })?;
-                if title.len() > MAX_TITLE {
-                    return Err(ErrorData::invalid_params(
-                        format!(
-                            "title exceeds {MAX_TITLE} char limit ({} chars)",
-                            title.len()
-                        ),
-                        None,
-                    ));
-                }
-                validate_meta(&args.meta)?;
-                let journal = JournalFile::new(&args.name, Some(title), args.meta);
-                store.create(journal).await.map_err(Self::store_err)?;
-                let p = Pagination::default();
-                let (j, _) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
-                let resp = OpenJournalResponse {
-                    name: j.name,
-                    title: j.title,
-                    item_count: j.items.len(),
-                    created: true,
-                };
-                Ok(CallToolResult::success(vec![Content::text(
-                    serde_json::to_string(&resp).unwrap(),
-                )]))
+        if !exists {
+            let title = args.title.ok_or_else(|| {
+                ErrorData::invalid_params("title is required when creating a new journal", None)
+            })?;
+            if title.len() > MAX_TITLE {
+                return Err(ErrorData::invalid_params(
+                    format!(
+                        "title exceeds {MAX_TITLE} char limit ({} chars)",
+                        title.len()
+                    ),
+                    None,
+                ));
             }
-            (false, Some(source)) => {
-                let title = args.title.ok_or_else(|| {
-                    ErrorData::invalid_params("title is required when forking a journal", None)
-                })?;
-                if title.len() > MAX_TITLE {
-                    return Err(ErrorData::invalid_params(
-                        format!(
-                            "title exceeds {MAX_TITLE} char limit ({} chars)",
-                            title.len()
-                        ),
-                        None,
-                    ));
-                }
-                validate_meta(&args.meta)?;
-                let forked = fork_journal(store.as_ref(), source, &args.name, title, args.meta)
-                    .await
-                    .map_err(Self::store_err)?;
-                let resp = OpenJournalResponse {
-                    name: forked.name,
-                    title: forked.title,
-                    item_count: forked.items.len(),
-                    created: true,
-                };
-                Ok(CallToolResult::success(vec![Content::text(
-                    serde_json::to_string(&resp).unwrap(),
-                )]))
-            }
-            (true, None) => {
-                let p = Pagination::default();
-                let (j, total) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
-                let resp = OpenJournalResponse {
-                    name: j.name,
-                    title: j.title,
-                    item_count: total,
-                    created: false,
-                };
-                Ok(CallToolResult::success(vec![Content::text(
-                    serde_json::to_string(&resp).unwrap(),
-                )]))
-            }
-            (true, Some(source)) if *source == args.name => {
-                let p = Pagination::default();
-                let (j, total) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
-                let resp = OpenJournalResponse {
-                    name: j.name,
-                    title: j.title,
-                    item_count: total,
-                    created: false,
-                };
-                Ok(CallToolResult::success(vec![Content::text(
-                    serde_json::to_string(&resp).unwrap(),
-                )]))
-            }
-            (true, Some(_)) => Err(ErrorData::invalid_params(
-                format!("journal already exists: {}", args.name),
-                None,
-            )),
+            validate_meta(&args.meta)?;
+            let journal = JournalFile::new(&args.name, Some(title), args.meta);
+            store.create(journal).await.map_err(Self::store_err)?;
+            let p = Pagination::default();
+            let (j, _) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
+            let resp = OpenJournalResponse {
+                name: j.name,
+                title: j.title,
+                item_count: j.items.len(),
+                created: true,
+            };
+            Ok(CallToolResult::success(vec![Content::text(
+                serde_json::to_string(&resp).unwrap(),
+            )]))
+        } else {
+            let p = Pagination::default();
+            let (j, total) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
+            let resp = OpenJournalResponse {
+                name: j.name,
+                title: j.title,
+                item_count: total,
+                created: false,
+            };
+            Ok(CallToolResult::success(vec![Content::text(
+                serde_json::to_string(&resp).unwrap(),
+            )]))
         }
     }
 

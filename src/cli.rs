@@ -1,8 +1,6 @@
 use crate::config::StoreRegistry;
 use crate::migrate::{self, MigrateResult};
 use crate::store::Store;
-use crate::store_json::fork_journal;
-use crate::tree::{build_tree, extract_fork_infos};
 use crate::types::{ItemType, JournalFile, JournalItem, Pagination, item_id, validate_name};
 use chrono::Utc;
 use clap::{Parser, Subcommand};
@@ -16,11 +14,7 @@ use std::io::Read;
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(
-    name = "foray",
-    version,
-    about = "Persistent, forkable investigation journals"
-)]
+#[command(name = "foray", version, about = "Persistent investigation journals")]
 pub struct Cli {
     /// Override journal name (skips env + .forayrc resolution)
     #[arg(long, global = true)]
@@ -76,17 +70,13 @@ pub enum Commands {
         #[arg(long = "meta", value_name = "KEY=VALUE")]
         meta: Vec<String>,
     },
-    /// Create or fork a journal, set it as active in .forayrc
+    /// Create or open a journal, set it as active in .forayrc
     Open {
         /// Journal name
         name: String,
-        /// Title (required for new/fork)
+        /// Title (required for new journals)
         #[arg(long)]
         title: Option<String>,
-        /// Fork from another journal. Without value: fork from active journal.
-        #[arg(long, num_args = 0..=1, default_missing_value = "")]
-        #[cfg_attr(feature = "dynamic-completion", arg(add = ArgValueCompleter::new(complete_journal_names)))]
-        fork: Option<String>,
         /// Metadata key=value pairs
         #[arg(long = "meta", value_name = "KEY=VALUE")]
         meta: Vec<String>,
@@ -96,9 +86,6 @@ pub enum Commands {
         /// Output as JSON
         #[arg(long)]
         json: bool,
-        /// Show fork lineage tree
-        #[arg(long)]
-        tree: bool,
         /// Show archived journals
         #[arg(long)]
         archived: bool,
@@ -109,7 +96,7 @@ pub enum Commands {
         #[arg(long)]
         offset: Option<usize>,
         /// Output bare journal names for shell completion (one per line)
-        #[arg(long, conflicts_with_all = ["json", "tree", "limit", "offset"])]
+        #[arg(long, conflicts_with_all = ["json", "limit", "offset"])]
         completion: bool,
     },
     /// Archive a journal
@@ -536,60 +523,26 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             let count = store.add_items(&journal_name, vec![item]).await?;
             println!("Added to {journal_name} ({count} items)");
         }
-        Commands::Open {
-            name,
-            title,
-            fork,
-            meta,
-        } => {
+        Commands::Open { name, title, meta } => {
             validate_name(name).map_err(|e| anyhow::anyhow!(e))?;
             let meta = parse_meta(meta);
             let exists = store.exists(name).await?;
 
-            match (exists, fork) {
-                (false, None) => {
-                    let title = title.as_ref().ok_or_else(|| {
-                        anyhow::anyhow!("--title is required when creating a new journal")
-                    })?;
-                    let journal = JournalFile::new(name, Some(title.clone()), meta);
-                    store.create(journal).await?;
-                    println!("Created journal: {name}");
-                }
-                (false, Some(source)) => {
-                    let title = title.as_ref().ok_or_else(|| {
-                        anyhow::anyhow!("--title is required when forking a journal")
-                    })?;
-                    let source_name = if source.is_empty() {
-                        resolve_journal(cli.journal.as_deref(), None)?
-                    } else {
-                        validate_name(source).map_err(|e| anyhow::anyhow!(e))?;
-                        source.clone()
-                    };
-                    let forked =
-                        fork_journal(store, &source_name, name, title.clone(), meta).await?;
-                    println!(
-                        "Forked {} → {} ({} items)",
-                        source_name,
-                        name,
-                        forked.items.len()
-                    );
-                }
-                (true, None) => {
-                    println!("Journal already exists: {name}");
-                }
-                (true, Some(source)) if source == name || source.is_empty() => {
-                    println!("Journal already exists: {name}");
-                }
-                (true, Some(_)) => {
-                    anyhow::bail!("journal already exists: {name}");
-                }
+            if exists {
+                println!("Journal already exists: {name}");
+            } else {
+                let title = title.as_ref().ok_or_else(|| {
+                    anyhow::anyhow!("--title is required when creating a new journal")
+                })?;
+                let journal = JournalFile::new(name, Some(title.clone()), meta);
+                store.create(journal).await?;
+                println!("Created journal: {name}");
             }
             write_forayrc(name, cli.store.as_deref())?;
             println!("Set active journal in .forayrc");
         }
         Commands::List {
             json,
-            tree,
             archived,
             limit,
             offset,
@@ -608,20 +561,7 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             };
             let (summaries, total) = store.list(&pagination, *archived).await?;
 
-            if *tree {
-                let all_p = Pagination::default();
-                let (all_summaries, _) = store.list(&all_p, false).await?;
-                let mut fork_data = Vec::new();
-                for s in &all_summaries {
-                    if let Ok((j, _)) = store.load(&s.name, &all_p).await {
-                        let infos = extract_fork_infos(&j.items);
-                        if !infos.is_empty() {
-                            fork_data.push((s.name.clone(), infos));
-                        }
-                    }
-                }
-                print!("{}", build_tree(&all_summaries, &fork_data));
-            } else if *json {
+            if *json {
                 println!(
                     "{}",
                     serde_json::to_string_pretty(

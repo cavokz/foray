@@ -89,10 +89,19 @@ pub fn migrate(value: Value) -> MigrateResult {
 }
 
 /// Migration 0 → 1: remove `created_at` and `updated_at` from the journal
-/// root and from every item, then inject `"schema": 1`.
+/// root, drop any `fork` items, then inject `"schema": 1`.
 fn v0_to_v1(mut obj: Map<String, Value>) -> Map<String, Value> {
     obj.remove("created_at");
     obj.remove("updated_at");
+
+    if let Some(Value::Array(items)) = obj.get_mut("items") {
+        items.retain(|item| {
+            item.get("type")
+                .and_then(Value::as_str)
+                .map(|t| t != "fork")
+                .unwrap_or(true)
+        });
+    }
 
     obj.insert("schema".to_string(), Value::from(1u32));
     obj
@@ -250,6 +259,27 @@ mod tests {
         match migrate(v) {
             MigrateResult::Current(out) => assert_eq!(out, original),
             _ => panic!("expected Current"),
+        }
+    }
+
+    #[test]
+    fn migrate_v0_drops_fork_items() {
+        let v = json!({
+            "id": "abc",
+            "name": "test",
+            "items": [
+                { "id": "a", "type": "fork", "content": "Forked from parent", "added_at": "2026-01-01T00:00:00Z" },
+                { "id": "b", "type": "finding", "content": "real finding", "added_at": "2026-01-01T00:00:00Z" }
+            ]
+        });
+        match migrate(v) {
+            MigrateResult::Migrated(out) => {
+                assert_eq!(out["schema"], json!(CURRENT_SCHEMA));
+                let items = out["items"].as_array().unwrap();
+                assert_eq!(items.len(), 1, "fork item should be dropped");
+                assert_eq!(items[0]["type"], json!("finding"));
+            }
+            _ => panic!("expected Migrated"),
         }
     }
 

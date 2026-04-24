@@ -483,7 +483,7 @@ impl Store for StdioStore {
         if !resp.created {
             return Err(StoreError::AlreadyExists(journal.name));
         }
-        // Persist any initial items (e.g. from `foray import` or `fork_journal`).
+        // Persist any initial items (e.g. from `foray import`).
         if !journal.items.is_empty() {
             self.add_items(&journal.name, journal.items).await?;
         }
