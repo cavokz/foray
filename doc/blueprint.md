@@ -102,7 +102,6 @@ No `.active` file. No project subdirectories. One JSON file per journal. Archive
 {
   "_note": "Edit this file freely. Each file is self-contained.",
   "schema": 1,
-  "id": "bkrnt-wflsd-jmxvp",
   "name": "auth-deep-dive",
   "title": "Investigating auth cache race conditions in session.go",
   "items": [
@@ -133,6 +132,7 @@ Runtime migration runs on raw `serde_json::Value` **before** serde deserializati
 | Field removal | Runtime migration, self-heal rewrite | None — transparent |
 | Schema stamp injection | Runtime migration 0→1 | None — transparent |
 | `ref` → `meta.ref` on items | Runtime migration 0→1 | None — transparent |
+| Journal-level `id` removal | Runtime migration 0→1 | None — transparent |
 | Field rename | Offline tool (planned: `foray migrate`) | Explicit, one-time |
 | Type change | Offline tool (planned: `foray migrate`) | Explicit, one-time |
 | `schema > CURRENT_SCHEMA` | Hard error: `SchemaTooNew` | Upgrade foray binary |
@@ -250,10 +250,10 @@ Errors include a structured `data` object with machine-readable fields for progr
 ### Tool response formats
 - `hello` → `{ version, nuance, protocol, stores: [{name, description}] }` (e.g. `{ "version": "1.2.3", "nuance": "abc123", "protocol": 1, "stores": [{"name": "local", "description": "Default local journal store"}] }`)
 - `open_journal` → `{ name, title, item_count, created }` (`created: bool` — true if new)
-- `sync_journal` → `{ schema, id, name, title, items: [...], added_ids: [...], cursor, total }` (`schema` is the wire protocol schema version; `id` is the journal's immutable ID; `cursor` is the position for the next call; `added_ids` lists IDs assigned to items added by this call in order)
+- `sync_journal` → `{ schema, name, title, items: [...], added_ids: [...], cursor, total }` (`schema` is the wire protocol schema version; `cursor` is the position for the next call; `added_ids` lists IDs assigned to items added by this call in order)
 - `list_journals` → `{ journals: [{ name, title, item_count, meta }], total, limit, offset }` (pass `archived: true` to list archived journals)
-- `archive_journal` → `{ archived: "<name>", id: "<id>" }`
-- `unarchive_journal` → `{ unarchived: "<name>", id: "<id>" }`
+- `archive_journal` → `{ archived: "<name>" }`
+- `unarchive_journal` → `{ unarchived: "<name>" }`
 
 ## CLI Commands
 
@@ -302,7 +302,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 
 ### Phase 2: Types + Store
 1. `types.rs`:
-   - `JournalFile` { `_note`, schema, id, name, title, items, meta } — `schema` is `CURRENT_SCHEMA` (u32), always set on creation. `id` is `journal_id()`: consonant-only `xxxxx-xxxxx-xxxxx` format (15 chars, ~65 bits), generated on creation, immutable
+   - `JournalFile` { `_note`, schema, name, title, items, meta } — `schema` is `CURRENT_SCHEMA` (u32), always set on creation
    - `JournalItem` { id, item_type, content, added_at, tags, meta } — `id` is `item_id()`: consonant-only `xxxx-xxxx-xxxx-xxxx` format (16 chars, ~70 bits)
    - `ItemType` enum { Finding, Decision, Snippet, Note }
    - `JournalSummary` { name, title, item_count, meta }
@@ -313,7 +313,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
    - `#[async_trait] trait Store: Send + Sync` with async methods: `load(name, pagination) -> (JournalFile, total)`, `create`, `add_items(name, Vec<JournalItem>)`, `list(pagination, archived) -> (Vec<JournalSummary>, total)`, `delete`, `exists`, `archive`, `unarchive`
    - `load` reads both active and archived journals (always readable).
    - `add_items` errors if the journal is archived.
-   - `archive(name) -> Result<String>` marks a journal as archived and returns the journal id; `unarchive(name) -> Result<String>` restores it and returns the journal id. `unarchive` on an already-active journal is idempotent (returns id). `archive` on an already-archived journal returns `StoreError::Archived`.
+   - `archive(name) -> Result<()>` marks a journal as archived; `unarchive(name) -> Result<()>` restores it. `unarchive` on an already-active journal is idempotent. `archive` on an already-archived journal returns `StoreError::Archived`.
    - `list(archived: bool)` returns active journals by default, archived when `archived = true`.
    - Pagination pushed down to the trait so backends (Elasticsearch, etc.) can handle it natively. `JsonFileStore` reads the full file and slices in memory — the cost is trivial compared to the LLM API call that follows. Pagination controls how much data the LLM receives, not I/O efficiency.
    - `JsonFileStore::new(base_dir)` — flat `~/.foray/journals/*.json`

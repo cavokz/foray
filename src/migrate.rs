@@ -33,11 +33,6 @@ pub const CURRENT_PROTOCOL: u32 = 1;
 /// a `store` argument.
 pub const PROTOCOL_0_IMPLICIT_STORE: &str = "local";
 
-/// Synthetic journal ID inserted into `sync_journal` responses from protocol 0
-/// servers that did not emit an `id` field. Visually distinct so it is
-/// obvious in logs or debug output that the value was synthesised.
-pub const PROTOCOL_0_IMPLICIT_ID: &str = "<unknown>";
-
 /// Result of running [`migrate`].
 pub enum MigrateResult {
     /// The value was already at the current schema — returned unchanged.
@@ -90,7 +85,7 @@ pub fn migrate(value: Value) -> MigrateResult {
 
 /// Migration 0 → 1: remove `created_at` and `updated_at` from the journal
 /// root, drop any `fork` items, move top-level `ref` on items into
-/// `meta["ref"]`, then inject `"schema": 1`.
+/// `meta["ref"]`, remove the top-level `id` field, then inject `"schema": 1`.
 fn v0_to_v1(mut obj: Map<String, Value>) -> Map<String, Value> {
     obj.remove("created_at");
     obj.remove("updated_at");
@@ -134,6 +129,7 @@ fn v0_to_v1(mut obj: Map<String, Value>) -> Map<String, Value> {
         }
     }
 
+    obj.remove("id");
     obj.insert("schema".to_string(), Value::from(1u32));
     obj
 }
@@ -225,7 +221,7 @@ pub fn adapt_receive(
 ) -> Result<Value, String> {
     // Protocol 0 → 1: the following fields were added in this transition:
     //   hello:            `protocol`, `stores`  (version was already present)
-    //   sync_journal:     `schema`, `id`
+    //   sync_journal:     `schema`
     //   open_journal:     `name`, `title`, `item_count`
     //   list_journals:    `limit`, `offset`
     //   archive_journal:  `archived`
@@ -250,8 +246,6 @@ pub fn adapt_receive(
             }
             "sync_journal" => {
                 obj.entry("schema").or_insert_with(|| Value::from(0u32));
-                obj.entry("id")
-                    .or_insert_with(|| Value::String(PROTOCOL_0_IMPLICIT_ID.to_string()));
             }
             "open_journal" => {
                 obj.entry("name")
@@ -285,7 +279,7 @@ mod tests {
 
     #[test]
     fn migrate_current() {
-        let v = json!({ "schema": 1, "id": "abc", "name": "test", "items": [] });
+        let v = json!({ "schema": 1, "name": "test", "items": [] });
         let original = v.clone();
         match migrate(v) {
             MigrateResult::Current(out) => assert_eq!(out, original),
@@ -461,6 +455,7 @@ mod tests {
         match migrate(v) {
             MigrateResult::Migrated(out) => {
                 assert_eq!(out["schema"], json!(CURRENT_SCHEMA));
+                assert!(out.get("id").is_none(), "id should be removed by v0_to_v1");
             }
             _ => panic!("expected Migrated"),
         }
@@ -469,8 +464,7 @@ mod tests {
     #[test]
     fn migrate_schema_overflow() {
         // Values > u32::MAX must not bypass the TooNew guard via truncation.
-        let v =
-            json!({ "schema": (u32::MAX as u64) + 1, "id": "abc", "name": "test", "items": [] });
+        let v = json!({ "schema": (u32::MAX as u64) + 1, "name": "test", "items": [] });
         match migrate(v) {
             MigrateResult::TooNew { found, max } => {
                 assert_eq!(found, u32::MAX);
@@ -482,7 +476,7 @@ mod tests {
 
     #[test]
     fn migrate_too_new() {
-        let v = json!({ "schema": 9999, "id": "abc", "name": "test", "items": [] });
+        let v = json!({ "schema": 9999, "name": "test", "items": [] });
         match migrate(v) {
             MigrateResult::TooNew { found, max } => {
                 assert_eq!(found, 9999);
@@ -600,15 +594,15 @@ mod tests {
     }
 
     #[test]
-    fn adapt_receive_sync_journal_inserts_id_and_schema_for_protocol_0() {
-        // v0.2.0 sync_journal response has no `id` or `schema`.
+    fn adapt_receive_sync_journal_inserts_schema_for_protocol_0() {
+        // v0.2.0 sync_journal response has no `schema`.
         let raw = json!({
             "name": "j", "title": null,
             "items": [], "added_ids": [], "cursor": 0, "total": 0
         });
         let result = adapt_receive(0, "sync_journal", raw).unwrap();
         assert_eq!(result["schema"], json!(0));
-        assert_eq!(result["id"], json!(PROTOCOL_0_IMPLICIT_ID));
+        assert!(result.get("id").is_none(), "id should be absent");
     }
 
     #[test]

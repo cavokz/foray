@@ -196,7 +196,7 @@ impl Store for JsonFileStore {
         Ok(self.find(name).is_some())
     }
 
-    async fn archive(&self, name: &str) -> Result<String, StoreError> {
+    async fn archive(&self, name: &str) -> Result<(), StoreError> {
         let active = self.journal_path(name);
         if !active.exists() {
             if self.archive_path(name).exists() {
@@ -204,28 +204,25 @@ impl Store for JsonFileStore {
             }
             return Err(StoreError::NotFound(name.into()));
         }
-        let id = self.read_journal(&active)?.id;
         let dest = self.archive_path(name);
         if let Some(parent) = dest.parent() {
             fs::create_dir_all(parent)?;
         }
         fs::rename(active, dest)?;
-        Ok(id)
+        Ok(())
     }
 
-    async fn unarchive(&self, name: &str) -> Result<String, StoreError> {
+    async fn unarchive(&self, name: &str) -> Result<(), StoreError> {
         let archived = self.archive_path(name);
         if !archived.exists() {
             if self.journal_path(name).exists() {
-                let id = self.read_journal(&self.journal_path(name))?.id;
-                return Ok(id);
+                return Ok(());
             }
             return Err(StoreError::NotFound(name.into()));
         }
-        let id = self.read_journal(&archived)?.id;
         let dest = self.journal_path(name);
         fs::rename(archived, dest)?;
-        Ok(id)
+        Ok(())
     }
 }
 
@@ -359,14 +356,7 @@ mod tests {
             .await
             .unwrap();
 
-        let (j, _) = store
-            .load("arch-test", &Pagination::default())
-            .await
-            .unwrap();
-        let expected_id = j.id.clone();
-
-        let archived_id = store.archive("arch-test").await.unwrap();
-        assert_eq!(archived_id, expected_id);
+        store.archive("arch-test").await.unwrap();
 
         let (loaded, _) = store
             .load("arch-test", &Pagination::default())
@@ -382,8 +372,7 @@ mod tests {
         let (active, _) = store.list(&Pagination::default(), false).await.unwrap();
         assert_eq!(active.len(), 0);
 
-        let unarchived_id = store.unarchive("arch-test").await.unwrap();
-        assert_eq!(unarchived_id, expected_id);
+        store.unarchive("arch-test").await.unwrap();
         let (active, _) = store.list(&Pagination::default(), false).await.unwrap();
         assert_eq!(active.len(), 1);
     }
@@ -412,15 +401,13 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn unarchive_already_active_returns_id() {
+    async fn unarchive_already_active_is_noop() {
         let (store, _dir) = make_store();
         store
             .create(JournalFile::new("active", Some("A".into()), None))
             .await
             .unwrap();
-        let (j, _) = store.load("active", &Pagination::default()).await.unwrap();
-        let id = store.unarchive("active").await.unwrap();
-        assert_eq!(id, j.id);
+        store.unarchive("active").await.unwrap();
         // still active
         let (active, _) = store.list(&Pagination::default(), false).await.unwrap();
         assert_eq!(active.len(), 1);

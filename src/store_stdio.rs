@@ -51,7 +51,6 @@ struct StoreInfoWire {
 #[allow(dead_code)]
 struct SyncJournalWire {
     schema: u32,
-    id: String,
     name: String,
     title: Option<String>,
     items: Vec<Value>,
@@ -88,7 +87,6 @@ struct ListJournalsWire {
 struct ArchiveWire {
     #[allow(dead_code)]
     archived: String,
-    id: String,
 }
 
 #[derive(Deserialize)]
@@ -96,7 +94,6 @@ struct ArchiveWire {
 struct UnarchiveWire {
     #[allow(dead_code)]
     unarchived: String,
-    id: String,
 }
 
 // ── Connection ───────────────────────────────────────────────────────
@@ -513,7 +510,6 @@ impl Store for StdioStore {
         // inspect and transform the items array.
         let migrate_input = serde_json::json!({
             "schema": wire.schema,
-            "id":     wire.id,
             "name":   wire.name,
             "title":  wire.title,
             "items":  wire.items,
@@ -539,7 +535,6 @@ impl Store for StdioStore {
         let journal = JournalFile {
             _note: None,
             schema: migrate::CURRENT_SCHEMA,
-            id: migrated["id"].as_str().unwrap_or("unknown").to_string(),
             name: migrated["name"].as_str().unwrap_or(name).to_string(),
             title: migrated["title"].as_str().map(String::from),
             items,
@@ -610,16 +605,18 @@ impl Store for StdioStore {
         Err(unsupported_err("delete"))
     }
 
-    async fn archive(&self, name: &str) -> Result<String, StoreError> {
+    async fn archive(&self, name: &str) -> Result<(), StoreError> {
         let args = serde_json::json!({ "name": name });
-        let resp: ArchiveWire = self.call_mcp("archive_journal", args).await?;
-        Ok(resp.id)
+        self.call_mcp::<ArchiveWire>("archive_journal", args)
+            .await?;
+        Ok(())
     }
 
-    async fn unarchive(&self, name: &str) -> Result<String, StoreError> {
+    async fn unarchive(&self, name: &str) -> Result<(), StoreError> {
         let args = serde_json::json!({ "name": name });
-        let resp: UnarchiveWire = self.call_mcp("unarchive_journal", args).await?;
-        Ok(resp.id)
+        self.call_mcp::<UnarchiveWire>("unarchive_journal", args)
+            .await?;
+        Ok(())
     }
 }
 
@@ -671,7 +668,7 @@ mod tests {
 
     #[test]
     fn sync_journal_wire_deserializes_fully_formed_response() {
-        let s = r#"{"schema":1,"id":"x","name":"j","title":null,"items":[],"added_ids":[],"cursor":0,"total":0}"#;
+        let s = r#"{"schema":1,"name":"j","title":null,"items":[],"added_ids":[],"cursor":0,"total":0}"#;
         let w: SyncJournalWire = serde_json::from_str(s).unwrap();
         assert_eq!(w.schema, 1);
         assert_eq!(w.name, "j");
@@ -679,7 +676,7 @@ mod tests {
 
     #[test]
     fn sync_journal_wire_rejects_unknown_fields() {
-        let s = r#"{"schema":1,"id":"x","name":"j","title":null,"items":[],"added_ids":[],"cursor":0,"total":0,"future_field":42}"#;
+        let s = r#"{"schema":1,"name":"j","title":null,"items":[],"added_ids":[],"cursor":0,"total":0,"future_field":42}"#;
         assert!(serde_json::from_str::<SyncJournalWire>(s).is_err());
     }
 

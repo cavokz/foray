@@ -178,7 +178,6 @@ struct OpenJournalResponse {
 struct SyncJournalResponse {
     /// Wire protocol schema version — always set to [`migrate::CURRENT_SCHEMA`].
     schema: u32,
-    id: String,
     name: String,
     title: Option<String>,
     items: Vec<serde_json::Value>,
@@ -553,7 +552,6 @@ impl ForayServer {
 
         let resp = SyncJournalResponse {
             schema: migrate::CURRENT_SCHEMA,
-            id: journal.id,
             name: journal.name,
             title: journal.title,
             items,
@@ -612,9 +610,9 @@ impl ForayServer {
         self.preflight(args.nuance.as_deref())?;
         validate_name(&args.name).map_err(|e| ErrorData::invalid_params(e, None))?;
         let store = self.resolve_store(args.store.as_deref())?;
-        let id = store.archive(&args.name).await.map_err(Self::store_err)?;
+        store.archive(&args.name).await.map_err(Self::store_err)?;
         Ok(CallToolResult::success(vec![Content::text(
-            serde_json::to_string(&serde_json::json!({ "archived": args.name, "id": id })).unwrap(),
+            serde_json::to_string(&serde_json::json!({ "archived": args.name })).unwrap(),
         )]))
     }
 
@@ -629,10 +627,9 @@ impl ForayServer {
         self.preflight(args.nuance.as_deref())?;
         validate_name(&args.name).map_err(|e| ErrorData::invalid_params(e, None))?;
         let store = self.resolve_store(args.store.as_deref())?;
-        let id = store.unarchive(&args.name).await.map_err(Self::store_err)?;
+        store.unarchive(&args.name).await.map_err(Self::store_err)?;
         Ok(CallToolResult::success(vec![Content::text(
-            serde_json::to_string(&serde_json::json!({ "unarchived": args.name, "id": id }))
-                .unwrap(),
+            serde_json::to_string(&serde_json::json!({ "unarchived": args.name })).unwrap(),
         )]))
     }
 }
@@ -917,7 +914,7 @@ mod tests {
         let text = result.unwrap().content[0].as_text().unwrap().text.clone();
         let json: serde_json::Value = serde_json::from_str(&text).unwrap();
         assert_eq!(json["archived"], "arc-test");
-        assert!(json["id"].as_str().is_some());
+        assert!(json.get("id").is_none());
 
         // Verify active list no longer contains it.
         let (active, _) = store
@@ -1081,7 +1078,6 @@ mod tests {
     fn sync_response_cursor_and_added_ids_present() {
         let resp = SyncJournalResponse {
             schema: migrate::CURRENT_SCHEMA,
-            id: "test-id-1234".into(),
             name: "my-journal".into(),
             title: Some("My Journal".into()),
             items: vec![],
@@ -1090,7 +1086,7 @@ mod tests {
             total: 7,
         };
         let json: serde_json::Value = serde_json::to_value(&resp).unwrap();
-        assert!(json["id"].as_str().is_some());
+        assert!(json.get("id").is_none());
         assert_eq!(json["cursor"], 7);
         assert_eq!(json["added_ids"], serde_json::json!(["abc-123"]));
     }

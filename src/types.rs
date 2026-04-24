@@ -38,7 +38,6 @@ pub struct JournalFile {
     /// Schema version. Always call [`crate::migrate::migrate`] before deserializing —
     /// migration guarantees this field is present and at the current version.
     pub schema: u32,
-    pub id: String,
     pub name: String,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub title: Option<String>,
@@ -56,7 +55,6 @@ impl JournalFile {
         Self {
             _note: Some("Edit this file freely. Each file is self-contained.".into()),
             schema: migrate::CURRENT_SCHEMA,
-            id: journal_id(),
             name: name.to_string(),
             title,
             items: Vec::new(),
@@ -114,12 +112,6 @@ fn random_consonants(n: usize) -> String {
     (0..n)
         .map(|_| CONSONANTS[rng.random_range(0..CONSONANTS.len())] as char)
         .collect()
-}
-
-/// Generate a journal ID in `xxxxx-xxxxx-xxxxx` format (15 consonants, 3 groups of 5).
-pub fn journal_id() -> String {
-    let c = random_consonants(15);
-    format!("{}-{}-{}", &c[..5], &c[5..10], &c[10..15])
 }
 
 /// Generate an item ID in `xxxx-xxxx-xxxx-xxxx` format (16 consonants, 4 groups of 4).
@@ -198,13 +190,7 @@ mod tests {
         assert_eq!(j.name, "test-journal");
         assert_eq!(j.title.as_deref(), Some("Test Title"));
         assert!(j.items.is_empty());
-        assert_eq!(j.id.len(), 17);
-        assert_eq!(&j.id[5..6], "-");
-        assert_eq!(&j.id[11..12], "-");
-        assert!(
-            j.id.chars()
-                .all(|c| c == '-' || CONSONANTS.contains(&(c as u8)))
-        );
+        assert_eq!(j.schema, migrate::CURRENT_SCHEMA);
     }
 
     #[test]
