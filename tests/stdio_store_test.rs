@@ -3,7 +3,7 @@
 use chrono::Utc;
 use foray::store::Store;
 use foray::store_stdio::StdioStore;
-use foray::types::{ItemType, JournalFile, JournalItem, Pagination, item_id};
+use foray::types::{ItemType, JournalItem, Pagination, item_id};
 
 /// Spawn `foray serve` in an isolated home directory, then exercise
 /// `create`, `load`, and `list` through a `StdioStore`.
@@ -27,12 +27,16 @@ async fn stdio_store_create_load_list() {
     );
 
     // ── create ────────────────────────────────────────────────────────
-    let journal = JournalFile::new("remote-test", Some("Remote Test Journal".into()), None);
-    store.create(journal).await.expect("create should succeed");
+    store
+        .create("remote-test", Some("Remote Test Journal".into()), None)
+        .await
+        .expect("create should succeed");
 
     // Creating the same journal again must error with AlreadyExists.
-    let dup = JournalFile::new("remote-test", Some("Dup".into()), None);
-    let err = store.create(dup).await.unwrap_err();
+    let err = store
+        .create("remote-test", Some("Dup".into()), None)
+        .await
+        .unwrap_err();
     assert!(
         matches!(err, foray::store::StoreError::AlreadyExists(_)),
         "expected AlreadyExists, got {err:?}"

@@ -467,22 +467,23 @@ fn classify_mcp_error(e: &ErrorData) -> StoreError {
 
 #[async_trait]
 impl Store for StdioStore {
-    async fn create(&self, journal: JournalFile) -> Result<(), StoreError> {
-        let mut args = serde_json::json!({ "name": journal.name });
-        if let Some(title) = &journal.title {
-            args["title"] = serde_json::Value::String(title.clone());
+    async fn create(
+        &self,
+        name: &str,
+        title: Option<String>,
+        meta: Option<std::collections::HashMap<String, serde_json::Value>>,
+    ) -> Result<(), StoreError> {
+        let mut args = serde_json::json!({ "name": name });
+        if let Some(title) = title {
+            args["title"] = serde_json::Value::String(title);
         }
-        if let Some(meta) = &journal.meta {
+        if let Some(meta) = meta {
             args["meta"] = serde_json::to_value(meta).unwrap_or_default();
         }
         let resp: OpenJournalWire = self.call_mcp("open_journal", args).await?;
         // `created: false` means the journal already existed — treat as conflict.
         if !resp.created {
-            return Err(StoreError::AlreadyExists(journal.name));
-        }
-        // Persist any initial items (e.g. from `foray import`).
-        if !journal.items.is_empty() {
-            self.add_items(&journal.name, journal.items).await?;
+            return Err(StoreError::AlreadyExists(name.to_string()));
         }
         Ok(())
     }

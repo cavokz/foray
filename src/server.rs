@@ -1,7 +1,7 @@
 use crate::config::StoreRegistry;
 use crate::migrate;
 use crate::store::{Store, StoreError};
-use crate::types::{ItemType, JournalFile, JournalItem, Pagination, item_id, validate_name};
+use crate::types::{ItemType, JournalItem, Pagination, item_id, validate_name};
 use chrono::Utc;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{
@@ -448,8 +448,10 @@ impl ForayServer {
                 ));
             }
             validate_meta(&args.meta)?;
-            let journal = JournalFile::new(&args.name, Some(title), args.meta);
-            store.create(journal).await.map_err(Self::store_err)?;
+            store
+                .create(&args.name, Some(title), args.meta)
+                .await
+                .map_err(Self::store_err)?;
             let p = Pagination::default();
             let (j, _) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
             let resp = OpenJournalResponse {
@@ -895,11 +897,7 @@ mod tests {
 
         // Create a journal directly via the store.
         store
-            .create(crate::types::JournalFile::new(
-                "arc-test",
-                Some("Arc Test".into()),
-                None,
-            ))
+            .create("arc-test", Some("Arc Test".into()), None)
             .await
             .unwrap();
 
