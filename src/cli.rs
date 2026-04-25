@@ -545,8 +545,7 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 let title = title.as_ref().ok_or_else(|| {
                     anyhow::anyhow!("--title is required when creating a new journal")
                 })?;
-                let journal = JournalFile::new(name, Some(title.clone()), meta);
-                store.create(journal).await?;
+                store.create(name, Some(title.clone()), meta).await?;
                 println!("Created journal: {name}");
             }
             write_forayrc(name, cli.store.as_deref())?;
@@ -627,7 +626,12 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             };
             let journal: JournalFile = serde_json::from_value(value)?;
             validate_name(&journal.name).map_err(|e| anyhow::anyhow!(e))?;
-            store.create(journal).await?;
+            let name = journal.name;
+            let items = journal.items;
+            store.create(&name, journal.title, journal.meta).await?;
+            if !items.is_empty() {
+                store.add_items(&name, items).await?;
+            }
             println!("Imported successfully");
         }
     }

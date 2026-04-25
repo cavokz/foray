@@ -145,11 +145,17 @@ impl Store for JsonFileStore {
         Ok((journal, total))
     }
 
-    async fn create(&self, journal: JournalFile) -> Result<(), StoreError> {
-        let path = self.journal_path(&journal.name);
-        if path.exists() || self.archive_path(&journal.name).exists() {
-            return Err(StoreError::AlreadyExists(journal.name.clone()));
+    async fn create(
+        &self,
+        name: &str,
+        title: Option<String>,
+        meta: Option<std::collections::HashMap<String, serde_json::Value>>,
+    ) -> Result<(), StoreError> {
+        let path = self.journal_path(name);
+        if path.exists() || self.archive_path(name).exists() {
+            return Err(StoreError::AlreadyExists(name.to_string()));
         }
+        let journal = JournalFile::new(name, title, meta);
         self.write_journal(&path, &journal)
     }
 
@@ -253,7 +259,10 @@ mod tests {
     async fn create_and_load() {
         let (store, _dir) = make_store();
         let journal = JournalFile::new("my-ctx", Some("Test".into()), None);
-        store.create(journal).await.unwrap();
+        store
+            .create(&journal.name, journal.title.clone(), journal.meta.clone())
+            .await
+            .unwrap();
         let (loaded, total) = store.load("my-ctx", &Pagination::default()).await.unwrap();
         assert_eq!(loaded.name, "my-ctx");
         assert_eq!(total, 0);
@@ -262,13 +271,8 @@ mod tests {
     #[tokio::test]
     async fn create_duplicate_errors() {
         let (store, _dir) = make_store();
-        store
-            .create(JournalFile::new("dup", Some("A".into()), None))
-            .await
-            .unwrap();
-        let result = store
-            .create(JournalFile::new("dup", Some("B".into()), None))
-            .await;
+        store.create("dup", Some("A".into()), None).await.unwrap();
+        let result = store.create("dup", Some("B".into()), None).await;
         assert!(matches!(result, Err(StoreError::AlreadyExists(_))));
     }
 
@@ -283,7 +287,7 @@ mod tests {
     async fn add_item_and_load() {
         let (store, _dir) = make_store();
         store
-            .create(JournalFile::new("my-ctx", Some("T".into()), None))
+            .create("my-ctx", Some("T".into()), None)
             .await
             .unwrap();
         let item = make_item("found a bug");
@@ -303,14 +307,8 @@ mod tests {
     #[tokio::test]
     async fn list_journals() {
         let (store, _dir) = make_store();
-        store
-            .create(JournalFile::new("alpha", Some("A".into()), None))
-            .await
-            .unwrap();
-        store
-            .create(JournalFile::new("beta", Some("B".into()), None))
-            .await
-            .unwrap();
+        store.create("alpha", Some("A".into()), None).await.unwrap();
+        store.create("beta", Some("B".into()), None).await.unwrap();
         let (summaries, total) = store.list(&Pagination::default(), false).await.unwrap();
         assert_eq!(total, 2);
         assert_eq!(summaries[0].name, "alpha");
@@ -321,10 +319,7 @@ mod tests {
     async fn list_pagination() {
         let (store, _dir) = make_store();
         for name in ["a", "b", "c", "d"] {
-            store
-                .create(JournalFile::new(name, Some(name.into()), None))
-                .await
-                .unwrap();
+            store.create(name, Some(name.into()), None).await.unwrap();
         }
         let p = Pagination {
             limit: Some(2),
@@ -341,7 +336,7 @@ mod tests {
     async fn delete_journal() {
         let (store, _dir) = make_store();
         store
-            .create(JournalFile::new("to-delete", Some("D".into()), None))
+            .create("to-delete", Some("D".into()), None)
             .await
             .unwrap();
         store.delete("to-delete").await.unwrap();
@@ -352,7 +347,7 @@ mod tests {
     async fn archive_and_unarchive() {
         let (store, _dir) = make_store();
         store
-            .create(JournalFile::new("arch-test", Some("A".into()), None))
+            .create("arch-test", Some("A".into()), None)
             .await
             .unwrap();
 
@@ -381,7 +376,7 @@ mod tests {
     async fn archive_already_archived_errors() {
         let (store, _dir) = make_store();
         store
-            .create(JournalFile::new("to-archive", Some("A".into()), None))
+            .create("to-archive", Some("A".into()), None)
             .await
             .unwrap();
         store.archive("to-archive").await.unwrap();
@@ -404,7 +399,7 @@ mod tests {
     async fn unarchive_already_active_is_noop() {
         let (store, _dir) = make_store();
         store
-            .create(JournalFile::new("active", Some("A".into()), None))
+            .create("active", Some("A".into()), None)
             .await
             .unwrap();
         store.unarchive("active").await.unwrap();
@@ -533,7 +528,7 @@ mod tests {
         let (store, dir) = make_store();
         // Create a normal journal first so there's something in the directory.
         store
-            .create(JournalFile::new("normal", Some("Normal".into()), None))
+            .create("normal", Some("Normal".into()), None)
             .await
             .unwrap();
         // Drop a future-schema file directly into the journals directory.
@@ -556,10 +551,7 @@ mod tests {
     #[tokio::test]
     async fn load_paginated_items() {
         let (store, _dir) = make_store();
-        store
-            .create(JournalFile::new("pag", Some("P".into()), None))
-            .await
-            .unwrap();
+        store.create("pag", Some("P".into()), None).await.unwrap();
         for i in 0..5 {
             store
                 .add_items("pag", vec![make_item(&format!("item-{i}"))])

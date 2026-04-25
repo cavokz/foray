@@ -1,5 +1,6 @@
 use crate::types::{JournalFile, JournalItem, JournalSummary, Pagination};
 use async_trait::async_trait;
+use std::collections::HashMap;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -41,7 +42,12 @@ pub trait Store: Send + Sync {
         name: &str,
         pagination: &Pagination,
     ) -> Result<(JournalFile, usize), StoreError>;
-    async fn create(&self, journal: JournalFile) -> Result<(), StoreError>;
+    async fn create(
+        &self,
+        name: &str,
+        title: Option<String>,
+        meta: Option<HashMap<String, serde_json::Value>>,
+    ) -> Result<(), StoreError>;
     async fn add_items(&self, name: &str, items: Vec<JournalItem>) -> Result<usize, StoreError>;
     async fn list(
         &self,
