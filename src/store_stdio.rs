@@ -56,7 +56,7 @@ struct StoreInfoWire {
 struct SyncJournalWire {
     schema: u32,
     name: String,
-    title: Option<String>,
+    title: String,
     items: Vec<Value>,
     added_ids: Vec<String>,
     cursor: usize,
@@ -69,7 +69,7 @@ struct OpenJournalWire {
     #[allow(dead_code)]
     name: String,
     #[allow(dead_code)]
-    title: Option<String>,
+    title: String,
     #[allow(dead_code)]
     item_count: usize,
     created: bool,
@@ -587,13 +587,10 @@ impl Store for StdioStore {
     async fn create(
         &self,
         name: &str,
-        title: Option<String>,
+        title: String,
         meta: Option<std::collections::HashMap<String, serde_json::Value>>,
     ) -> Result<(), StoreError> {
-        let mut args = serde_json::json!({ "name": name });
-        if let Some(title) = title {
-            args["title"] = serde_json::Value::String(title);
-        }
+        let mut args = serde_json::json!({ "name": name, "title": title });
         if let Some(meta) = meta {
             args["meta"] = serde_json::to_value(meta).unwrap_or_default();
         }
@@ -651,8 +648,8 @@ impl Store for StdioStore {
 
         let journal = JournalFile {
             schema: migrate::CURRENT_SCHEMA,
-            name: migrated["name"].as_str().unwrap_or(name).to_string(),
-            title: migrated["title"].as_str().map(String::from),
+            name: wire.name,
+            title: wire.title,
             items,
             meta: None,
         };
@@ -756,7 +753,7 @@ mod tests {
             vec![],
             None,
         );
-        let err = store.create("x", Some("T".into()), None).await.unwrap_err();
+        let err = store.create("x", "T".into(), None).await.unwrap_err();
         let msg = err.to_string();
         assert!(
             msg.contains("no route to host"),
@@ -808,7 +805,7 @@ mod tests {
 
     #[test]
     fn sync_journal_wire_deserializes_fully_formed_response() {
-        let s = r#"{"schema":1,"name":"j","title":null,"items":[],"added_ids":[],"cursor":0,"total":0}"#;
+        let s = r#"{"schema":1,"name":"j","title":"My Journal","items":[],"added_ids":[],"cursor":0,"total":0}"#;
         let w: SyncJournalWire = serde_json::from_str(s).unwrap();
         assert_eq!(w.schema, 1);
         assert_eq!(w.name, "j");
@@ -816,7 +813,7 @@ mod tests {
 
     #[test]
     fn sync_journal_wire_rejects_unknown_fields() {
-        let s = r#"{"schema":1,"name":"j","title":null,"items":[],"added_ids":[],"cursor":0,"total":0,"future_field":42}"#;
+        let s = r#"{"schema":1,"name":"j","title":"My Journal","items":[],"added_ids":[],"cursor":0,"total":0,"future_field":42}"#;
         assert!(serde_json::from_str::<SyncJournalWire>(s).is_err());
     }
 

@@ -474,9 +474,7 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 }
             } else {
                 println!("Journal: {}", journal.name);
-                if let Some(title) = &journal.title {
-                    println!("Title:   {title}");
-                }
+                println!("Title:   {}", journal.title);
                 println!("Items:   {} / {total}", journal.items.len());
                 println!();
                 for item in &journal.items {
@@ -545,7 +543,7 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 let title = title.as_ref().ok_or_else(|| {
                     anyhow::anyhow!("--title is required when creating a new journal")
                 })?;
-                store.create(name, Some(title.clone()), meta).await?;
+                store.create(name, title.clone(), meta).await?;
                 println!("Created journal: {name}");
             }
             write_forayrc(name, cli.store.as_deref())?;
@@ -582,7 +580,7 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 let label = if *archived { "archived" } else { "active" };
                 println!("{} journal(s) ({label}):", total);
                 for s in &summaries {
-                    let title = s.title.as_deref().unwrap_or("");
+                    let title = &s.title;
                     println!("  {} ({} items) {}", s.name, s.item_count, title);
                 }
             }

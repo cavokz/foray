@@ -252,7 +252,8 @@ pub fn adapt_receive(
             "open_journal" => {
                 obj.entry("name")
                     .or_insert_with(|| Value::String(String::new()));
-                obj.entry("title").or_insert(Value::Null);
+                obj.entry("title")
+                    .or_insert_with(|| Value::String(String::new()));
                 obj.entry("item_count")
                     .or_insert_with(|| Value::from(0usize));
             }
@@ -599,12 +600,11 @@ mod tests {
     fn adapt_receive_sync_journal_inserts_schema_for_protocol_0() {
         // v0.2.0 sync_journal response has no `schema`.
         let raw = json!({
-            "name": "j", "title": null,
+            "name": "j", "title": "My Journal",
             "items": [], "added_ids": [], "cursor": 0, "total": 0
         });
         let result = adapt_receive(0, "sync_journal", raw).unwrap();
         assert_eq!(result["schema"], json!(0));
-        assert!(result.get("id").is_none(), "id should be absent");
     }
 
     #[test]

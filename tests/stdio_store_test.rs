@@ -28,13 +28,13 @@ async fn stdio_store_create_load_list() {
 
     // ── create ────────────────────────────────────────────────────────
     store
-        .create("remote-test", Some("Remote Test Journal".into()), None)
+        .create("remote-test", "Remote Test Journal".into(), None)
         .await
         .expect("create should succeed");
 
     // Creating the same journal again must error with AlreadyExists.
     let err = store
-        .create("remote-test", Some("Dup".into()), None)
+        .create("remote-test", "Dup".into(), None)
         .await
         .unwrap_err();
     assert!(
@@ -64,7 +64,7 @@ async fn stdio_store_create_load_list() {
         .expect("load should succeed");
 
     assert_eq!(loaded.name, "remote-test");
-    assert_eq!(loaded.title.as_deref(), Some("Remote Test Journal"));
+    assert_eq!(loaded.title, "Remote Test Journal");
     assert_eq!(item_total, 1);
     assert_eq!(loaded.items.len(), 1);
     assert_eq!(loaded.items[0].content, "hello from remote");

@@ -148,7 +148,7 @@ impl Store for JsonFileStore {
     async fn create(
         &self,
         name: &str,
-        title: Option<String>,
+        title: String,
         meta: Option<std::collections::HashMap<String, serde_json::Value>>,
     ) -> Result<(), StoreError> {
         let path = self.journal_path(name);
@@ -258,7 +258,7 @@ mod tests {
     #[tokio::test]
     async fn create_and_load() {
         let (store, _dir) = make_store();
-        let journal = JournalFile::new("my-ctx", Some("Test".into()), None);
+        let journal = JournalFile::new("my-ctx", "Test".into(), None);
         store
             .create(&journal.name, journal.title.clone(), journal.meta.clone())
             .await
@@ -271,8 +271,8 @@ mod tests {
     #[tokio::test]
     async fn create_duplicate_errors() {
         let (store, _dir) = make_store();
-        store.create("dup", Some("A".into()), None).await.unwrap();
-        let result = store.create("dup", Some("B".into()), None).await;
+        store.create("dup", "A".into(), None).await.unwrap();
+        let result = store.create("dup", "B".into(), None).await;
         assert!(matches!(result, Err(StoreError::AlreadyExists(_))));
     }
 
@@ -286,10 +286,7 @@ mod tests {
     #[tokio::test]
     async fn add_item_and_load() {
         let (store, _dir) = make_store();
-        store
-            .create("my-ctx", Some("T".into()), None)
-            .await
-            .unwrap();
+        store.create("my-ctx", "T".into(), None).await.unwrap();
         let item = make_item("found a bug");
         store.add_items("my-ctx", vec![item]).await.unwrap();
         let (loaded, total) = store.load("my-ctx", &Pagination::default()).await.unwrap();
@@ -307,8 +304,8 @@ mod tests {
     #[tokio::test]
     async fn list_journals() {
         let (store, _dir) = make_store();
-        store.create("alpha", Some("A".into()), None).await.unwrap();
-        store.create("beta", Some("B".into()), None).await.unwrap();
+        store.create("alpha", "A".into(), None).await.unwrap();
+        store.create("beta", "B".into(), None).await.unwrap();
         let (summaries, total) = store.list(&Pagination::default(), false).await.unwrap();
         assert_eq!(total, 2);
         assert_eq!(summaries[0].name, "alpha");
@@ -319,7 +316,7 @@ mod tests {
     async fn list_pagination() {
         let (store, _dir) = make_store();
         for name in ["a", "b", "c", "d"] {
-            store.create(name, Some(name.into()), None).await.unwrap();
+            store.create(name, name.into(), None).await.unwrap();
         }
         let p = Pagination {
             limit: Some(2),
@@ -335,10 +332,7 @@ mod tests {
     #[tokio::test]
     async fn delete_journal() {
         let (store, _dir) = make_store();
-        store
-            .create("to-delete", Some("D".into()), None)
-            .await
-            .unwrap();
+        store.create("to-delete", "D".into(), None).await.unwrap();
         store.delete("to-delete").await.unwrap();
         assert!(!store.exists("to-delete").await.unwrap());
     }
@@ -346,10 +340,7 @@ mod tests {
     #[tokio::test]
     async fn archive_and_unarchive() {
         let (store, _dir) = make_store();
-        store
-            .create("arch-test", Some("A".into()), None)
-            .await
-            .unwrap();
+        store.create("arch-test", "A".into(), None).await.unwrap();
 
         store.archive("arch-test").await.unwrap();
 
@@ -375,10 +366,7 @@ mod tests {
     #[tokio::test]
     async fn archive_already_archived_errors() {
         let (store, _dir) = make_store();
-        store
-            .create("to-archive", Some("A".into()), None)
-            .await
-            .unwrap();
+        store.create("to-archive", "A".into(), None).await.unwrap();
         store.archive("to-archive").await.unwrap();
         assert!(matches!(
             store.archive("to-archive").await,
@@ -398,10 +386,7 @@ mod tests {
     #[tokio::test]
     async fn unarchive_already_active_is_noop() {
         let (store, _dir) = make_store();
-        store
-            .create("active", Some("A".into()), None)
-            .await
-            .unwrap();
+        store.create("active", "A".into(), None).await.unwrap();
         store.unarchive("active").await.unwrap();
         // still active
         let (active, _) = store.list(&Pagination::default(), false).await.unwrap();
@@ -426,6 +411,7 @@ mod tests {
             "_note": "old file",
             "id": "aaaaa-bbbbb-ccccc",
             "name": "legacy",
+            "title": "Legacy Journal",
             "items": [
                 {
                     "id": "xxxx-xxxx-xxxx-xxxx",
@@ -465,6 +451,7 @@ mod tests {
         let raw = serde_json::json!({
             "id": "aaaaa-bbbbb-ccccc",
             "name": "legacy",
+            "title": "Legacy Journal",
             "items": [],
             "created_at": "2026-01-01T00:00:00Z",
             "updated_at": "2026-01-02T00:00:00Z"
@@ -527,10 +514,7 @@ mod tests {
         // so the caller knows a newer-version file exists.
         let (store, dir) = make_store();
         // Create a normal journal first so there's something in the directory.
-        store
-            .create("normal", Some("Normal".into()), None)
-            .await
-            .unwrap();
+        store.create("normal", "Normal".into(), None).await.unwrap();
         // Drop a future-schema file directly into the journals directory.
         let path = dir.path().join("future.json");
         let raw = serde_json::json!({
@@ -551,7 +535,7 @@ mod tests {
     #[tokio::test]
     async fn load_paginated_items() {
         let (store, _dir) = make_store();
-        store.create("pag", Some("P".into()), None).await.unwrap();
+        store.create("pag", "P".into(), None).await.unwrap();
         for i in 0..5 {
             store
                 .add_items("pag", vec![make_item(&format!("item-{i}"))])
