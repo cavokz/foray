@@ -790,12 +790,24 @@ mod tests {
     #[test]
     fn resolve_store_falls_back_to_default() {
         let _guard = SERIAL_LOCK.lock().unwrap();
-        let (registry, _dir) = make_registry();
+        let (registry, dir) = make_registry();
+        // Stop find_store_in_forayrc() from walking up into parent dirs.
+        std::fs::write(dir.path().join(".forayrc"), "root = true\n").unwrap();
+        let orig = std::env::current_dir().unwrap();
+        std::env::set_current_dir(dir.path()).unwrap();
+        let prior_foray_store = std::env::var("FORAY_STORE").ok();
         unsafe {
             std::env::remove_var("FORAY_STORE");
         }
         // Single-store registry: implicit default is returned.
         let result = resolve_store(&registry, None);
+        std::env::set_current_dir(&orig).unwrap();
+        unsafe {
+            match prior_foray_store {
+                Some(v) => std::env::set_var("FORAY_STORE", v),
+                None => std::env::remove_var("FORAY_STORE"),
+            }
+        }
         assert!(result.is_ok());
     }
 
@@ -806,10 +818,22 @@ mod tests {
         let dir2 = tempfile::TempDir::new().unwrap();
         let registry =
             StoreRegistry::for_test_two(dir1.path().to_path_buf(), dir2.path().to_path_buf());
+        // Stop find_store_in_forayrc() from walking up into parent dirs.
+        std::fs::write(dir1.path().join(".forayrc"), "root = true\n").unwrap();
+        let orig = std::env::current_dir().unwrap();
+        std::env::set_current_dir(dir1.path()).unwrap();
+        let prior_foray_store = std::env::var("FORAY_STORE").ok();
         unsafe {
             std::env::remove_var("FORAY_STORE");
         }
         let result = resolve_store(&registry, None);
+        std::env::set_current_dir(&orig).unwrap();
+        unsafe {
+            match prior_foray_store {
+                Some(v) => std::env::set_var("FORAY_STORE", v),
+                None => std::env::remove_var("FORAY_STORE"),
+            }
+        }
         assert!(result.is_err());
         let msg = result.err().unwrap().to_string();
         assert!(msg.contains("no store specified"));
