@@ -260,7 +260,7 @@ Errors include a structured `data` object with machine-readable fields for progr
 ```
 foray serve                          # Start MCP stdio server
 foray show [name] [--json] [--limit N] [--offset N]  # Full journal with items
-foray add <content> [--type TYPE] [--ref FILE] [--tags CSV] [--meta KEY=VALUE]...
+foray add <content> [--type TYPE] [--ref REF] [--tags CSV] [--meta KEY=VALUE]...
 foray open <name> [--title "..."] [--meta KEY=VALUE]...  # Create or reopen. --title required for new journals.
 foray list [--json] [--archived] [--limit N] [--offset N] [--completion]  # List journals. --archived shows archived. --json outputs {"total": N, "journals": [...]}. --completion outputs bare names (for shell scripts).
 foray archive <name>                   # Archive a journal

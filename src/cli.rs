@@ -60,9 +60,9 @@ pub enum Commands {
         /// Item type: finding, decision, snippet, note
         #[arg(long, name = "type", default_value = "note")]
         item_type: String,
-        /// File reference (path, URL, etc.)
+        /// External reference (URL, file path, ticket/PR link, etc.)
         #[arg(long, name = "ref")]
-        file_ref: Option<String>,
+        item_ref: Option<String>,
         /// Comma-separated tags
         #[arg(long)]
         tags: Option<String>,
@@ -503,7 +503,7 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
         Commands::Add {
             content,
             item_type,
-            file_ref,
+            item_ref,
             tags,
             meta,
         } => {
@@ -515,7 +515,7 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                     .collect::<Vec<_>>()
             });
             let mut parsed_meta = parse_meta(meta);
-            if let Some(r) = file_ref {
+            if let Some(r) = item_ref {
                 parsed_meta
                     .get_or_insert_with(HashMap::new)
                     .entry("ref".to_string())
