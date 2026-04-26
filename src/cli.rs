@@ -670,10 +670,8 @@ mod tests {
     fn write_forayrc_persists_store_when_given() {
         let _guard = SERIAL_LOCK.blocking_lock();
         let dir = tempfile::TempDir::new().unwrap();
-        let orig = std::env::current_dir().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
+        let _cwd = CwdGuard::set(dir.path());
         write_forayrc("my-journal", Some("remote")).unwrap();
-        std::env::set_current_dir(&orig).unwrap();
         let contents = std::fs::read_to_string(dir.path().join(".forayrc")).unwrap();
         let table: toml::Table = contents.parse().unwrap();
         assert_eq!(table["current-journal"].as_str(), Some("my-journal"));
@@ -684,10 +682,8 @@ mod tests {
     fn write_forayrc_omits_store_when_none() {
         let _guard = SERIAL_LOCK.blocking_lock();
         let dir = tempfile::TempDir::new().unwrap();
-        let orig = std::env::current_dir().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
+        let _cwd = CwdGuard::set(dir.path());
         write_forayrc("my-journal", None).unwrap();
-        std::env::set_current_dir(&orig).unwrap();
         let contents = std::fs::read_to_string(dir.path().join(".forayrc")).unwrap();
         let table: toml::Table = contents.parse().unwrap();
         assert_eq!(table["current-journal"].as_str(), Some("my-journal"));
@@ -795,15 +791,13 @@ mod tests {
         let (registry, dir) = make_registry();
         // Stop find_store_in_forayrc() from walking up into parent dirs.
         std::fs::write(dir.path().join(".forayrc"), "root = true\n").unwrap();
-        let orig = std::env::current_dir().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
+        let _cwd = CwdGuard::set(dir.path());
         let prior_foray_store = std::env::var("FORAY_STORE").ok();
         unsafe {
             std::env::remove_var("FORAY_STORE");
         }
         // Single-store registry: implicit default is returned.
         let result = resolve_store(&registry, None);
-        std::env::set_current_dir(&orig).unwrap();
         unsafe {
             match prior_foray_store {
                 Some(v) => std::env::set_var("FORAY_STORE", v),
@@ -822,14 +816,12 @@ mod tests {
             StoreRegistry::for_test_two(dir1.path().to_path_buf(), dir2.path().to_path_buf());
         // Stop find_store_in_forayrc() from walking up into parent dirs.
         std::fs::write(dir1.path().join(".forayrc"), "root = true\n").unwrap();
-        let orig = std::env::current_dir().unwrap();
-        std::env::set_current_dir(dir1.path()).unwrap();
+        let _cwd = CwdGuard::set(dir1.path());
         let prior_foray_store = std::env::var("FORAY_STORE").ok();
         unsafe {
             std::env::remove_var("FORAY_STORE");
         }
         let result = resolve_store(&registry, None);
-        std::env::set_current_dir(&orig).unwrap();
         unsafe {
             match prior_foray_store {
                 Some(v) => std::env::set_var("FORAY_STORE", v),
@@ -860,21 +852,33 @@ mod tests {
         }
     }
 
+    // RAII guard that restores the process cwd on drop, even on panic.
+    struct CwdGuard(std::path::PathBuf);
+    impl CwdGuard {
+        fn set(dir: &std::path::Path) -> Self {
+            let orig = std::env::current_dir().unwrap();
+            std::env::set_current_dir(dir).unwrap();
+            Self(orig)
+        }
+    }
+    impl Drop for CwdGuard {
+        fn drop(&mut self) {
+            let _ = std::env::set_current_dir(&self.0);
+        }
+    }
+
     #[tokio::test]
     async fn open_rejects_empty_title() {
         let _guard = SERIAL_LOCK.lock().await;
         let dir = tempfile::TempDir::new().unwrap();
         let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
-        // Stop write_forayrc from writing into the real cwd.
-        let orig = std::env::current_dir().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
+        let _cwd = CwdGuard::set(dir.path());
         let cli = make_cli(Commands::Open {
             name: "my-journal".to_string(),
             title: Some("".to_string()),
             meta: vec![],
         });
         let err = run(&cli, &store).await.unwrap_err();
-        std::env::set_current_dir(&orig).unwrap();
         assert!(err.to_string().contains("must not be empty"), "{err}");
     }
 
@@ -883,15 +887,13 @@ mod tests {
         let _guard = SERIAL_LOCK.lock().await;
         let dir = tempfile::TempDir::new().unwrap();
         let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
-        let orig = std::env::current_dir().unwrap();
-        std::env::set_current_dir(dir.path()).unwrap();
+        let _cwd = CwdGuard::set(dir.path());
         let cli = make_cli(Commands::Open {
             name: "my-journal".to_string(),
             title: Some("   ".to_string()),
             meta: vec![],
         });
         let err = run(&cli, &store).await.unwrap_err();
-        std::env::set_current_dir(&orig).unwrap();
         assert!(err.to_string().contains("must not be empty"), "{err}");
     }
 }
