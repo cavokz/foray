@@ -215,7 +215,11 @@ impl StdioStore {
                         stderr.take(STDERR_BUF_LIMIT as u64).read_to_end(&mut buf),
                     )
                     .await;
-                    String::from_utf8_lossy(&buf).into_owned()
+                    let s = String::from_utf8_lossy(&buf).into_owned();
+                    if !s.is_empty() {
+                        eprint!("[remote stderr] {s}");
+                    }
+                    s
                 } else {
                     String::new()
                 };
