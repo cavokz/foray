@@ -9,6 +9,10 @@ use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::io;
+use std::process::Stdio;
+use std::sync::Arc;
+use std::time::Duration;
+use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 use tokio::sync::Mutex;
 
@@ -98,6 +102,9 @@ struct UnarchiveWire {
 
 // ── Connection ───────────────────────────────────────────────────────
 
+/// Bounded stderr buffer — caps collection at 4 KB to avoid unbounded growth.
+const STDERR_BUF_LIMIT: usize = 4 * 1024;
+
 /// A live connection to a remote foray MCP server.
 struct Connection {
     /// Keep-alive: the background task shuts down when this is dropped.
@@ -108,6 +115,8 @@ struct Connection {
     store_name: String,
     /// Wire protocol version reported by the remote server's `hello` response.
     protocol: u32,
+    /// Stderr collected by the background drain task. Read on connection failure.
+    stderr_buf: Arc<Mutex<String>>,
 }
 
 // ── StdioStore ───────────────────────────────────────────────────────
@@ -184,12 +193,88 @@ impl StdioStore {
             cmd.env(k, v);
         }
 
-        let transport = TokioChildProcess::new(cmd).map_err(StoreError::Io)?;
+        let (transport, stderr_handle) = TokioChildProcess::builder(cmd)
+            .stderr(Stdio::piped())
+            .spawn()
+            .map_err(StoreError::Io)?;
 
         // MCP initialize handshake.
-        let service: RunningService<RoleClient, ()> = serve_client((), transport)
-            .await
-            .map_err(|e| io_err(e.to_string()))?;
+        // Hold stderr_handle here — we start the background drain only on
+        // success so that on failure we can read it directly without any race.
+        let service: RunningService<RoleClient, ()> = match serve_client((), transport).await {
+            Ok(s) => s,
+            Err(e) => {
+                // On handshake failure, drain stderr with a short timeout:
+                // if the subprocess died, EOF arrives immediately;
+                // if it's still alive (higher-level failure), we get whatever
+                // arrived during the handshake and move on.
+                let stderr_output = if let Some(stderr) = stderr_handle {
+                    let mut buf = Vec::new();
+                    let _ = tokio::time::timeout(
+                        Duration::from_millis(500),
+                        stderr.take(STDERR_BUF_LIMIT as u64).read_to_end(&mut buf),
+                    )
+                    .await;
+                    String::from_utf8_lossy(&buf).into_owned()
+                } else {
+                    String::new()
+                };
+                let base = e.to_string();
+                let msg = if stderr_output.trim().is_empty() {
+                    base
+                } else {
+                    format!("{base}: {}", stderr_output.trim())
+                };
+                return Err(io_err(msg));
+            }
+        };
+
+        // Handshake succeeded — now start the background stderr drain.
+        // It forwards output to the server log and accumulates into a bounded
+        // buffer so any future transport failure can include the subprocess
+        // stderr in its error message.
+        let stderr_buf: Arc<Mutex<String>> = Arc::new(Mutex::new(String::new()));
+        if let Some(mut stderr) = stderr_handle {
+            let buf = stderr_buf.clone();
+            tokio::spawn(async move {
+                let mut chunk = [0u8; 512];
+                loop {
+                    match stderr.read(&mut chunk).await {
+                        Ok(0) | Err(_) => break,
+                        Ok(n) => {
+                            let s = String::from_utf8_lossy(&chunk[..n]);
+                            eprint!("[remote stderr] {s}");
+                            // Keep the most recent output: if adding this chunk
+                            // would exceed the cap, evict enough from the front
+                            // first so errors always reflect the latest stderr.
+                            // Snap offsets to char boundaries to avoid panics
+                            // on multi-byte UTF-8 sequences in stderr.
+                            let s_capped = {
+                                let start = if s.len() > STDERR_BUF_LIMIT {
+                                    let raw = s.len() - STDERR_BUF_LIMIT;
+                                    (raw..=s.len())
+                                        .find(|&i| s.is_char_boundary(i))
+                                        .unwrap_or(s.len())
+                                } else {
+                                    0
+                                };
+                                &s[start..]
+                            };
+                            let mut guard = buf.lock().await;
+                            let excess = guard.len() + s_capped.len();
+                            if excess > STDERR_BUF_LIMIT {
+                                let drain_to = excess - STDERR_BUF_LIMIT;
+                                let safe = (drain_to..=guard.len())
+                                    .find(|&i| guard.is_char_boundary(i))
+                                    .unwrap_or(guard.len());
+                                guard.drain(..safe);
+                            }
+                            guard.push_str(s_capped);
+                        }
+                    }
+                }
+            });
+        }
 
         // Call hello to get nuance + store list.
         let hello_result = service
@@ -259,6 +344,7 @@ impl StdioStore {
             nuance: nuance.clone(),
             store_name: store_name.clone(),
             protocol,
+            stderr_buf,
         });
 
         Ok((peer, nuance, store_name, protocol))
@@ -297,7 +383,22 @@ impl StdioStore {
                     first_text(&result.content).ok_or_else(|| io_err("empty tool response"))?;
                 let raw: Value = serde_json::from_str(text).map_err(|e| io_err(e.to_string()))?;
                 let adapted = migrate::adapt_receive(server_protocol, tool, raw).map_err(io_err)?;
-                serde_json::from_value(adapted).map_err(|e| io_err(e.to_string()))
+                let value = serde_json::from_value(adapted).map_err(|e| io_err(e.to_string()))?;
+                // Clear the stderr buffer only after full success so that
+                // parse/adapt failures don't silently discard stderr context.
+                // Clone the Arc out first to avoid awaiting while holding the
+                // self.conn guard (violates the "don't hold conn across await"
+                // convention).
+                let stderr_buf = self
+                    .conn
+                    .lock()
+                    .await
+                    .as_ref()
+                    .map(|c| c.stderr_buf.clone());
+                if let Some(buf) = stderr_buf {
+                    buf.lock().await.clear();
+                }
+                Ok(value)
             }
             Err(ServiceError::McpError(e)) => {
                 let err = classify_mcp_error(&e);
@@ -321,9 +422,21 @@ impl StdioStore {
             }
             Err(e) => {
                 // Transport failure — subprocess died or pipe broke.
-                // Clear the connection so the next call spawns a fresh subprocess.
-                *self.conn.lock().await = None;
-                Err(io_err(e.to_string()))
+                // Atomically take conn (clearing it) and extract stderr_buf in
+                // one critical section, then read the buffer after releasing
+                // the self.conn guard (don't await while holding it).
+                let stderr_buf = self.conn.lock().await.take().map(|c| c.stderr_buf);
+                let stderr_output = match stderr_buf {
+                    Some(buf) => buf.lock().await.clone(),
+                    None => String::new(),
+                };
+                let base = e.to_string();
+                let msg = if stderr_output.trim().is_empty() {
+                    base
+                } else {
+                    format!("{base}: {}", stderr_output.trim())
+                };
+                Err(io_err(msg))
             }
         }
     }
@@ -622,6 +735,30 @@ impl Store for StdioStore {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    // ── connect: stderr propagation ───────────────────────────────────
+
+    /// A subprocess that writes to stderr and exits non-zero should produce
+    /// an I/O error whose message includes the stderr output.
+    #[tokio::test]
+    #[cfg(unix)]
+    async fn connect_failure_includes_stderr() {
+        let store = StdioStore::new(
+            "sh".to_string(),
+            vec![
+                "-c".to_string(),
+                "echo 'no route to host' >&2; exit 1".to_string(),
+            ],
+            vec![],
+            None,
+        );
+        let err = store.create("x", Some("T".into()), None).await.unwrap_err();
+        let msg = err.to_string();
+        assert!(
+            msg.contains("no route to host"),
+            "expected stderr in error message, got: {msg}"
+        );
+    }
 
     // ── check_protocol ────────────────────────────────────────────────
 
