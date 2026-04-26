@@ -85,7 +85,20 @@ impl JsonFileStore {
                 )));
             }
         };
-        Ok(serde_json::from_value(value)?)
+        let journal: JournalFile = serde_json::from_value(value)?;
+        if journal.name.trim().is_empty() {
+            return Err(StoreError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "journal name is empty",
+            )));
+        }
+        if journal.title.trim().is_empty() {
+            return Err(StoreError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                "journal title is empty",
+            )));
+        }
+        Ok(journal)
     }
 
     fn write_journal(&self, path: &Path, journal: &JournalFile) -> Result<(), StoreError> {
@@ -400,6 +413,142 @@ mod tests {
             store.unarchive("missing").await,
             Err(StoreError::NotFound(_))
         ));
+    }
+
+    // ── empty name / title rejection ─────────────────────────────────
+
+    #[test]
+    fn read_journal_rejects_empty_name() {
+        let (store, dir) = make_store();
+        let path = dir.path().join("empty-name.json");
+        let raw = serde_json::json!({
+            "schema": migrate::CURRENT_SCHEMA,
+            "name": "",
+            "title": "Some Title",
+            "items": []
+        });
+        std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
+
+        let err = store.read_journal(&path).unwrap_err();
+        assert!(
+            matches!(err, StoreError::Io(ref e) if e.kind() == std::io::ErrorKind::InvalidData),
+            "expected InvalidData, got {err:?}"
+        );
+        assert!(
+            err.to_string().contains("name"),
+            "message should mention name: {err}"
+        );
+    }
+
+    #[test]
+    fn read_journal_rejects_empty_title() {
+        let (store, dir) = make_store();
+        let path = dir.path().join("empty-title.json");
+        let raw = serde_json::json!({
+            "schema": migrate::CURRENT_SCHEMA,
+            "name": "my-journal",
+            "title": "",
+            "items": []
+        });
+        std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
+
+        let err = store.read_journal(&path).unwrap_err();
+        assert!(
+            matches!(err, StoreError::Io(ref e) if e.kind() == std::io::ErrorKind::InvalidData),
+            "expected InvalidData, got {err:?}"
+        );
+        assert!(
+            err.to_string().contains("title"),
+            "message should mention title: {err}"
+        );
+    }
+
+    #[test]
+    fn read_journal_rejects_whitespace_only_name() {
+        let (store, dir) = make_store();
+        let path = dir.path().join("ws-name.json");
+        let raw = serde_json::json!({
+            "schema": migrate::CURRENT_SCHEMA,
+            "name": "   ",
+            "title": "Some Title",
+            "items": []
+        });
+        std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
+
+        let err = store.read_journal(&path).unwrap_err();
+        assert!(
+            matches!(err, StoreError::Io(ref e) if e.kind() == std::io::ErrorKind::InvalidData),
+            "expected InvalidData, got {err:?}"
+        );
+        assert!(
+            err.to_string().contains("name"),
+            "message should mention name: {err}"
+        );
+    }
+
+    #[test]
+    fn read_journal_rejects_whitespace_only_title() {
+        let (store, dir) = make_store();
+        let path = dir.path().join("ws-title.json");
+        let raw = serde_json::json!({
+            "schema": migrate::CURRENT_SCHEMA,
+            "name": "my-journal",
+            "title": "   ",
+            "items": []
+        });
+        std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
+
+        let err = store.read_journal(&path).unwrap_err();
+        assert!(
+            matches!(err, StoreError::Io(ref e) if e.kind() == std::io::ErrorKind::InvalidData),
+            "expected InvalidData, got {err:?}"
+        );
+        assert!(
+            err.to_string().contains("title"),
+            "message should mention title: {err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn list_skips_empty_name_journal() {
+        let (store, dir) = make_store();
+        store.create("valid", "Valid".into(), None).await.unwrap();
+        let path = dir.path().join("empty-name.json");
+        let raw = serde_json::json!({
+            "schema": migrate::CURRENT_SCHEMA,
+            "name": "",
+            "title": "Some Title",
+            "items": []
+        });
+        std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
+
+        let (summaries, total) = store.list(&Pagination::default(), false).await.unwrap();
+        assert_eq!(
+            total, 1,
+            "corrupt file should be skipped, only 1 valid journal"
+        );
+        assert_eq!(summaries[0].name, "valid");
+    }
+
+    #[tokio::test]
+    async fn list_skips_empty_title_journal() {
+        let (store, dir) = make_store();
+        store.create("valid", "Valid".into(), None).await.unwrap();
+        let path = dir.path().join("empty-title.json");
+        let raw = serde_json::json!({
+            "schema": migrate::CURRENT_SCHEMA,
+            "name": "my-journal",
+            "title": "",
+            "items": []
+        });
+        std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
+
+        let (summaries, total) = store.list(&Pagination::default(), false).await.unwrap();
+        assert_eq!(
+            total, 1,
+            "corrupt file should be skipped, only 1 valid journal"
+        );
+        assert_eq!(summaries[0].name, "valid");
     }
 
     #[tokio::test]

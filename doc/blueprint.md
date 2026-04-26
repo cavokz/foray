@@ -448,7 +448,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 - **First use**: Explicit — `sync_journal` with items to non-existent journal is an error. Use `open_journal` first.
 - **Item counts**: Single count per journal (files are self-contained).
 - **Concurrency**: `add_items` (store method) locks a `{name}.lock` sidecar file via `fs2::lock_exclusive` during read-modify-write. Concurrent adds from multiple MCP server processes or CLI are serialized. Append-only — no conflicts.
-- **Input limits** (server-side, write path only): content max 64KB, title max 512 chars, max 20 tags each max 64 chars, meta max 8KB serialized. Stored data is not validated on read — trust what's on disk.
+- **Input limits** (server-side, write path): content max 64KB, title non-empty and max 512 chars, max 20 tags each max 64 chars, meta max 8KB serialized. Read path also validates: `read_journal` and `load` reject journals with empty or whitespace-only `name` or `title`; `list_journals` skips invalid files rather than surfacing them.
 - **Pagination cap**: Server caps `limit` to 500 in both `sync_journal` and `list_journals`.
 - **`ref` in `meta`**: references (file paths, URLs, ticket/PR links, cross-journal `foray:` refs) are stored as `meta["ref"]` on the item. The CLI exposes `--ref` as a convenience flag that populates `meta.ref`. The v0→1 migration moves any top-level `ref` field on existing items into `meta.ref` automatically.
 - **Serde**: strict deserialization (`deny_unknown_fields`), `meta` field for extensibility, `Option` fields skipped when None.

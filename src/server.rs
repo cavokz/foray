@@ -438,6 +438,10 @@ impl ForayServer {
             let title = args.title.ok_or_else(|| {
                 ErrorData::invalid_params("title is required when creating a new journal", None)
             })?;
+            let title = title.trim();
+            if title.is_empty() {
+                return Err(ErrorData::invalid_params("title must not be empty", None));
+            }
             if title.len() > MAX_TITLE {
                 return Err(ErrorData::invalid_params(
                     format!(
@@ -447,6 +451,7 @@ impl ForayServer {
                     None,
                 ));
             }
+            let title = title.to_string();
             validate_meta(&args.meta)?;
             store
                 .create(&args.name, title, args.meta)
@@ -1044,6 +1049,46 @@ mod tests {
         .unwrap();
         assert!(json["stores"].is_array());
         assert_eq!(json["stores"][0]["name"], "local");
+    }
+
+    // ── open_journal title validation ──────────────────────────────
+
+    #[tokio::test]
+    async fn open_journal_rejects_empty_title() {
+        let server = test_server();
+        let nuance = server.registry.nuance.clone();
+        let args = Parameters(OpenJournalParams {
+            name: "new-journal".into(),
+            title: Some("".into()),
+            meta: None,
+            store: Some("local".into()),
+            nuance: Some(nuance),
+        });
+        let err = server.open_journal(args).await.unwrap_err();
+        assert!(
+            err.message.contains("empty"),
+            "expected 'empty' in message, got: {}",
+            err.message
+        );
+    }
+
+    #[tokio::test]
+    async fn open_journal_rejects_whitespace_only_title() {
+        let server = test_server();
+        let nuance = server.registry.nuance.clone();
+        let args = Parameters(OpenJournalParams {
+            name: "new-journal".into(),
+            title: Some("   ".into()),
+            meta: None,
+            store: Some("local".into()),
+            nuance: Some(nuance),
+        });
+        let err = server.open_journal(args).await.unwrap_err();
+        assert!(
+            err.message.contains("empty"),
+            "expected 'empty' in message, got: {}",
+            err.message
+        );
     }
 
     // ── Tool param store field deserialization ─────────────────────
