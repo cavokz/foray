@@ -646,6 +646,18 @@ impl Store for StdioStore {
         let items: Vec<JournalItem> =
             serde_json::from_value(migrated["items"].clone()).map_err(|e| io_err(e.to_string()))?;
 
+        if wire.name.trim().is_empty() {
+            return Err(StoreError::Io(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "journal name is empty",
+            )));
+        }
+        if wire.title.trim().is_empty() {
+            return Err(StoreError::Io(io::Error::new(
+                io::ErrorKind::InvalidData,
+                "journal title is empty",
+            )));
+        }
         let journal = JournalFile {
             schema: migrate::CURRENT_SCHEMA,
             name: wire.name,
