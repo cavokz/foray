@@ -531,8 +531,13 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 added_at: Utc::now(),
                 meta: parsed_meta,
             };
-            let count = store.add_items(&journal_name, vec![item]).await?;
-            println!("Added to {journal_name} ({count} items)");
+            let failed = store.add_items(&journal_name, &[item]).await?;
+            if !failed.is_empty() {
+                return Err(anyhow::anyhow!(
+                    "failed to add item to {journal_name}: ID collision after store rejected it"
+                ));
+            }
+            println!("Added to {journal_name}");
         }
         Commands::Open { name, title, meta } => {
             validate_name(name).map_err(|e| anyhow::anyhow!(e))?;
@@ -630,7 +635,14 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             let items = journal.items;
             store.create(&name, journal.title, journal.meta).await?;
             if !items.is_empty() {
-                store.add_items(&name, items).await?;
+                let failed = store.add_items(&name, &items).await?;
+                if !failed.is_empty() {
+                    return Err(anyhow::anyhow!(
+                        "import incomplete: {} item(s) failed to store: {}",
+                        failed.len(),
+                        failed.join(", ")
+                    ));
+                }
             }
             println!("Imported successfully");
         }

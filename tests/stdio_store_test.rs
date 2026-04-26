@@ -51,11 +51,11 @@ async fn stdio_store_create_load_list() {
         added_at: Utc::now(),
         meta: None,
     };
-    let total = store
-        .add_items("remote-test", vec![item])
+    let failed = store
+        .add_items("remote-test", &[item])
         .await
         .expect("add_items should succeed");
-    assert_eq!(total, 1, "journal should now have 1 item");
+    assert!(failed.is_empty(), "no items should fail to add");
 
     // ── load ─────────────────────────────────────────────────────────
     let (loaded, item_total) = store
