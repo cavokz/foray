@@ -169,7 +169,7 @@ struct StoreInfo {
 #[derive(Serialize)]
 struct OpenJournalResponse {
     name: String,
-    title: Option<String>,
+    title: String,
     item_count: usize,
     created: bool,
 }
@@ -179,7 +179,7 @@ struct SyncJournalResponse {
     /// Wire protocol schema version — always set to [`migrate::CURRENT_SCHEMA`].
     schema: u32,
     name: String,
-    title: Option<String>,
+    title: String,
     items: Vec<serde_json::Value>,
     added_ids: Vec<String>,
     cursor: usize,
@@ -449,7 +449,7 @@ impl ForayServer {
             }
             validate_meta(&args.meta)?;
             store
-                .create(&args.name, Some(title), args.meta)
+                .create(&args.name, title, args.meta)
                 .await
                 .map_err(Self::store_err)?;
             let p = Pagination::default();
@@ -897,7 +897,7 @@ mod tests {
 
         // Create a journal directly via the store.
         store
-            .create("arc-test", Some("Arc Test".into()), None)
+            .create("arc-test", "Arc Test".into(), None)
             .await
             .unwrap();
 
@@ -1077,7 +1077,7 @@ mod tests {
         let resp = SyncJournalResponse {
             schema: migrate::CURRENT_SCHEMA,
             name: "my-journal".into(),
-            title: Some("My Journal".into()),
+            title: "My Journal".into(),
             items: vec![],
             added_ids: vec!["abc-123".into()],
             cursor: 7,

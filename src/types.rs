@@ -37,8 +37,7 @@ pub struct JournalFile {
     /// migration guarantees this field is present and at the current version.
     pub schema: u32,
     pub name: String,
-    #[serde(skip_serializing_if = "Option::is_none")]
-    pub title: Option<String>,
+    pub title: String,
     pub items: Vec<JournalItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<HashMap<String, serde_json::Value>>,
@@ -47,7 +46,7 @@ pub struct JournalFile {
 impl JournalFile {
     pub fn new(
         name: &str,
-        title: Option<String>,
+        title: String,
         meta: Option<HashMap<String, serde_json::Value>>,
     ) -> Self {
         Self {
@@ -64,7 +63,7 @@ impl JournalFile {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct JournalSummary {
     pub name: String,
-    pub title: Option<String>,
+    pub title: String,
     pub item_count: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<HashMap<String, serde_json::Value>>,
@@ -183,9 +182,9 @@ mod tests {
 
     #[test]
     fn journal_file_new() {
-        let j = JournalFile::new("test-journal", Some("Test Title".into()), None);
+        let j = JournalFile::new("test-journal", "Test Title".into(), None);
         assert_eq!(j.name, "test-journal");
-        assert_eq!(j.title.as_deref(), Some("Test Title"));
+        assert_eq!(j.title, "Test Title");
         assert!(j.items.is_empty());
         assert_eq!(j.schema, migrate::CURRENT_SCHEMA);
     }

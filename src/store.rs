@@ -45,7 +45,7 @@ pub trait Store: Send + Sync {
     async fn create(
         &self,
         name: &str,
-        title: Option<String>,
+        title: String,
         meta: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<(), StoreError>;
     async fn add_items(&self, name: &str, items: Vec<JournalItem>) -> Result<usize, StoreError>;
