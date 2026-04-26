@@ -110,18 +110,24 @@ sync_journal(
 
 ## Cursor Tracking
 
-Every `sync_journal` response includes a `cursor`. Always capture it and pass it on the next call to the same journal. This returns only new items, keeping responses small.
+Every `sync_journal` response includes `cursor` and `total`. Track one cursor per journal and always pass it on the next call — this returns only new items, keeping responses small.
+
+**Before the first `sync_journal` call**, check `total` from `list_journals`. Large journals (e.g. > 50 items) or journals with content-heavy items can overflow tool output buffers — a single call fetching hundreds of large items will likely be truncated or fail. Omit `limit` on the first call and let the server default (30) apply.
 
 ```
-# First call — no cursor, get all items
-sync_journal(name: "auth-cache-race", nuance: "...")              → cursor: 42
+# First call — omit cursor (read from beginning) and omit limit (server defaults to 30)
+sync_journal(name: "my-journal", nuance: "...")              → cursor: 30, total: 42
 
-# All subsequent calls — pass the cursor
-sync_journal(name: "auth-cache-race", cursor: 42, nuance: "...")  → only new items, cursor: 45
-sync_journal(name: "auth-cache-race", cursor: 45, nuance: "...")  → only new items, cursor: 45
+# cursor < total → paginate; adjust limit based on observed item size if needed (server hard-caps at 200)
+sync_journal(name: "my-journal", cursor: 30, nuance: "...")  → cursor: 42, total: 42
+
+# cursor == total → all items received; subsequent calls return only new items
+sync_journal(name: "my-journal", cursor: 42, nuance: "...")  → cursor: 45, total: 45
 ```
 
-Track one cursor per journal. Always pass it — except when intentionally requesting a full reload (e.g., the first `sync_journal` call when resuming after a session break).
+Track one cursor per journal. Always pass it — except on the very first call when starting or resuming a session (omit cursor to read from the beginning).
+
+After the first page, adapt `limit` based on observed item sizes: smaller if items were long or content-heavy, larger if they were short. Never exceed the server hard cap of 200.
 
 ## Resuming Work
 
@@ -129,7 +135,7 @@ When the user returns to continue:
 
 1. Call `hello` to get the nuance token
 2. Call `list_journals` to find relevant journals (pass nuance)
-3. Call `sync_journal` without `cursor` to get the full history — capture the returned `cursor` (pass nuance)
+3. Call `sync_journal` without `cursor` to start reading from the beginning — paginate (passing `cursor` each time) until `cursor == total`; capture the final `cursor`
 4. Summarize recent items for the user
 5. Continue adding via `sync_journal`, always passing `cursor` and `nuance` from the previous response
 
@@ -202,7 +208,7 @@ sync_journal(
 - Use descriptive, lowercase, hyphenated journal names
 - Set `ref` for file paths, URLs, ticket links, PR links
 - Don't use foray for simple one-shot Q&A with no follow-up work
-- Track `cursor` per journal: capture it from every `sync_journal` response and pass it on the next call — never omit it after the first call within a session
+- Track `cursor` per journal: capture it from every `sync_journal` response and pass it on the next call — never omit it after the first call within a session. Always check `cursor == total` to confirm all items were received; paginate if not. **Omit `limit` on the first call**; adapt it on subsequent pages based on observed item size, up to the server hard cap of 200.
 - Route tangential items to the most appropriate journal, not always the current one
 - **Sync proactively** — don't wait to be asked. Sync at natural completion points: after a task is done, when a round of review comments is addressed, when the user signals approval ("good", "done", "looks good"). Batch items when it makes sense, but don't defer indefinitely.
 

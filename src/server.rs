@@ -111,7 +111,7 @@ pub struct SyncJournalParams {
     /// Position from previous sync response — return only items after this position (omit for full read)
     #[serde(default)]
     pub cursor: Option<usize>,
-    /// Maximum number of items to return (does not affect additions — all items are always added)
+    /// Maximum number of items to return (does not affect additions — all items are always added). Defaults to 30 if omitted.
     #[serde(default)]
     pub limit: Option<usize>,
     /// Items to add to the journal
@@ -218,7 +218,8 @@ pub struct SummarizeParams {
 
 // ── Server ──────────────────────────────────────────────────────────
 
-const MAX_LIMIT: usize = 500;
+const DEFAULT_LIMIT: usize = 30;
+const MAX_LIMIT: usize = 200;
 const MAX_CONTENT: usize = 64 * 1024;
 const MAX_TITLE: usize = 512;
 const MAX_TAGS: usize = 20;
@@ -546,7 +547,7 @@ impl ForayServer {
             &[]
         };
 
-        let limit = args.limit.unwrap_or(items_slice.len()).min(MAX_LIMIT);
+        let limit = args.limit.unwrap_or(DEFAULT_LIMIT).min(MAX_LIMIT);
         let items: Vec<serde_json::Value> = items_slice
             .iter()
             .take(limit)
@@ -660,7 +661,7 @@ impl ForayServer {
 
     #[tool(
         name = "sync_journal",
-        description = "Read and write journal items in one call. Returns items since your last cursor position. Pass items to add them. Pass cursor from the previous response to get only new items — omit cursor for a full read. Response includes cursor for the next call and added_ids for items you added."
+        description = "Read and write journal items in one call. Returns items since your last cursor position. Pass items to add them. Pass cursor from the previous response to get only new items — omit cursor to read from the beginning. Returns at most 30 items by default; omit limit on the first call and adjust it on subsequent pages based on observed item sizes (hard cap: 200). Check cursor == total to confirm all items were received; if cursor < total, paginate by passing the returned cursor."
     )]
     async fn sync_journal(
         &self,
@@ -1227,6 +1228,124 @@ mod tests {
             serde_json::from_str(r#"{"name":"j","cursor":0,"store":"local","nuance":"abc"}"#)
                 .unwrap();
         assert_eq!(p.store.as_deref(), Some("local"));
+    }
+
+    // ── DEFAULT_LIMIT ───────────────────────────────────────────────
+
+    #[tokio::test]
+    async fn sync_journal_default_limit_caps_returned_items() {
+        let server = test_server();
+        let nuance = server.registry.nuance.clone();
+        let store = server.resolve_store(Some("local")).unwrap();
+
+        store
+            .create("big-j", "Big Journal".into(), None)
+            .await
+            .unwrap();
+
+        // Add DEFAULT_LIMIT + 5 items so the journal is definitely larger.
+        let extra = 5;
+        let items: Vec<_> = (0..DEFAULT_LIMIT + extra)
+            .map(|i| crate::types::JournalItem {
+                id: format!("id-{i}"),
+                item_type: crate::types::ItemType::Note,
+                content: format!("item {i}"),
+                tags: None,
+                added_at: chrono::Utc::now(),
+                meta: None,
+            })
+            .collect();
+        store.add_items("big-j", items).await.unwrap();
+
+        let args = Parameters(SyncJournalParams {
+            name: "big-j".into(),
+            cursor: None,
+            limit: None, // no explicit limit → should use DEFAULT_LIMIT
+            items: None,
+            store: Some("local".into()),
+            nuance: Some(nuance.clone()),
+        });
+        let result = server.sync_journal(args).await.unwrap();
+        let text = result.content[0].as_text().unwrap().text.clone();
+        let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let returned = json["items"].as_array().unwrap().len();
+        assert_eq!(
+            returned, DEFAULT_LIMIT,
+            "expected DEFAULT_LIMIT={DEFAULT_LIMIT} items, got {returned}"
+        );
+        assert_eq!(json["cursor"].as_u64().unwrap(), DEFAULT_LIMIT as u64);
+        assert_eq!(
+            json["total"].as_u64().unwrap(),
+            (DEFAULT_LIMIT + extra) as u64
+        );
+
+        // A follow-up call with the returned cursor drains the remaining items.
+        let next_args = Parameters(SyncJournalParams {
+            name: "big-j".into(),
+            cursor: Some(DEFAULT_LIMIT),
+            limit: None,
+            items: None,
+            store: Some("local".into()),
+            nuance: Some(nuance.clone()),
+        });
+        let next_result = server.sync_journal(next_args).await.unwrap();
+        let next_text = next_result.content[0].as_text().unwrap().text.clone();
+        let next_json: serde_json::Value = serde_json::from_str(&next_text).unwrap();
+        let remaining = next_json["items"].as_array().unwrap().len();
+        assert_eq!(
+            remaining, extra,
+            "expected {extra} remaining items, got {remaining}"
+        );
+        assert_eq!(
+            next_json["total"].as_u64().unwrap(),
+            (DEFAULT_LIMIT + extra) as u64
+        );
+        assert_eq!(
+            next_json["cursor"].as_u64().unwrap(),
+            (DEFAULT_LIMIT + extra) as u64
+        );
+    }
+
+    #[tokio::test]
+    async fn sync_journal_explicit_limit_overrides_default() {
+        let server = test_server();
+        let nuance = server.registry.nuance.clone();
+        let store = server.resolve_store(Some("local")).unwrap();
+
+        store
+            .create("big-j2", "Big Journal 2".into(), None)
+            .await
+            .unwrap();
+
+        let items: Vec<_> = (0..DEFAULT_LIMIT + 10)
+            .map(|i| crate::types::JournalItem {
+                id: format!("id-{i}"),
+                item_type: crate::types::ItemType::Note,
+                content: format!("item {i}"),
+                tags: None,
+                added_at: chrono::Utc::now(),
+                meta: None,
+            })
+            .collect();
+        store.add_items("big-j2", items).await.unwrap();
+
+        let explicit = 5usize;
+        let args = Parameters(SyncJournalParams {
+            name: "big-j2".into(),
+            cursor: None,
+            limit: Some(explicit),
+            items: None,
+            store: Some("local".into()),
+            nuance: Some(nuance.clone()),
+        });
+        let result = server.sync_journal(args).await.unwrap();
+        let text = result.content[0].as_text().unwrap().text.clone();
+        let json: serde_json::Value = serde_json::from_str(&text).unwrap();
+        let returned = json["items"].as_array().unwrap().len();
+        assert_eq!(
+            returned, explicit,
+            "expected {explicit} items, got {returned}"
+        );
     }
     // ── SyncJournalResponse serialization ──────────────────────────
 
