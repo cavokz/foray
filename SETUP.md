@@ -1,6 +1,6 @@
 # Setup Guide
 
-> **For AI assistants:** You are being directed to set up foray for yourself. You know which MCP client you are (Claude CLI, Claude Desktop, Cursor, VS Code / GitHub Copilot / VS Code Agents). Determine the OS from system context, or ask the user. Then follow **Steps 2–4** for your client and OS. Step 1 is a one-time user action — confirm with the user whether the binary is already installed before attempting it.
+> **For AI assistants:** You are being directed to set up foray for yourself. You know which MCP client you are (Claude Code, Claude Desktop, Cursor, VS Code / GitHub Copilot / VS Code Agents). Determine the OS from system context, or ask the user. Then follow **Steps 2–4** for your client and OS. Step 1 is a one-time user action — confirm with the user whether the binary is already installed before attempting it.
 
 Step 1 is done once. Steps 2–4 must be repeated for each AI assistant/client you want to use foray with — you can direct each assistant to this guide for further support.
 
@@ -53,7 +53,7 @@ The MCP server exposes foray's journal tools to your AI client. It runs locally 
 
 After adding or changing MCP server config, restart the application or start a new chat session for the tools to appear.
 
-### Claude CLI
+### Claude Code
 
 Run this command to register foray as a global MCP server:
 
@@ -123,14 +123,14 @@ Config file:
 
 The companion skill teaches your AI assistant when and how to use foray effectively.
 
-For most clients, download `SKILL.md` from the [latest release](https://github.com/cavokz/foray/releases/latest/download/SKILL.md) and install it in the standard global path below. Some MCP clients may also surface built-in server instructions that mention a project-local skill location for certain clients; treat that as an optional project-scoped override, while the paths below are the recommended default install locations. For Claude Desktop, see the note after the table.
+Download `SKILL.md` from the [latest release](https://github.com/cavokz/foray/releases/latest/download/SKILL.md) and install it in:
 
-| Client | macOS | Linux | Windows |
-|--------|-------|-------|---------|
-| Claude CLI | `~/.claude/skills/foray/SKILL.md` | `~/.claude/skills/foray/SKILL.md` | `%USERPROFILE%\.claude\skills\foray\SKILL.md` |
-| Claude Desktop | See note below | — | See note below |
-| Cursor | `~/.cursor/skills/foray/SKILL.md` | `~/.cursor/skills/foray/SKILL.md` | `%USERPROFILE%\.cursor\skills\foray\SKILL.md` |
-| VS Code / GitHub Copilot / VS Code Agents | `~/Library/Application Support/Code/User/prompts/foray.md` | `~/.config/Code/User/prompts/foray.md` | `%APPDATA%\Code\User\prompts\foray.md` |
+| Location | macOS / Linux | Windows |
+|----------|---------------|---------|
+| Universal (VS Code, GitHub Copilot CLI, Cursor, Codex, most tools) | `~/.agents/skills/foray/SKILL.md` | `%USERPROFILE%\.agents\skills\foray\SKILL.md` |
+| Claude Code | `~/.claude/skills/foray/SKILL.md` | `%USERPROFILE%\.claude\skills\foray\SKILL.md` |
+
+Install `SKILL.md` in both locations if you use Claude Code alongside other tools.
 
 > **Note for Claude Desktop assistants:** Claude Desktop has no file-based skill path. The practical alternative is project instructions: guide the user to open Claude Desktop, go to **Projects**, create or open the project they use for development work, click **"Set project instructions"** on the right panel, paste the full contents of `SKILL.md`, and click **"Save instructions"**. The skill will then be active for all conversations in that project. Projects and project instructions are available to all users including free accounts.
 
