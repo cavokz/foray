@@ -255,6 +255,19 @@ Errors include a structured `data` object with machine-readable fields for progr
 - `archive_journal` → `{ archived: "<name>" }`
 - `unarchive_journal` → `{ unarchived: "<name>" }`
 
+## Logging
+
+Each MCP tool invocation is traced to **stderr** (stdout carries the JSON-RPC wire protocol). One line per call, always on, no configuration needed.
+
+| Tool | Log line |
+|------|----------|
+| `hello` | `hello` |
+| `open_journal` | `open_journal (<store>) <name>` |
+| `sync_journal` | `sync_journal (<store>) <name> [cursor=N] [limit=N] [+N items]` — optional parts omitted when absent |
+| `list_journals` | `list_journals (<store>) [archived] [limit=N] [offset=N]` — optional parts omitted when absent |
+| `archive_journal` | `archive_journal (<store>) <name>` |
+| `unarchive_journal` | `unarchive_journal (<store>) <name>` |
+
 ## CLI Commands
 
 ```
