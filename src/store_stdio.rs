@@ -669,7 +669,11 @@ impl Store for StdioStore {
         Ok((journal, total))
     }
 
-    async fn add_items(&self, name: &str, items: Vec<JournalItem>) -> Result<usize, StoreError> {
+    async fn add_items(
+        &self,
+        name: &str,
+        items: &[JournalItem],
+    ) -> Result<Vec<String>, StoreError> {
         let items_json: Vec<Value> = items
             .iter()
             .map(|item| {
@@ -694,8 +698,8 @@ impl Store for StdioStore {
             .collect();
 
         let args = serde_json::json!({ "name": name, "items": items_json });
-        let resp: SyncJournalWire = self.call_mcp("sync_journal", args).await?;
-        Ok(resp.total)
+        let _resp: SyncJournalWire = self.call_mcp("sync_journal", args).await?;
+        Ok(vec![])
     }
 
     async fn list(

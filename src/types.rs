@@ -116,13 +116,13 @@ pub fn item_id() -> String {
     format!("{}-{}-{}-{}", &c[..4], &c[4..8], &c[8..12], &c[12..16])
 }
 
-/// Validate a journal name: `[a-z0-9_-]`, non-empty, max 64 chars.
+/// Validate a journal name: `[a-z0-9_-]`, non-empty, max 256 chars.
 pub fn validate_name(name: &str) -> Result<(), String> {
     if name.is_empty() {
         return Err("journal name cannot be empty".into());
     }
-    if name.len() > 64 {
-        return Err("journal name cannot exceed 64 characters".into());
+    if name.len() > 256 {
+        return Err("journal name cannot exceed 256 characters".into());
     }
     if !name
         .chars()
@@ -151,7 +151,8 @@ mod tests {
         assert!(validate_name("Auth").is_err());
         assert!(validate_name("has space").is_err());
         assert!(validate_name("has.dot").is_err());
-        assert!(validate_name(&"a".repeat(65)).is_err());
+        assert!(validate_name(&"a".repeat(256)).is_ok());
+        assert!(validate_name(&"a".repeat(257)).is_err());
     }
 
     #[test]

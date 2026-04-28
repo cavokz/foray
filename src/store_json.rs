@@ -172,7 +172,11 @@ impl Store for JsonFileStore {
         self.write_journal(&path, &journal)
     }
 
-    async fn add_items(&self, name: &str, items: Vec<JournalItem>) -> Result<usize, StoreError> {
+    async fn add_items(
+        &self,
+        name: &str,
+        items: &[JournalItem],
+    ) -> Result<Vec<String>, StoreError> {
         let (path, is_archived) = self
             .find(name)
             .ok_or_else(|| StoreError::NotFound(name.into()))?;
@@ -181,10 +185,9 @@ impl Store for JsonFileStore {
         }
         let _lock = self.with_lock(name)?;
         let mut journal = self.read_journal(&path)?;
-        journal.items.extend(items);
-        let count = journal.items.len();
+        journal.items.extend_from_slice(items);
         self.write_journal(&path, &journal)?;
-        Ok(count)
+        Ok(vec![])
     }
 
     async fn list(
@@ -301,7 +304,7 @@ mod tests {
         let (store, _dir) = make_store();
         store.create("my-ctx", "T".into(), None).await.unwrap();
         let item = make_item("found a bug");
-        store.add_items("my-ctx", vec![item]).await.unwrap();
+        store.add_items("my-ctx", &[item]).await.unwrap();
         let (loaded, total) = store.load("my-ctx", &Pagination::default()).await.unwrap();
         assert_eq!(total, 1);
         assert_eq!(loaded.items[0].content, "found a bug");
@@ -310,7 +313,8 @@ mod tests {
     #[tokio::test]
     async fn add_item_not_found() {
         let (store, _dir) = make_store();
-        let result = store.add_items("nope", vec![make_item("x")]).await;
+        // &[...] temporary lives to end-of-statement, safely covering .await.
+        let result = store.add_items("nope", &[make_item("x")]).await;
         assert!(matches!(result, Err(StoreError::NotFound(_))));
     }
 
@@ -362,8 +366,9 @@ mod tests {
             .await
             .unwrap();
         assert_eq!(loaded.name, "arch-test");
+        // &[...] temporary lives to end-of-statement, safely covering .await.
         assert!(matches!(
-            store.add_items("arch-test", vec![make_item("x")]).await,
+            store.add_items("arch-test", &[make_item("x")]).await,
             Err(StoreError::Archived(_))
         ));
         let (archived_list, _) = store.list(&Pagination::default(), true).await.unwrap();
@@ -608,8 +613,9 @@ mod tests {
         std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
 
         // add_items holds the lock and rewrites the file — this is the heal path.
+        // &[...] temporary lives to end-of-statement, safely covering .await.
         store
-            .add_items("legacy", vec![make_item("new item")])
+            .add_items("legacy", &[make_item("new item")])
             .await
             .unwrap();
 
@@ -686,8 +692,9 @@ mod tests {
         let (store, _dir) = make_store();
         store.create("pag", "P".into(), None).await.unwrap();
         for i in 0..5 {
+            // &[...] temporary lives to end-of-statement, safely covering .await.
             store
-                .add_items("pag", vec![make_item(&format!("item-{i}"))])
+                .add_items("pag", &[make_item(&format!("item-{i}"))])
                 .await
                 .unwrap();
         }

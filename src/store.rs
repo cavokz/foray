@@ -48,7 +48,11 @@ pub trait Store: Send + Sync {
         title: String,
         meta: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<(), StoreError>;
-    async fn add_items(&self, name: &str, items: Vec<JournalItem>) -> Result<usize, StoreError>;
+    /// Add items to the journal. Returns the IDs of items that could not be stored
+    /// (e.g. due to an ID collision). An empty vec means all items were stored.
+    /// Fatal errors (network, permission, etc.) are returned as `Err`.
+    async fn add_items(&self, name: &str, items: &[JournalItem])
+    -> Result<Vec<String>, StoreError>;
     async fn list(
         &self,
         pagination: &Pagination,
