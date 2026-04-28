@@ -355,8 +355,8 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 1. `SETUP.md` — LLM-oriented setup guide (not a skill, a one-time instruction document). User downloads it from GitHub and directs each AI assistant to read it and follow the steps for itself. The guide is split into two sections:
     - **Step 1 (one-time)**: binary installation — check if `foray` is on PATH (`foray --version`). If not: download a prebuilt binary from GitHub releases or `cargo install foray`. The AI confirms with the user before attempting.
     - **Steps 2–4 (per-assistant)**: each AI assistant follows these for itself:
-      - **MCP server configuration**: configure `foray serve` as an MCP server for its specific client (Claude CLI, Claude Desktop, Cursor, VS Code / GitHub Copilot), with per-client config file paths and JSON snippets inline
-      - **Companion skill installation**: download `SKILL.md` from `https://github.com/cavokz/foray/releases/latest/download/SKILL.md` and save to the global skills path for the client (Claude Desktop uses project instructions instead)
+      - **MCP server configuration**: configure `foray serve` as an MCP server for its specific client (Claude Code, Claude Desktop, Cursor, VS Code / GitHub Copilot), with per-client config file paths and JSON snippets inline
+      - **Companion skill installation**: download `SKILL.md` from `https://github.com/cavokz/foray/releases/latest/download/SKILL.md` and install in the universal location (`~/.agents/skills/foray/SKILL.md` on macOS/Linux, `%USERPROFILE%\.agents\skills\foray\SKILL.md` on Windows); additionally install in the Claude Code location (`~/.claude/skills/foray/SKILL.md`) when using Claude Code alongside other tools; Claude Desktop uses project instructions instead
       - **Verification**: invoke `list_journals` to confirm the MCP server is responding
     - User never needs to clone the foray repo
 
