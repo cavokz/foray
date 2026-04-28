@@ -366,6 +366,25 @@ impl ForayServer {
         }
     }
 
+    fn sanitize(s: &str) -> String {
+        const MAX: usize = 128;
+        const SUFFIX: &str = "…[truncated]";
+        let mut out = String::with_capacity(MAX.min(s.len()));
+        let mut kept = 0usize;
+        for c in s.chars() {
+            if c.is_control() {
+                continue;
+            }
+            if kept == MAX {
+                out.push_str(SUFFIX);
+                break;
+            }
+            out.push(c);
+            kept += 1;
+        }
+        out
+    }
+
     fn preflight(&self, nuance: Option<&str>) -> Result<(), ErrorData> {
         if nuance != Some(self.registry.nuance.as_str()) {
             return Err(ErrorData::invalid_params(
@@ -390,15 +409,8 @@ impl ForayServer {
             )),
         }
     }
-}
 
-#[tool_router]
-impl ForayServer {
-    #[tool(
-        name = "hello",
-        description = "Establish a session handshake. Returns the server version, nuance token, and available stores. Always call this before any other tool, then pass the returned nuance and a store name on every subsequent call."
-    )]
-    async fn hello(&self) -> Result<CallToolResult, ErrorData> {
+    async fn do_hello(&self) -> Result<CallToolResult, ErrorData> {
         let stores = self
             .registry
             .entries()
@@ -419,14 +431,7 @@ impl ForayServer {
         )]))
     }
 
-    #[tool(
-        name = "open_journal",
-        description = "Create or reopen a journal. title is required when creating (error if missing), ignored when reopening. Idempotent if journal exists."
-    )]
-    async fn open_journal(
-        &self,
-        Parameters(args): Parameters<OpenJournalParams>,
-    ) -> Result<CallToolResult, ErrorData> {
+    async fn do_open_journal(&self, args: OpenJournalParams) -> Result<CallToolResult, ErrorData> {
         self.preflight(args.nuance.as_deref())?;
 
         validate_name(&args.name).map_err(|e| ErrorData::invalid_params(e, None))?;
@@ -483,14 +488,7 @@ impl ForayServer {
         }
     }
 
-    #[tool(
-        name = "sync_journal",
-        description = "Read and write journal items in one call. Returns items since your last cursor position. Pass items to add them. Pass cursor from the previous response to get only new items — omit cursor for a full read. Response includes cursor for the next call and added_ids for items you added."
-    )]
-    async fn sync_journal(
-        &self,
-        Parameters(args): Parameters<SyncJournalParams>,
-    ) -> Result<CallToolResult, ErrorData> {
+    async fn do_sync_journal(&self, args: SyncJournalParams) -> Result<CallToolResult, ErrorData> {
         self.preflight(args.nuance.as_deref())?;
         validate_name(&args.name).map_err(|e| ErrorData::invalid_params(e, None))?;
         let store = self.resolve_store(args.store.as_deref())?;
@@ -571,13 +569,9 @@ impl ForayServer {
         )]))
     }
 
-    #[tool(
-        name = "list_journals",
-        description = "List journals. Pass `archived: true` to list archived journals instead of active ones. Paginated: defaults to first 500."
-    )]
-    async fn list_journals(
+    async fn do_list_journals(
         &self,
-        Parameters(args): Parameters<ListJournalsParams>,
+        args: ListJournalsParams,
     ) -> Result<CallToolResult, ErrorData> {
         self.preflight(args.nuance.as_deref())?;
         let store = self.resolve_store(args.store.as_deref())?;
@@ -606,13 +600,9 @@ impl ForayServer {
         )]))
     }
 
-    #[tool(
-        name = "archive_journal",
-        description = "Archive a journal. Archived journals are readable but not writable. Use `unarchive_journal` to restore."
-    )]
-    async fn archive_journal(
+    async fn do_archive_journal(
         &self,
-        Parameters(args): Parameters<ArchiveJournalParams>,
+        args: ArchiveJournalParams,
     ) -> Result<CallToolResult, ErrorData> {
         self.preflight(args.nuance.as_deref())?;
         validate_name(&args.name).map_err(|e| ErrorData::invalid_params(e, None))?;
@@ -623,13 +613,9 @@ impl ForayServer {
         )]))
     }
 
-    #[tool(
-        name = "unarchive_journal",
-        description = "Unarchive a previously archived journal, making it writable again."
-    )]
-    async fn unarchive_journal(
+    async fn do_unarchive_journal(
         &self,
-        Parameters(args): Parameters<UnarchiveJournalParams>,
+        args: UnarchiveJournalParams,
     ) -> Result<CallToolResult, ErrorData> {
         self.preflight(args.nuance.as_deref())?;
         validate_name(&args.name).map_err(|e| ErrorData::invalid_params(e, None))?;
@@ -638,6 +624,133 @@ impl ForayServer {
         Ok(CallToolResult::success(vec![Content::text(
             serde_json::to_string(&serde_json::json!({ "unarchived": args.name })).unwrap(),
         )]))
+    }
+}
+
+#[tool_router]
+impl ForayServer {
+    #[tool(
+        name = "hello",
+        description = "Establish a session handshake. Returns the server version, nuance token, and available stores. Always call this before any other tool, then pass the returned nuance and a store name on every subsequent call."
+    )]
+    async fn hello(&self) -> Result<CallToolResult, ErrorData> {
+        eprintln!("hello");
+        self.do_hello()
+            .await
+            .inspect_err(|e| eprintln!("error: {}", Self::sanitize(&e.message)))
+    }
+
+    #[tool(
+        name = "open_journal",
+        description = "Create or reopen a journal. title is required when creating (error if missing), ignored when reopening. Idempotent if journal exists."
+    )]
+    async fn open_journal(
+        &self,
+        Parameters(args): Parameters<OpenJournalParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        eprintln!(
+            "open_journal ({}) {}",
+            Self::sanitize(args.store.as_deref().unwrap_or("?")),
+            Self::sanitize(&args.name)
+        );
+        self.do_open_journal(args)
+            .await
+            .inspect_err(|e| eprintln!("error: {}", Self::sanitize(&e.message)))
+    }
+
+    #[tool(
+        name = "sync_journal",
+        description = "Read and write journal items in one call. Returns items since your last cursor position. Pass items to add them. Pass cursor from the previous response to get only new items — omit cursor for a full read. Response includes cursor for the next call and added_ids for items you added."
+    )]
+    async fn sync_journal(
+        &self,
+        Parameters(args): Parameters<SyncJournalParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        {
+            let mut msg = format!(
+                "sync_journal ({}) {}",
+                Self::sanitize(args.store.as_deref().unwrap_or("?")),
+                Self::sanitize(&args.name)
+            );
+            if let Some(c) = args.cursor {
+                msg.push_str(&format!(" cursor={c}"));
+            }
+            if let Some(l) = args.limit {
+                msg.push_str(&format!(" limit={l}"));
+            }
+            if let Some(ref items) = args.items {
+                msg.push_str(&format!(" +{} items", items.len()));
+            }
+            eprintln!("{msg}");
+        }
+        self.do_sync_journal(args)
+            .await
+            .inspect_err(|e| eprintln!("error: {}", Self::sanitize(&e.message)))
+    }
+
+    #[tool(
+        name = "list_journals",
+        description = "List journals. Pass `archived: true` to list archived journals instead of active ones. Paginated: defaults to first 500."
+    )]
+    async fn list_journals(
+        &self,
+        Parameters(args): Parameters<ListJournalsParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        {
+            let mut msg = format!(
+                "list_journals ({})",
+                Self::sanitize(args.store.as_deref().unwrap_or("?"))
+            );
+            if args.archived {
+                msg.push_str(" archived");
+            }
+            if let Some(l) = args.limit {
+                msg.push_str(&format!(" limit={l}"));
+            }
+            if let Some(o) = args.offset {
+                msg.push_str(&format!(" offset={o}"));
+            }
+            eprintln!("{msg}");
+        }
+        self.do_list_journals(args)
+            .await
+            .inspect_err(|e| eprintln!("error: {}", Self::sanitize(&e.message)))
+    }
+
+    #[tool(
+        name = "archive_journal",
+        description = "Archive a journal. Archived journals are readable but not writable. Use `unarchive_journal` to restore."
+    )]
+    async fn archive_journal(
+        &self,
+        Parameters(args): Parameters<ArchiveJournalParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        eprintln!(
+            "archive_journal ({}) {}",
+            Self::sanitize(args.store.as_deref().unwrap_or("?")),
+            Self::sanitize(&args.name)
+        );
+        self.do_archive_journal(args)
+            .await
+            .inspect_err(|e| eprintln!("error: {}", Self::sanitize(&e.message)))
+    }
+
+    #[tool(
+        name = "unarchive_journal",
+        description = "Unarchive a previously archived journal, making it writable again."
+    )]
+    async fn unarchive_journal(
+        &self,
+        Parameters(args): Parameters<UnarchiveJournalParams>,
+    ) -> Result<CallToolResult, ErrorData> {
+        eprintln!(
+            "unarchive_journal ({}) {}",
+            Self::sanitize(args.store.as_deref().unwrap_or("?")),
+            Self::sanitize(&args.name)
+        );
+        self.do_unarchive_journal(args)
+            .await
+            .inspect_err(|e| eprintln!("error: {}", Self::sanitize(&e.message)))
     }
 }
 
