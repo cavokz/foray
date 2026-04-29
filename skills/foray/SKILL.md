@@ -133,6 +133,17 @@ When the user returns to continue:
 4. Summarize recent items for the user
 5. Continue adding via `sync_journal`, always passing `cursor` and `nuance` from the previous response
 
+## Summarizing a Journal
+
+When the user asks to summarize a journal:
+
+1. Call `list_journals` to get `total` — note the size before deciding page size
+2. Call `sync_journal` without `cursor` (omit `limit` on the first call)
+3. Accumulate items across pages, paginating until `cursor == total`
+4. Synthesize: group by type or theme, highlight key decisions and findings, note open questions
+
+For large journals, summarize incrementally — synthesize each page as you go rather than waiting for all items. This avoids holding everything in context at once.
+
 ## Cross-Referencing Journals
 
 To reference another journal's finding, use the `ref` field with foray's cross-reference format:
