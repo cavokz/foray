@@ -61,12 +61,17 @@ impl JournalFile {
 
 /// Summary returned by `list_journals`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct JournalSummary {
     pub name: String,
     pub title: String,
     pub item_count: usize,
     #[serde(skip_serializing_if = "Option::is_none")]
+    pub schema: Option<u32>,
+    #[serde(skip_serializing_if = "Option::is_none")]
     pub meta: Option<HashMap<String, serde_json::Value>>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub error: Option<String>,
 }
 
 impl From<&JournalFile> for JournalSummary {
@@ -75,7 +80,9 @@ impl From<&JournalFile> for JournalSummary {
             name: j.name.clone(),
             title: j.title.clone(),
             item_count: j.items.len(),
+            schema: Some(j.schema),
             meta: j.meta.clone(),
+            error: None,
         }
     }
 }

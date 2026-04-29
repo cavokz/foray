@@ -69,6 +69,14 @@ impl JsonFileStore {
     pub fn read_journal(&self, path: &Path) -> Result<JournalFile, StoreError> {
         let data = fs::read_to_string(path)?;
         let raw: serde_json::Value = serde_json::from_str(&data)?;
+        self.parse_journal(raw)
+    }
+
+    /// Parse a raw JSON [`Value`] into a [`JournalFile`], running migration and validation.
+    ///
+    /// Extracted from [`Self::read_journal`] so that [`list_dir`] can reuse the already-parsed
+    /// raw value without re-reading the file.
+    fn parse_journal(&self, raw: serde_json::Value) -> Result<JournalFile, StoreError> {
         let value = match migrate::migrate(raw) {
             MigrateResult::Current(v) | MigrateResult::Migrated(v) => v,
             MigrateResult::TooNew { found, max } => {
@@ -115,29 +123,80 @@ impl JsonFileStore {
         Ok(())
     }
 
-    fn list_dir(&self, dir: &Path) -> Result<Vec<JournalFile>, StoreError> {
+    fn list_dir(&self, dir: &Path) -> Result<Vec<JournalSummary>, StoreError> {
         if !dir.exists() {
             return Ok(Vec::new());
         }
-        let mut journals = Vec::new();
+        let mut summaries = Vec::new();
         for entry in fs::read_dir(dir)? {
             let entry = entry?;
             let path = entry.path();
             if path.extension().is_some_and(|e| e == "json") && path.is_file() {
-                match self.read_journal(&path) {
-                    Ok(j) => journals.push(j),
-                    // Forward-compat: propagate schema-too-new so the caller
-                    // knows a newer-version journal exists rather than silently
-                    // omitting it from results.
-                    Err(e @ StoreError::SchemaTooNew { .. }) => return Err(e),
-                    // Other errors (corrupt JSON, permission denied, etc.) are
-                    // skipped so one bad file doesn't break the entire listing.
-                    Err(_) => continue,
+                let name = path
+                    .file_stem()
+                    .map(|s| s.to_string_lossy().into_owned())
+                    .unwrap_or_else(|| path.to_string_lossy().into_owned());
+
+                // Read and parse raw JSON first so we can extract the schema version
+                // before  attempting full deserialization.
+                let raw_result =
+                    fs::read_to_string(&path)
+                        .map_err(StoreError::Io)
+                        .and_then(|data| {
+                            serde_json::from_str::<serde_json::Value>(&data)
+                                .map_err(StoreError::Json)
+                        });
+
+                let (raw_schema, journal_result) = match raw_result {
+                    Err(e) => {
+                        // I/O or JSON parse error: schema is unknown.
+                        summaries.push(JournalSummary {
+                            name,
+                            title: String::new(),
+                            item_count: 0,
+                            schema: None,
+                            meta: None,
+                            error: Some(e.to_string()),
+                        });
+                        continue;
+                    }
+                    Ok(raw) => {
+                        let raw_schema = raw.as_object().map(|obj| {
+                            obj.get("schema")
+                                .and_then(serde_json::Value::as_u64)
+                                .map(|n| u32::try_from(n).unwrap_or(u32::MAX))
+                                .unwrap_or(0)
+                        });
+                        let result = self.parse_journal(raw);
+                        (raw_schema, result)
+                    }
+                };
+
+                match journal_result {
+                    Ok(j) => {
+                        let mut summary = JournalSummary::from(&j);
+                        summary.name = name;
+                        summaries.push(summary);
+                    }
+                    Err(e) => {
+                        let schema = match &e {
+                            StoreError::SchemaTooNew { found, .. } => Some(*found),
+                            _ => raw_schema,
+                        };
+                        summaries.push(JournalSummary {
+                            name,
+                            title: String::new(),
+                            item_count: 0,
+                            schema,
+                            meta: None,
+                            error: Some(e.to_string()),
+                        });
+                    }
                 }
             }
         }
-        journals.sort_by(|a, b| a.name.cmp(&b.name));
-        Ok(journals)
+        summaries.sort_by(|a, b| a.name.cmp(&b.name));
+        Ok(summaries)
     }
 }
 
@@ -197,8 +256,7 @@ impl Store for JsonFileStore {
         } else {
             self.base_dir.clone()
         };
-        let journals = self.list_dir(&dir)?;
-        let summaries: Vec<JournalSummary> = journals.iter().map(JournalSummary::from).collect();
+        let summaries = self.list_dir(&dir)?;
         let (page, total) = pagination.apply(&summaries);
         Ok((page, total))
     }
@@ -510,7 +568,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn list_skips_empty_name_journal() {
+    async fn list_includes_empty_name_as_error() {
         let (store, dir) = make_store();
         store.create("valid", "Valid".into(), None).await.unwrap();
         let path = dir.path().join("empty-name.json");
@@ -523,15 +581,23 @@ mod tests {
         std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
 
         let (summaries, total) = store.list(&Pagination::default(), false).await.unwrap();
-        assert_eq!(
-            total, 1,
-            "corrupt file should be skipped, only 1 valid journal"
+        assert_eq!(total, 2, "both valid and error journals should appear");
+        let valid = summaries.iter().find(|s| s.name == "valid").unwrap();
+        assert!(valid.error.is_none(), "valid journal should have no error");
+        let error_entry = summaries.iter().find(|s| s.name == "empty-name").unwrap();
+        assert!(
+            error_entry.error.is_some(),
+            "invalid journal should have an error"
         );
-        assert_eq!(summaries[0].name, "valid");
+        assert_eq!(
+            error_entry.schema,
+            Some(migrate::CURRENT_SCHEMA),
+            "schema should be reported even for error entries"
+        );
     }
 
     #[tokio::test]
-    async fn list_skips_empty_title_journal() {
+    async fn list_includes_empty_title_as_error() {
         let (store, dir) = make_store();
         store.create("valid", "Valid".into(), None).await.unwrap();
         let path = dir.path().join("empty-title.json");
@@ -544,11 +610,17 @@ mod tests {
         std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
 
         let (summaries, total) = store.list(&Pagination::default(), false).await.unwrap();
-        assert_eq!(
-            total, 1,
-            "corrupt file should be skipped, only 1 valid journal"
+        assert_eq!(total, 2, "both valid and error journals should appear");
+        let error_entry = summaries.iter().find(|s| s.name == "empty-title").unwrap();
+        assert!(
+            error_entry.error.is_some(),
+            "invalid journal should have an error"
         );
-        assert_eq!(summaries[0].name, "valid");
+        assert_eq!(
+            error_entry.schema,
+            Some(migrate::CURRENT_SCHEMA),
+            "schema should be reported even for error entries"
+        );
     }
 
     #[tokio::test]
@@ -657,10 +729,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn list_propagates_schema_too_new() {
-        // A journal with a schema newer than CURRENT_SCHEMA must not be
-        // silently omitted from list() — it should propagate SchemaTooNew
-        // so the caller knows a newer-version file exists.
+    async fn list_includes_schema_too_new_as_error() {
+        // A journal with a schema newer than CURRENT_SCHEMA must appear in the
+        // list as an error entry with the schema version populated.
         let (store, dir) = make_store();
         // Create a normal journal first so there's something in the directory.
         store.create("normal", "Normal".into(), None).await.unwrap();
@@ -674,10 +745,58 @@ mod tests {
         });
         std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
 
-        let err = store.list(&Pagination::default(), false).await.unwrap_err();
+        let (summaries, total) = store.list(&Pagination::default(), false).await.unwrap();
+        assert_eq!(total, 2, "both journals should appear");
+        let error_entry = summaries.iter().find(|s| s.name == "future").unwrap();
         assert!(
-            matches!(err, StoreError::SchemaTooNew { found: 9999, .. }),
-            "expected SchemaTooNew, got {err:?}"
+            error_entry.error.is_some(),
+            "future-schema journal should have an error"
+        );
+        assert_eq!(
+            error_entry.schema,
+            Some(9999),
+            "schema version should match the on-disk value"
+        );
+    }
+
+    #[tokio::test]
+    async fn list_includes_corrupt_json_as_error() {
+        let (store, dir) = make_store();
+        store.create("valid", "Valid".into(), None).await.unwrap();
+        let path = dir.path().join("corrupt.json");
+        std::fs::write(&path, b"this is not valid json {{{").unwrap();
+
+        let (summaries, total) = store.list(&Pagination::default(), false).await.unwrap();
+        assert_eq!(total, 2, "both journals should appear");
+        let error_entry = summaries.iter().find(|s| s.name == "corrupt").unwrap();
+        assert!(
+            error_entry.error.is_some(),
+            "corrupt file should have an error"
+        );
+        assert_eq!(
+            error_entry.schema, None,
+            "schema should be absent when JSON cannot be parsed"
+        );
+    }
+
+    #[tokio::test]
+    async fn list_includes_non_object_json_as_error() {
+        // Valid JSON but not a JSON object (e.g. an array) — schema must be absent.
+        let (store, dir) = make_store();
+        store.create("valid", "Valid".into(), None).await.unwrap();
+        let path = dir.path().join("array.json");
+        std::fs::write(&path, b"[1, 2, 3]").unwrap();
+
+        let (summaries, total) = store.list(&Pagination::default(), false).await.unwrap();
+        assert_eq!(total, 2, "both journals should appear");
+        let error_entry = summaries.iter().find(|s| s.name == "array").unwrap();
+        assert!(
+            error_entry.error.is_some(),
+            "non-object JSON file should have an error"
+        );
+        assert_eq!(
+            error_entry.schema, None,
+            "schema should be absent when the JSON is not an object"
         );
     }
 
