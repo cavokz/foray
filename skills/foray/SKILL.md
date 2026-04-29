@@ -133,14 +133,6 @@ When the user returns to continue:
 4. Summarize recent items for the user
 5. Continue adding via `sync_journal`, always passing `cursor` and `nuance` from the previous response
 
-## Comparing Branches
-
-When the user asks to compare directions:
-
-1. Call `sync_journal` on each journal being compared
-2. Compare items side by side
-3. Highlight which direction has more evidence
-
 ## Cross-Referencing Journals
 
 To reference another journal's finding, use the `ref` field with foray's cross-reference format:
