@@ -563,7 +563,9 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             if *completion {
                 let (summaries, _) = store.list(&Pagination::default(), *archived).await?;
                 for s in &summaries {
-                    println!("{}", s.name);
+                    if s.error.is_none() {
+                        println!("{}", s.name);
+                    }
                 }
                 return Ok(());
             }
@@ -584,8 +586,12 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 let label = if *archived { "archived" } else { "active" };
                 println!("{} journal(s) ({label}):", total);
                 for s in &summaries {
-                    let title = &s.title;
-                    println!("  {} ({} items) {}", s.name, s.item_count, title);
+                    if let Some(err) = &s.error {
+                        println!("  {} (ERROR: {})", s.name, err);
+                    } else {
+                        let title = &s.title;
+                        println!("  {} ({} items) {}", s.name, s.item_count, title);
+                    }
                 }
             }
         }

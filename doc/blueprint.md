@@ -251,7 +251,7 @@ Errors include a structured `data` object with machine-readable fields for progr
 - `hello` → `{ version, nuance, protocol, stores: [{name, description}] }` (e.g. `{ "version": "1.2.3", "nuance": "abc123", "protocol": 1, "stores": [{"name": "local", "description": "Default local journal store"}] }`)
 - `open_journal` → `{ name, title, item_count, created }` (`created: bool` — true if new)
 - `sync_journal` → `{ schema, name, title, items: [...], added_ids: [...], cursor, total }` (`schema` is the wire protocol schema version; `cursor` is the position for the next call; `added_ids` lists IDs assigned to items added by this call in order)
-- `list_journals` → `{ journals: [{ name, title, item_count, meta }], total, limit, offset }` (pass `archived: true` to list archived journals)
+- `list_journals` → `{ journals: [{ name, title, item_count, schema?, meta?, error? }], total, limit, offset }` (pass `archived: true` to list archived journals; `schema` is the on-disk schema version — present whenever the file is parseable as a JSON object; `error` is present for journals that could not be fully loaded, in which case `title` is empty and `item_count` is 0)
 - `archive_journal` → `{ archived: "<name>" }`
 - `unarchive_journal` → `{ unarchived: "<name>" }`
 
@@ -318,9 +318,9 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
    - `JournalFile` { schema, name, title, items, meta } — `schema` is `CURRENT_SCHEMA` (u32), always set on creation
    - `JournalItem` { id, item_type, content, added_at, tags, meta } — `id` is `item_id()`: consonant-only `xxxx-xxxx-xxxx-xxxx` format (16 chars, ~70 bits)
    - `ItemType` enum { Finding, Decision, Snippet, Note }
-   - `JournalSummary` { name, title, item_count, meta }
+   - `JournalSummary` { name, title, item_count, schema?, meta?, error? } — `schema` is the on-disk schema version (present whenever the file is parseable as a JSON object); `error` is set for journals that could not be fully loaded (in which case `title` is empty and `item_count` is 0)
    - `Pagination` { limit: Option<usize>, offset: Option<usize> }
-   - Both `JournalFile` and `JournalItem` get `#[serde(deny_unknown_fields)]` and `meta: Option<HashMap<String, serde_json::Value>>` for client-specific extensibility
+   - Both `JournalFile`, `JournalItem`, and `JournalSummary` get `#[serde(deny_unknown_fields)]` and `meta: Option<HashMap<String, serde_json::Value>>` for client-specific extensibility
    - `validate_name()` for journal name validation
 2. `store.rs`:
    - `#[async_trait] trait Store: Send + Sync` with async methods: `load(name, pagination) -> (JournalFile, total)`, `create(name, title, meta)`, `add_items(name, Vec<JournalItem>)`, `list(pagination, archived) -> (Vec<JournalSummary>, total)`, `delete`, `exists`, `archive`, `unarchive`
@@ -461,7 +461,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 - **First use**: Explicit — `sync_journal` with items to non-existent journal is an error. Use `open_journal` first.
 - **Item counts**: Single count per journal (files are self-contained).
 - **Concurrency**: `add_items` (store method) locks a `{name}.lock` sidecar file via `fs2::lock_exclusive` during read-modify-write. Concurrent adds from multiple MCP server processes or CLI are serialized. Append-only — no conflicts.
-- **Input limits** (server-side, write path): content max 64KB, title non-empty and max 512 chars, max 20 tags each max 64 chars, meta max 8KB serialized. Read path also validates: `read_journal` and `load` reject journals with empty or whitespace-only `name` or `title`; `list_journals` skips invalid files rather than surfacing them.
+- **Input limits** (server-side, write path): content max 64KB, title non-empty and max 512 chars, max 20 tags each max 64 chars, meta max 8KB serialized. Read path also validates: `read_journal` and `load` reject journals with empty or whitespace-only `name` or `title`; `list_journals` surfaces invalid files as error entries (with `error` set and `schema` populated when the JSON was at least parseable).
 - **Pagination cap**: Server caps `limit` to 500 in both `sync_journal` and `list_journals`.
 - **`ref` in `meta`**: references (file paths, URLs, ticket/PR links, cross-journal `foray:` refs) are stored as `meta["ref"]` on the item. The CLI exposes `--ref` as a convenience flag that populates `meta.ref`. The v0→1 migration moves any top-level `ref` field on existing items into `meta.ref` automatically.
 - **Serde**: strict deserialization (`deny_unknown_fields`), `meta` field for extensibility, `Option` fields skipped when None.
