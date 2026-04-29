@@ -138,7 +138,7 @@ impl JsonFileStore {
                     .unwrap_or_else(|| path.to_string_lossy().into_owned());
 
                 // Read and parse raw JSON first so we can extract the schema version
-                // before  attempting full deserialization.
+                // before attempting full deserialization.
                 let raw_result =
                     fs::read_to_string(&path)
                         .map_err(StoreError::Io)
@@ -211,6 +211,8 @@ impl Store for JsonFileStore {
             .find(name)
             .ok_or_else(|| StoreError::NotFound(name.into()))?;
         let mut journal = self.read_journal(&path)?;
+        // The file stem is the authoritative name; override whatever the JSON says.
+        journal.name = name.to_string();
         let total = journal.items.len();
         let (items, _) = pagination.apply(&journal.items);
         journal.items = items;
@@ -240,6 +242,8 @@ impl Store for JsonFileStore {
         }
         let _lock = self.with_lock(name)?;
         let mut journal = self.read_journal(&path)?;
+        // The file stem is the authoritative name; keep it consistent on write-back.
+        journal.name = name.to_string();
         journal.items.extend(items);
         let count = journal.items.len();
         self.write_journal(&path, &journal)?;
