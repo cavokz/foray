@@ -28,7 +28,7 @@ Use foray when the conversation involves **substantive, evolving work** — not 
 | Tool | Use |
 |------|-----|
 | `hello` | Establish handshake and get `nuance` + available `stores` — call this first, every session |
-| `list_journals` | Check existing journals before creating |
+| `list_journals` | Check existing journals before creating; capture `avg_item_size` and `std_item_size` to compute a safe `limit` for `sync_journal` |
 | `open_journal` | Create or reopen a journal |
 | `sync_journal` | Read items and/or add new ones (the workhorse) |
 | `archive_journal` | Archive a journal (readable but not writable) |
@@ -37,7 +37,7 @@ Use foray when the conversation involves **substantive, evolving work** — not 
 ## Starting a Journal
 
 1. Call `hello` to get the `nuance` token and available `stores` — capture both, you'll use them on every subsequent call
-2. Call `list_journals` to check for existing related journals (pass `nuance` and `store`)
+2. Call `list_journals` to check for existing related journals (pass `nuance` and `store`) — capture `avg_item_size` and `std_item_size` for any journal you plan to sync
 3. If none fit, call `open_journal` with a descriptive `name` and `title`
 4. Begin adding items as you work
 
@@ -112,22 +112,27 @@ sync_journal(
 
 Every `sync_journal` response includes `cursor` and `total`. Track one cursor per journal and always pass it on the next call — this returns only new items, keeping responses small.
 
-**Before the first `sync_journal` call**, check `total` from `list_journals`. Large journals (e.g. > 50 items) or journals with content-heavy items can overflow tool output buffers — a single call fetching hundreds of large items will likely be truncated or fail. Omit `limit` on the first call and let the server default (30) apply.
+**Before the first `sync_journal` call**, compute a safe page size from `list_journals`. Each journal entry includes `avg_item_size` (average serialized JSON byte size of all items) and `std_item_size` (standard deviation of item sizes). Use your tool-output size budget (in bytes) to derive a limit:
+- `avg_item_size` absent → old server, size unknown; use `limit: 5`
+- `avg_item_size: 0` → journal is empty, no items to fetch
+- `avg_item_size: N, std_item_size: S` → `limit = floor(output_budget / (N + 2×S))`, minimum 1 (covers ~95th percentile item size)
+- `avg_item_size: N, std_item_size` absent → `limit = floor(output_budget / N)`, minimum 1
+
+**Use that computed limit on every page** — not just the first. Do not raise it mid-pagination without a reason (e.g. if actual items turn out smaller than the average).
 
 ```
-# First call — omit cursor (read from beginning) and omit limit (server defaults to 30)
-sync_journal(name: "my-journal", nuance: "...")              → cursor: 30, total: 42
+# output_budget: 50_000 bytes; avg_item_size: 444, std_item_size: 120
+# limit = floor(50_000 / (444 + 2×120)) = floor(50_000 / 684) = 73
+# First call — omit cursor (read from beginning), use computed limit
+sync_journal(name: "my-journal", nuance: "...", limit: 73)    → cursor: 73, total: 91
 
-# cursor < total → paginate; adjust limit based on observed item size if needed (server hard-caps at 200)
-sync_journal(name: "my-journal", cursor: 30, nuance: "...")  → cursor: 42, total: 42
+# cursor < total → paginate with the same limit
+sync_journal(name: "my-journal", cursor: 73, nuance: "...", limit: 73)  → cursor: 91, total: 91
 
-# cursor == total → all items received; subsequent calls return only new items
-sync_journal(name: "my-journal", cursor: 42, nuance: "...")  → cursor: 45, total: 45
+# cursor == total → all items received
 ```
 
 Track one cursor per journal. Always pass it — except on the very first call when starting or resuming a session (omit cursor to read from the beginning).
-
-After the first page, adapt `limit` based on observed item sizes: smaller if items were long or content-heavy, larger if they were short. Never exceed the server hard cap of 200.
 
 ## Resuming Work
 
@@ -208,7 +213,7 @@ sync_journal(
 - Use descriptive, lowercase, hyphenated journal names
 - Set `ref` for file paths, URLs, ticket links, PR links
 - Don't use foray for simple one-shot Q&A with no follow-up work
-- Track `cursor` per journal: capture it from every `sync_journal` response and pass it on the next call — never omit it after the first call within a session. Always check `cursor == total` to confirm all items were received; paginate if not. **Omit `limit` on the first call**; adapt it on subsequent pages based on observed item size, up to the server hard cap of 200.
+- Track `cursor` per journal: capture it from every `sync_journal` response and pass it on the next call — never omit it after the first call within a session. Always check `cursor == total` to confirm all items were received; paginate if not. **Compute a safe limit from `list_journals` before the first call**: `floor(output_budget / (avg + 2×std))` if both present, `floor(output_budget / avg)` if only avg, or `5` if absent. Keep that limit on every subsequent page — never raise it mid-pagination.
 - Route tangential items to the most appropriate journal, not always the current one
 - **Sync proactively** — don't wait to be asked. Sync at natural completion points: after a task is done, when a round of review comments is addressed, when the user signals approval ("good", "done", "looks good"). Batch items when it makes sense, but don't defer indefinitely.
 

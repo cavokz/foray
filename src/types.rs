@@ -66,6 +66,16 @@ pub struct JournalSummary {
     pub name: String,
     pub title: String,
     pub item_count: usize,
+    /// Average serialized JSON byte size of all items (content + meta + all fields).
+    /// `None` means the server does not support this field (old protocol) — treat as unknown.
+    /// `Some(0)` means the journal is empty.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avg_item_size: Option<usize>,
+    /// Standard deviation of serialized JSON byte size across all items.
+    /// `None` means the server does not support this field or the journal has 0–1 items.
+    /// Use `avg_item_size + 2 × std_item_size` as a conservative worst-case estimate.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub std_item_size: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub schema: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -76,10 +86,38 @@ pub struct JournalSummary {
 
 impl From<&JournalFile> for JournalSummary {
     fn from(j: &JournalFile) -> Self {
+        let sizes: Vec<usize> = j
+            .items
+            .iter()
+            .map(|item| serde_json::to_vec(item).map(|v| v.len()).unwrap_or(0))
+            .collect();
+
+        let (avg_item_size, std_item_size) = if sizes.is_empty() {
+            (Some(0), None)
+        } else {
+            let avg = sizes.iter().sum::<usize>() / sizes.len();
+            let std = if sizes.len() < 2 {
+                None
+            } else {
+                let variance = sizes
+                    .iter()
+                    .map(|&s| {
+                        let diff = (s as f64) - (avg as f64);
+                        diff * diff
+                    })
+                    .sum::<f64>()
+                    / sizes.len() as f64;
+                Some(variance.sqrt() as usize)
+            };
+            (Some(avg), std)
+        };
+
         Self {
             name: j.name.clone(),
             title: j.title.clone(),
             item_count: j.items.len(),
+            avg_item_size,
+            std_item_size,
             schema: Some(j.schema),
             meta: j.meta.clone(),
             error: None,

@@ -661,7 +661,7 @@ impl ForayServer {
 
     #[tool(
         name = "sync_journal",
-        description = "Read and write journal items in one call. Returns items since your last cursor position. Pass items to add them. Pass cursor from the previous response to get only new items — omit cursor to read from the beginning. Returns at most 30 items by default; omit limit on the first call and adjust it on subsequent pages based on observed item sizes (hard cap: 200). Check cursor == total to confirm all items were received; if cursor < total, paginate by passing the returned cursor."
+        description = "Read and write journal items in one call. Returns items since your last cursor position. Pass items to add them. Pass cursor from the previous response to get only new items — omit cursor to read from the beginning. Use limit to control page size (hard cap: 200, default: 30) — compute it from list_journals before calling: limit = floor(output_budget / (avg_item_size + 2 * std_item_size)), where output_budget is your tool-output size limit in bytes. Use floor(output_budget / avg_item_size) if std_item_size is absent; use limit: 5 if neither is available. Keep the same limit on every page. Check cursor == total to confirm all items were received; if cursor < total, paginate by passing the returned cursor."
     )]
     async fn sync_journal(
         &self,
@@ -691,7 +691,7 @@ impl ForayServer {
 
     #[tool(
         name = "list_journals",
-        description = "List journals. Pass `archived: true` to list archived journals instead of active ones. Paginated: defaults to first 500."
+        description = "List journals. Pass `archived: true` to list archived journals instead of active ones. Paginated: defaults to first 500. Each entry includes `avg_item_size` (average serialized JSON byte size of all items) and `std_item_size` (standard deviation) — use these to compute a safe sync_journal limit: floor(output_budget / (avg_item_size + 2 * std_item_size)), where output_budget is your tool-output size limit in bytes. Absent means the server does not support this field; use limit: 5 as a safe default."
     )]
     async fn list_journals(
         &self,
