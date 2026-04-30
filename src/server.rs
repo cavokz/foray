@@ -128,12 +128,6 @@ pub struct SyncJournalParams {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ListJournalsParams {
-    /// Maximum number of journals to return
-    #[serde(default)]
-    pub limit: Option<usize>,
-    /// Number of journals to skip
-    #[serde(default)]
-    pub offset: Option<usize>,
     /// List archived journals instead of active ones
     #[serde(default)]
     pub archived: bool,
@@ -188,8 +182,6 @@ struct SyncJournalResponse {
 struct ListJournalsResponse {
     journals: Vec<serde_json::Value>,
     total: usize,
-    limit: Option<usize>,
-    offset: Option<usize>,
 }
 
 // ── Prompt parameter types ──────────────────────────────────────────
@@ -216,7 +208,6 @@ pub struct SummarizeParams {
 
 // ── Server ──────────────────────────────────────────────────────────
 
-const MAX_LIMIT: usize = 500;
 const MAX_CONTENT: usize = 64 * 1024;
 const MAX_TITLE: usize = 512;
 const MAX_TAGS: usize = 20;
@@ -568,26 +559,14 @@ impl ForayServer {
     ) -> Result<CallToolResult, ErrorData> {
         self.preflight(args.nuance.as_deref())?;
         let store = self.resolve_store(args.store.as_deref())?;
-        let pagination = Pagination {
-            from: args.offset.unwrap_or(0),
-            size: args.limit.unwrap_or(MAX_LIMIT).min(MAX_LIMIT),
-        };
-        let (summaries, total) = store
-            .list(&pagination, args.archived)
-            .await
-            .map_err(Self::store_err)?;
+        let (summaries, total) = store.list(args.archived).await.map_err(Self::store_err)?;
 
         let journals: Vec<serde_json::Value> = summaries
             .iter()
             .map(|s| serde_json::to_value(s).unwrap())
             .collect();
 
-        let resp = ListJournalsResponse {
-            journals,
-            total,
-            limit: args.limit,
-            offset: args.offset,
-        };
+        let resp = ListJournalsResponse { journals, total };
         Ok(CallToolResult::success(vec![Content::text(
             serde_json::to_string(&resp).unwrap(),
         )]))
@@ -679,28 +658,17 @@ impl ForayServer {
 
     #[tool(
         name = "list_journals",
-        description = "List journals. Pass `archived: true` to list archived journals instead of active ones. Paginated: defaults to first 500."
+        description = "List journals. Pass `archived: true` to list archived journals instead of active ones. Returns all journals in one call. Each entry includes `avg_item_size` (average serialized JSON byte size of all items) and `std_item_size` (standard deviation) — use these to compute a safe sync_journal size: floor(output_budget / (avg_item_size + 2 * std_item_size)). Absent means the server does not support this field; use size: 5 as a safe default."
     )]
     async fn list_journals(
         &self,
         Parameters(args): Parameters<ListJournalsParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        {
-            let mut msg = format!(
-                "list_journals ({})",
-                Self::sanitize(args.store.as_deref().unwrap_or("?"))
-            );
-            if args.archived {
-                msg.push_str(" archived");
-            }
-            if let Some(l) = args.limit {
-                msg.push_str(&format!(" limit={l}"));
-            }
-            if let Some(o) = args.offset {
-                msg.push_str(&format!(" offset={o}"));
-            }
-            eprintln!("{msg}");
-        }
+        eprintln!(
+            "list_journals ({}){}",
+            Self::sanitize(args.store.as_deref().unwrap_or("?")),
+            if args.archived { " archived" } else { "" }
+        );
         self.do_list_journals(args)
             .await
             .inspect_err(|e| eprintln!("error: {}", Self::sanitize(&e.message)))
@@ -1022,11 +990,11 @@ mod tests {
         assert!(json.get("id").is_none());
 
         // Verify active list no longer contains it.
-        let (active, _) = store.list(&Pagination::all(), false).await.unwrap();
+        let (active, _) = store.list(false).await.unwrap();
         assert!(!active.iter().any(|s| s.name == "arc-test"));
 
         // Verify archived list contains it.
-        let (archived, _) = store.list(&Pagination::all(), true).await.unwrap();
+        let (archived, _) = store.list(true).await.unwrap();
         assert!(archived.iter().any(|s| s.name == "arc-test"));
 
         // Unarchive it.
@@ -1046,7 +1014,7 @@ mod tests {
         assert_eq!(json["unarchived"], "arc-test");
 
         // Verify it is active again.
-        let (active, _) = store.list(&Pagination::all(), false).await.unwrap();
+        let (active, _) = store.list(false).await.unwrap();
         assert!(active.iter().any(|s| s.name == "arc-test"));
     }
 

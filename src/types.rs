@@ -66,6 +66,14 @@ pub struct JournalSummary {
     pub name: String,
     pub title: String,
     pub item_count: usize,
+    /// Average serialized byte size of items in this journal.
+    /// `None` if the journal is empty or the server does not report it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub avg_item_size: Option<usize>,
+    /// Standard deviation of serialized item sizes.
+    /// `None` for journals with 0 or 1 items, or if the server does not report it.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub std_item_size: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
     pub schema: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -76,10 +84,49 @@ pub struct JournalSummary {
 
 impl From<&JournalFile> for JournalSummary {
     fn from(j: &JournalFile) -> Self {
+        let n = j.items.len();
+        let (avg_item_size, std_item_size) = if n == 0 {
+            (None, None)
+        } else {
+            // Welford's online algorithm for mean and population variance.
+            // ByteCounter avoids allocating a buffer per item.
+            struct ByteCounter(usize);
+            impl std::io::Write for ByteCounter {
+                fn write(&mut self, buf: &[u8]) -> std::io::Result<usize> {
+                    self.0 += buf.len();
+                    Ok(buf.len())
+                }
+                fn flush(&mut self) -> std::io::Result<()> {
+                    Ok(())
+                }
+            }
+            let mut count = 0usize;
+            let mut mean = 0.0f64;
+            let mut m2 = 0.0f64;
+            for item in &j.items {
+                let mut counter = ByteCounter(0);
+                serde_json::to_writer(&mut counter, item)
+                    .expect("serialization to ByteCounter cannot fail");
+                let x = counter.0 as f64;
+                count += 1;
+                let delta = x - mean;
+                mean += delta / count as f64;
+                m2 += delta * (x - mean);
+            }
+            let avg = mean.ceil() as usize;
+            let std = if n < 2 {
+                None
+            } else {
+                Some((m2 / n as f64).sqrt().ceil() as usize)
+            };
+            (Some(avg), std)
+        };
         Self {
             name: j.name.clone(),
             title: j.title.clone(),
-            item_count: j.items.len(),
+            item_count: n,
+            avg_item_size,
+            std_item_size,
             schema: Some(j.schema),
             meta: j.meta.clone(),
             error: None,
@@ -95,7 +142,9 @@ pub struct Pagination {
 }
 
 impl Pagination {
-    /// No explicit constraint: start from the beginning, with no size limit.
+    /// Returns a `Pagination` that spans all items: starts at offset 0 with no
+    /// size limit (`size = usize::MAX`). Backends backed by in-memory slices
+    /// (e.g. `JsonStore`) honor `usize::MAX` directly via `Pagination::apply`.
     pub fn all() -> Self {
         Self {
             from: 0,
@@ -193,6 +242,53 @@ mod tests {
         assert_eq!(j.title, "Test Title");
         assert!(j.items.is_empty());
         assert_eq!(j.schema, migrate::CURRENT_SCHEMA);
+    }
+
+    #[test]
+    fn journal_summary_avg_std_item_size() {
+        // 0 items — both None
+        let j = JournalFile::new("empty", "Empty".into(), None);
+        let s = JournalSummary::from(&j);
+        assert_eq!(s.avg_item_size, None);
+        assert_eq!(s.std_item_size, None);
+
+        // 1 item — avg is Some, std is None (need at least 2 for std)
+        let mut j = JournalFile::new("one", "One".into(), None);
+        j.items.push(JournalItem {
+            id: item_id(),
+            item_type: ItemType::Note,
+            content: "hello".into(),
+            tags: None,
+            added_at: Utc::now(),
+            meta: None,
+        });
+        let s = JournalSummary::from(&j);
+        assert!(s.avg_item_size.is_some());
+        assert_eq!(s.std_item_size, None);
+
+        // 2+ items — both Some; avg matches manual calculation
+        let mut j = JournalFile::new("two", "Two".into(), None);
+        for content in &["short", "a longer piece of content"] {
+            j.items.push(JournalItem {
+                id: item_id(),
+                item_type: ItemType::Note,
+                content: content.to_string(),
+                tags: None,
+                added_at: Utc::now(),
+                meta: None,
+            });
+        }
+        let sizes: Vec<usize> = j
+            .items
+            .iter()
+            .map(|item| serde_json::to_vec(item).unwrap().len())
+            .collect();
+        let sum = sizes.iter().sum::<usize>();
+        let n = sizes.len();
+        let expected_avg = (sum as f64 / n as f64).ceil() as usize;
+        let s = JournalSummary::from(&j);
+        assert_eq!(s.avg_item_size, Some(expected_avg));
+        assert!(s.std_item_size.is_some());
     }
 
     #[test]
