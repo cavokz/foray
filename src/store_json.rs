@@ -154,6 +154,8 @@ impl JsonFileStore {
                             name,
                             title: String::new(),
                             item_count: 0,
+                            avg_item_size: None,
+                            std_item_size: None,
                             schema: None,
                             meta: None,
                             error: Some(e.to_string()),
@@ -187,6 +189,8 @@ impl JsonFileStore {
                             name,
                             title: String::new(),
                             item_count: 0,
+                            avg_item_size: None,
+                            std_item_size: None,
                             schema,
                             meta: None,
                             error: Some(e.to_string()),
@@ -250,19 +254,15 @@ impl Store for JsonFileStore {
         Ok(count)
     }
 
-    async fn list(
-        &self,
-        pagination: &Pagination,
-        archived: bool,
-    ) -> Result<(Vec<JournalSummary>, usize), StoreError> {
+    async fn list(&self, archived: bool) -> Result<(Vec<JournalSummary>, usize), StoreError> {
         let dir = if archived {
             self.base_dir.join("archive")
         } else {
             self.base_dir.clone()
         };
         let summaries = self.list_dir(&dir)?;
-        let (page, total) = pagination.apply(&summaries);
-        Ok((page, total))
+        let total = summaries.len();
+        Ok((summaries, total))
     }
 
     async fn delete(&self, name: &str) -> Result<(), StoreError> {
@@ -381,24 +381,21 @@ mod tests {
         let (store, _dir) = make_store();
         store.create("alpha", "A".into(), None).await.unwrap();
         store.create("beta", "B".into(), None).await.unwrap();
-        let (summaries, total) = store.list(&Pagination::all(), false).await.unwrap();
+        let (summaries, total) = store.list(false).await.unwrap();
         assert_eq!(total, 2);
         assert_eq!(summaries[0].name, "alpha");
         assert_eq!(summaries[1].name, "beta");
     }
 
     #[tokio::test]
-    async fn list_pagination() {
+    async fn list_all() {
         let (store, _dir) = make_store();
         for name in ["a", "b", "c", "d"] {
             store.create(name, name.into(), None).await.unwrap();
         }
-        let p = Pagination { from: 1, size: 2 };
-        let (page, total) = store.list(&p, false).await.unwrap();
+        let (page, total) = store.list(false).await.unwrap();
         assert_eq!(total, 4);
-        assert_eq!(page.len(), 2);
-        assert_eq!(page[0].name, "b");
-        assert_eq!(page[1].name, "c");
+        assert_eq!(page.len(), 4);
     }
 
     #[tokio::test]
@@ -422,13 +419,13 @@ mod tests {
             store.add_items("arch-test", vec![make_item("x")]).await,
             Err(StoreError::Archived(_))
         ));
-        let (archived_list, _) = store.list(&Pagination::all(), true).await.unwrap();
+        let (archived_list, _) = store.list(true).await.unwrap();
         assert_eq!(archived_list.len(), 1);
-        let (active, _) = store.list(&Pagination::all(), false).await.unwrap();
+        let (active, _) = store.list(false).await.unwrap();
         assert_eq!(active.len(), 0);
 
         store.unarchive("arch-test").await.unwrap();
-        let (active, _) = store.list(&Pagination::all(), false).await.unwrap();
+        let (active, _) = store.list(false).await.unwrap();
         assert_eq!(active.len(), 1);
     }
 
@@ -458,7 +455,7 @@ mod tests {
         store.create("active", "A".into(), None).await.unwrap();
         store.unarchive("active").await.unwrap();
         // still active
-        let (active, _) = store.list(&Pagination::all(), false).await.unwrap();
+        let (active, _) = store.list(false).await.unwrap();
         assert_eq!(active.len(), 1);
     }
 
@@ -578,7 +575,7 @@ mod tests {
         });
         std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
 
-        let (summaries, total) = store.list(&Pagination::all(), false).await.unwrap();
+        let (summaries, total) = store.list(false).await.unwrap();
         assert_eq!(total, 2, "both valid and error journals should appear");
         let valid = summaries.iter().find(|s| s.name == "valid").unwrap();
         assert!(valid.error.is_none(), "valid journal should have no error");
@@ -607,7 +604,7 @@ mod tests {
         });
         std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
 
-        let (summaries, total) = store.list(&Pagination::all(), false).await.unwrap();
+        let (summaries, total) = store.list(false).await.unwrap();
         assert_eq!(total, 2, "both valid and error journals should appear");
         let error_entry = summaries.iter().find(|s| s.name == "empty-title").unwrap();
         assert!(
@@ -743,7 +740,7 @@ mod tests {
         });
         std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
 
-        let (summaries, total) = store.list(&Pagination::all(), false).await.unwrap();
+        let (summaries, total) = store.list(false).await.unwrap();
         assert_eq!(total, 2, "both journals should appear");
         let error_entry = summaries.iter().find(|s| s.name == "future").unwrap();
         assert!(
@@ -764,7 +761,7 @@ mod tests {
         let path = dir.path().join("corrupt.json");
         std::fs::write(&path, b"this is not valid json {{{").unwrap();
 
-        let (summaries, total) = store.list(&Pagination::all(), false).await.unwrap();
+        let (summaries, total) = store.list(false).await.unwrap();
         assert_eq!(total, 2, "both journals should appear");
         let error_entry = summaries.iter().find(|s| s.name == "corrupt").unwrap();
         assert!(
@@ -785,7 +782,7 @@ mod tests {
         let path = dir.path().join("array.json");
         std::fs::write(&path, b"[1, 2, 3]").unwrap();
 
-        let (summaries, total) = store.list(&Pagination::all(), false).await.unwrap();
+        let (summaries, total) = store.list(false).await.unwrap();
         assert_eq!(total, 2, "both journals should appear");
         let error_entry = summaries.iter().find(|s| s.name == "array").unwrap();
         assert!(

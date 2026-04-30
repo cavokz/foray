@@ -239,7 +239,6 @@ pub fn adapt_receive(
     //   hello:            `protocol`, `stores`  (version was already present)
     //   sync_journal:     `schema`; `cursor` renamed to `from`
     //   open_journal:     `name`, `title`, `item_count`
-    //   list_journals:    `limit`, `offset`
     //   archive_journal:  `archived`
     //   unarchive_journal:`unarchived`
     if server_protocol < 1 {
@@ -275,10 +274,6 @@ pub fn adapt_receive(
                 obj.entry("item_count")
                     .or_insert_with(|| Value::from(0usize));
             }
-            "list_journals" => {
-                obj.entry("limit").or_insert(Value::Null);
-                obj.entry("offset").or_insert(Value::Null);
-            }
             "archive_journal" => {
                 obj.entry("archived")
                     .or_insert_with(|| Value::String(String::new()));
@@ -286,6 +281,13 @@ pub fn adapt_receive(
             "unarchive_journal" => {
                 obj.entry("unarchived")
                     .or_insert_with(|| Value::String(String::new()));
+            }
+            "list_journals" => {
+                // Protocol 0 servers returned `limit` and `offset` in the
+                // response; strip them so `ListJournalsWire` (deny_unknown_fields)
+                // can deserialize without error.
+                obj.remove("limit");
+                obj.remove("offset");
             }
             _ => {}
         }
@@ -521,14 +523,13 @@ mod tests {
 
     #[test]
     fn adapt_send_strips_store_and_archived_false_for_protocol_0() {
-        let args = json!({ "store": PROTOCOL_0_IMPLICIT_STORE, "limit": 10, "archived": false });
+        let args = json!({ "store": PROTOCOL_0_IMPLICIT_STORE, "archived": false });
         let result = adapt_send(0, "list_journals", args).unwrap();
         assert!(result.get("store").is_none(), "store should be stripped");
         assert!(
             result.get("archived").is_none(),
             "archived false should be stripped"
         );
-        assert_eq!(result["limit"], json!(10));
     }
 
     #[test]
@@ -566,7 +567,7 @@ mod tests {
 
     #[test]
     fn adapt_send_keeps_archived_for_protocol_1() {
-        let args = json!({ "limit": 10, "archived": true });
+        let args = json!({ "archived": true });
         let result = adapt_send(1, "list_journals", args).unwrap();
         assert_eq!(result["archived"], json!(true));
     }
@@ -629,11 +630,17 @@ mod tests {
     }
 
     #[test]
-    fn adapt_receive_list_journals_inserts_pagination_for_protocol_0() {
-        let raw = json!({ "journals": [], "total": 0 });
+    fn adapt_receive_list_journals_strips_limit_offset_for_protocol_0() {
+        let raw = json!({ "journals": [], "total": 0, "limit": 500, "offset": 0 });
         let result = adapt_receive(0, "list_journals", raw).unwrap();
-        assert!(result["limit"].is_null());
-        assert!(result["offset"].is_null());
+        assert_eq!(result, json!({ "journals": [], "total": 0 }));
+    }
+
+    #[test]
+    fn adapt_receive_list_journals_no_limit_offset_is_noop_for_protocol_0() {
+        let raw = json!({ "journals": [], "total": 0 });
+        let result = adapt_receive(0, "list_journals", raw.clone()).unwrap();
+        assert_eq!(result, raw);
     }
 
     #[test]

@@ -81,10 +81,6 @@ struct OpenJournalWire {
 struct ListJournalsWire {
     journals: Vec<JournalSummary>,
     total: usize,
-    #[allow(dead_code)]
-    limit: Option<usize>,
-    #[allow(dead_code)]
-    offset: Option<usize>,
 }
 
 #[derive(Deserialize)]
@@ -694,22 +690,11 @@ impl Store for StdioStore {
         Ok(resp.total)
     }
 
-    async fn list(
-        &self,
-        pagination: &Pagination,
-        archived: bool,
-    ) -> Result<(Vec<JournalSummary>, usize), StoreError> {
-        let mut args = serde_json::json!({ "archived": archived });
-        if pagination.size != usize::MAX {
-            args["limit"] = Value::from(pagination.size);
-        }
-        if pagination.from > 0 {
-            args["offset"] = Value::from(pagination.from);
-        }
-
+    async fn list(&self, archived: bool) -> Result<(Vec<JournalSummary>, usize), StoreError> {
+        let args = serde_json::json!({ "archived": archived });
         let resp: ListJournalsWire = self.call_mcp("list_journals", args).await?;
-
-        Ok((resp.journals, resp.total))
+        let total = resp.total;
+        Ok((resp.journals, total))
     }
 
     async fn exists(&self, name: &str) -> Result<bool, StoreError> {

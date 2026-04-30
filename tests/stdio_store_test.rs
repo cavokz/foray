@@ -81,10 +81,7 @@ async fn stdio_store_create_load_list() {
     );
 
     // ── list ─────────────────────────────────────────────────────────
-    let (summaries, list_total) = store
-        .list(&Pagination::all(), false)
-        .await
-        .expect("list should succeed");
+    let (summaries, list_total) = store.list(false).await.expect("list should succeed");
 
     assert_eq!(list_total, 1);
     assert_eq!(summaries.len(), 1);

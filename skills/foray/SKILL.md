@@ -1,6 +1,6 @@
 ---
 name: foray
-requires: foray >= 0.2.0
+requires: foray >= 0.3.0
 update-url: https://github.com/cavokz/foray/releases/latest/download/SKILL.md
 user-invocable: false
 ---
@@ -28,9 +28,9 @@ Use foray when the conversation involves **substantive, evolving work** — not 
 | Tool | Use |
 |------|-----|
 | `hello` | Establish handshake and get `nuance` + available `stores` — call this first, every session |
-| `list_journals` | Check existing journals before creating |
+| `list_journals` | Check existing journals before creating. Returns `avg_item_size` + `std_item_size` — use to compute a safe `size` for `sync_journal` |
 | `open_journal` | Create or reopen a journal |
-| `sync_journal` | Read items and/or add new ones (the workhorse) |
+| `sync_journal` | Read items and/or add new ones (the workhorse). Paginated via `from`/`size` |
 | `archive_journal` | Archive a journal (readable but not writable) |
 | `unarchive_journal` | Restore an archived journal |
 
@@ -108,30 +108,49 @@ sync_journal(
 )
 ```
 
-## Cursor Tracking
+## Offset Tracking
 
-Every `sync_journal` response includes a `cursor`. Always capture it and pass it on the next call to the same journal. This returns only new items, keeping responses small.
+Every `sync_journal` response includes a `from` field (a plain integer offset). Capture it and pass it on the next call to return only new items.
+
+`from` is not an opaque token — it is a simple item count. When you know the journal's `total`, all page offsets can be computed upfront and fetched in parallel.
+
+**Computing a safe page size:** call `list_journals` first. Use `avg_item_size` and `std_item_size` from the response:
 
 ```
-# First call — no cursor, get all items
-sync_journal(name: "auth-cache-race", nuance: "...")              → cursor: 42
-
-# All subsequent calls — pass the cursor
-sync_journal(name: "auth-cache-race", cursor: 42, nuance: "...")  → only new items, cursor: 45
-sync_journal(name: "auth-cache-race", cursor: 45, nuance: "...")  → only new items, cursor: 45
+size = floor(output_budget / (avg_item_size + 2 × std_item_size))
 ```
 
-Track one cursor per journal. Always pass it — except when intentionally requesting a full reload (e.g., the first `sync_journal` call when resuming after a session break).
+`output_budget` is how many bytes you can safely receive in one response. Choose a value appropriate for your context window and response budget.
+
+parallel:
+  sync_journal(name: "auth-cache-race", from: 22, size: 22, nuance: "...")
+  sync_journal(name: "auth-cache-race", from: 44, size: 22, nuance: "...")
+  sync_journal(name: "auth-cache-race", from: 66, size: 22, nuance: "...")
+  ...
+```
+
+Track one `from` value per journal. On the next session, pass the last `from` you saw to retrieve only new items.
+
+```
+# First call — from: 0 to get all items
+sync_journal(name: "auth-cache-race", from: 0, size: 30, nuance: "...")  → from: 42
+
+# Subsequent calls — pass from
+sync_journal(name: "auth-cache-race", from: 42, size: 30, nuance: "...")  → only new items, from: 45
+sync_journal(name: "auth-cache-race", from: 45, size: 30, nuance: "...")  → only new items, from: 45
+```
 
 ## Resuming Work
 
 When the user returns to continue:
 
 1. Call `hello` to get the nuance token
-2. Call `list_journals` to find relevant journals (pass nuance)
-3. Call `sync_journal` without `cursor` to get the full history — capture the returned `cursor` (pass nuance)
-4. Summarize recent items for the user
-5. Continue adding via `sync_journal`, always passing `cursor` and `nuance` from the previous response
+2. Call `list_journals` to find relevant journals (pass nuance) — note `avg_item_size` + `std_item_size` for sizing
+3. Compute `size = floor(output_budget / (avg_item_size + 2 × std_item_size))`
+4. Call `sync_journal` with `from: 0` and the computed `size` to get the full history
+5. If `from < total`, fire remaining pages in parallel (see Offset Tracking)
+6. Summarize recent items for the user
+7. Continue adding via `sync_journal`, passing `from` and `nuance` from the previous response
 
 ## Cross-Referencing Journals
 
@@ -191,7 +210,7 @@ sync_journal(
 - Use descriptive, lowercase, hyphenated journal names
 - Set `ref` for file paths, URLs, ticket links, PR links
 - Don't use foray for simple one-shot Q&A with no follow-up work
-- Track `cursor` per journal: capture it from every `sync_journal` response and pass it on the next call — never omit it after the first call within a session
+- Track `from` per journal: capture it from every `sync_journal` response and pass it on the next call — this returns only new items and keeps responses small
 - Route tangential items to the most appropriate journal, not always the current one
 - **Sync proactively** — don't wait to be asked. Sync at natural completion points: after a task is done, when a round of review comments is addressed, when the user signals approval ("good", "done", "looks good"). Batch items when it makes sense, but don't defer indefinitely.
 

@@ -49,11 +49,7 @@ pub trait Store: Send + Sync {
         meta: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<(), StoreError>;
     async fn add_items(&self, name: &str, items: Vec<JournalItem>) -> Result<usize, StoreError>;
-    async fn list(
-        &self,
-        pagination: &Pagination,
-        archived: bool,
-    ) -> Result<(Vec<JournalSummary>, usize), StoreError>;
+    async fn list(&self, archived: bool) -> Result<(Vec<JournalSummary>, usize), StoreError>;
     async fn delete(&self, name: &str) -> Result<(), StoreError>;
     async fn exists(&self, name: &str) -> Result<bool, StoreError>;
     async fn archive(&self, name: &str) -> Result<(), StoreError>;
