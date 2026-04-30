@@ -2,12 +2,12 @@
 name: foray
 requires: foray >= 0.3.0
 update-url: https://github.com/cavokz/foray/releases/latest/download/SKILL.md
-user-invocable: false
+user-invocable: true
 ---
 
 # foray — Journal Companion
 
-You have access to **foray**, a persistent journal system via MCP tools. Use it to record findings, track decisions, and maintain context across sessions — for any work that spans multiple conversations, involves decisions worth tracing, or may need to be picked up later.
+You have access to **foray**, a persistent journal system via MCP tools. Use it to record findings, track decisions, and maintain context across sessions — for any work that spans multiple conversations, involves decisions worth tracing, or may need to be picked up later. **Also load this skill whenever reading, syncing, or summarizing a foray journal** — the pagination formula and parallel sync patterns are here.
 
 ## When to Use
 
@@ -22,6 +22,7 @@ Use foray when the conversation involves **substantive, evolving work** — not 
 - The work might branch into multiple directions
 - You're making decisions that should be traceable later
 - The user explicitly asks you to use foray or open a journal
+- **User asks to read, load, sync, or summarize a foray journal**
 
 ## Tools Available
 
@@ -51,10 +52,12 @@ open_journal(name: "auth-cache-race", title: "Auth cache race condition", store:
 
 `store` is required on every tool call that targets a journal. Pass the store name exactly as returned by `hello`.
 
+When there are multiple stores, call `list_journals` for all of them in parallel:
+
 ```
-open_journal(name: "auth-cache-race", title: "Auth cache race", store: "work", nuance: "abc123")
-sync_journal(name: "auth-cache-race", store: "work", nuance: "abc123", items: [...])
-list_journals(store: "work", nuance: "abc123")
+parallel:
+  list_journals(store: "local", nuance: "abc123")
+  list_journals(store: "work",  nuance: "abc123")
 ```
 
 Stick to one store per journal within a session — a journal's store must be specified consistently.
@@ -108,49 +111,93 @@ sync_journal(
 )
 ```
 
-## Offset Tracking
+## Reading a Journal
 
-Every `sync_journal` response includes a `from` field (a plain integer offset). Capture it and pass it on the next call to return only new items.
+> **Prerequisite — always call `list_journals` before `sync_journal`.**
+> You need `item_count`, `avg_item_size`, and `std_item_size` to compute a safe page `size` and plan all parallel calls upfront. Calling `sync_journal` without these means blind paging: you can't parallelize and risk oversized responses.
 
-`from` is not an opaque token — it is a simple item count. When you know the journal's `total`, all page offsets can be computed upfront and fetched in parallel.
+`from` is a plain integer offset — not an opaque token. `list_journals` returns `item_count` for each journal — use it to compute all page offsets before making any `sync_journal` call.
 
-**Computing a safe page size:** call `list_journals` first. Use `avg_item_size` and `std_item_size` from the response:
+### Complete Sync
+
+Use when you need all items (resuming work, summarizing, first load after a session break).
+
+**`output_budget`** is the maximum response size (in bytes) before the runtime writes the output to a temporary file instead of returning it directly. If you don't know such budget, use **20,000**.
+
+From `list_journals` you already have `item_count`, `avg_item_size`, and `std_item_size`. Compute page size and fire all pages in parallel in one shot:
 
 ```
+# From list_journals: item_count: 120, avg_item_size: 444, std_item_size: 215
+# size = floor(20_000 / (444 + 2 × 215)) = floor(20_000 / 874) = 22
 size = floor(output_budget / (avg_item_size + 2 × std_item_size))
-```
 
-`output_budget` is how many bytes you can safely receive in one response. Choose a value appropriate for your context window and response budget.
+# If avg_item_size is absent (old server / empty journal) or std_item_size is absent (old server / <2 items): use size = 5
 
 parallel:
-  sync_journal(name: "auth-cache-race", from: 22, size: 22, nuance: "...")
-  sync_journal(name: "auth-cache-race", from: 44, size: 22, nuance: "...")
-  sync_journal(name: "auth-cache-race", from: 66, size: 22, nuance: "...")
-  ...
+  sync_journal(name: "auth-cache-race", from: 0,   size: 22, nuance: "...")
+  sync_journal(name: "auth-cache-race", from: 22,  size: 22, nuance: "...")
+  sync_journal(name: "auth-cache-race", from: 44,  size: 22, nuance: "...")
+  sync_journal(name: "auth-cache-race", from: 66,  size: 22, nuance: "...")
+  sync_journal(name: "auth-cache-race", from: 88,  size: 22, nuance: "...")
+  sync_journal(name: "auth-cache-race", from: 110, size: 22, nuance: "...")
 ```
 
-Track one `from` value per journal. On the next session, pass the last `from` you saw to retrieve only new items.
+**Never use a round-number heuristic (`size: 50`, `size: 100`, etc.) when `avg_item_size` and `std_item_size` are available.** Always compute from the formula above.
+
+Merge pages in offset order when done. The greatest `from` returned is your starting point for the next incremental sync.
+
+### Incremental Sync
+
+Use during an active session to pick up only new items added since the last read. Requires the `from` value saved from the previous sync.
 
 ```
-# First call — from: 0 to get all items
-sync_journal(name: "auth-cache-race", from: 0, size: 30, nuance: "...")  → from: 42
+# Pick up new items since from: 42
+sync_journal(name: "auth-cache-race", from: 42, size: 30, nuance: "...")
+→ { total: 45, from: 45, items: [...3 new items...] }
 
-# Subsequent calls — pass from
-sync_journal(name: "auth-cache-race", from: 42, size: 30, nuance: "...")  → only new items, from: 45
-sync_journal(name: "auth-cache-race", from: 45, size: 30, nuance: "...")  → only new items, from: 45
+# Next call — nothing new
+sync_journal(name: "auth-cache-race", from: 45, size: 30, nuance: "...")
+→ { total: 45, from: 45, items: [] }
 ```
+
+Save the returned `from` after each call. If `from == total`, there are no new items.
+
+### Tool response too large
+
+If a tool response exceeds your output budget, split the oversized page into two smaller ones:
+
+```
+# Original call that returned too much
+sync_journal(name: "auth-cache-race", from: 44, size: 50, nuance: "...")
+# → response too large
+
+# Split: re-request the same range as two half-sized calls
+parallel:
+  sync_journal(name: "auth-cache-race", from: 44, size: 25, nuance: "...")
+  sync_journal(name: "auth-cache-race", from: 69, size: 25, nuance: "...")
+```
+
+Halve `size` until the responses fit. The item content is fixed — smaller `size` just means fewer items per call.
 
 ## Resuming Work
 
 When the user returns to continue:
 
 1. Call `hello` to get the nuance token
-2. Call `list_journals` to find relevant journals (pass nuance) — note `avg_item_size` + `std_item_size` for sizing
-3. Compute `size = floor(output_budget / (avg_item_size + 2 × std_item_size))`
-4. Call `sync_journal` with `from: 0` and the computed `size` to get the full history
-5. If `from < total`, fire remaining pages in parallel (see Offset Tracking)
-6. Summarize recent items for the user
-7. Continue adding via `sync_journal`, passing `from` and `nuance` from the previous response
+2. Call `list_journals` to find relevant journals (pass nuance)
+3. Do a **complete sync** (see Reading a Journal) to reload all items
+4. Summarize recent items for the user
+5. Continue adding via `sync_journal`, using **incremental sync** to stay up to date
+
+## Summarizing a Journal
+
+When the user asks to summarize a journal:
+
+1. Call `list_journals` — note `item_count`, `avg_item_size`, `std_item_size`; compute `size`
+2. Do a **complete sync** (see Reading a Journal) to load all items
+3. Synthesize: group by type or theme, highlight key decisions and findings, note open questions
+
+For large journals, synthesize each page as you receive it rather than waiting for all pages.
 
 ## Cross-Referencing Journals
 
@@ -210,9 +257,10 @@ sync_journal(
 - Use descriptive, lowercase, hyphenated journal names
 - Set `ref` for file paths, URLs, ticket links, PR links
 - Don't use foray for simple one-shot Q&A with no follow-up work
-- Track `from` per journal: capture it from every `sync_journal` response and pass it on the next call — this returns only new items and keeps responses small
+- Track `from` per journal: save the value returned by each `sync_journal` call; use incremental sync (pass last `from`) to pick up only new items, or complete sync (start from `from: 0`) to reload everything
 - Route tangential items to the most appropriate journal, not always the current one
 - **Sync proactively** — don't wait to be asked. Sync at natural completion points: after a task is done, when a round of review comments is addressed, when the user signals approval ("good", "done", "looks good"). Batch items when it makes sense, but don't defer indefinitely.
+- **Never guess a page size.** When `avg_item_size` and `std_item_size` are available, always compute `size` from the formula. When they are absent, use `size: 5`. Round numbers like 30, 50, or 100 are never acceptable when stats are available.
 
 ## Self-Update
 
