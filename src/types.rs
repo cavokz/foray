@@ -88,22 +88,27 @@ impl From<&JournalFile> for JournalSummary {
 }
 
 /// Pagination parameters for list/get operations.
-#[derive(Debug, Clone, Default)]
+#[derive(Debug, Clone)]
 pub struct Pagination {
-    pub limit: Option<usize>,
-    pub offset: Option<usize>,
+    pub from: usize,
+    pub size: usize,
 }
 
 impl Pagination {
+    /// No explicit constraint: start from the beginning, with no size limit.
+    pub fn all() -> Self {
+        Self {
+            from: 0,
+            size: usize::MAX,
+        }
+    }
+
     /// Apply pagination to a slice, returning the page and total count.
     pub fn apply<T: Clone>(&self, items: &[T]) -> (Vec<T>, usize) {
         let total = items.len();
-        let offset = self.offset.unwrap_or(0).min(total);
+        let offset = self.from.min(total);
         let remaining = &items[offset..];
-        let page = match self.limit {
-            Some(limit) => &remaining[..limit.min(remaining.len())],
-            None => remaining,
-        };
+        let page = &remaining[..self.size.min(remaining.len())];
         (page.to_vec(), total)
     }
 }
@@ -165,23 +170,17 @@ mod tests {
     fn pagination_apply() {
         let items: Vec<i32> = (0..10).collect();
 
-        let p = Pagination {
-            limit: Some(3),
-            offset: Some(2),
-        };
+        let p = Pagination { from: 2, size: 3 };
         let (page, total) = p.apply(&items);
         assert_eq!(total, 10);
         assert_eq!(page, vec![2, 3, 4]);
 
-        let p = Pagination::default();
+        let p = Pagination::all();
         let (page, total) = p.apply(&items);
         assert_eq!(total, 10);
         assert_eq!(page.len(), 10);
 
-        let p = Pagination {
-            limit: Some(5),
-            offset: Some(8),
-        };
+        let p = Pagination { from: 8, size: 5 };
         let (page, total) = p.apply(&items);
         assert_eq!(total, 10);
         assert_eq!(page, vec![8, 9]);

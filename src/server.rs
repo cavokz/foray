@@ -108,12 +108,10 @@ pub struct SyncItemInput {
 pub struct SyncJournalParams {
     /// Journal name
     pub name: String,
-    /// Position from previous sync response — return only items after this position (omit for full read)
-    #[serde(default)]
-    pub cursor: Option<usize>,
-    /// Maximum number of items to return (does not affect additions — all items are always added)
-    #[serde(default)]
-    pub limit: Option<usize>,
+    /// Item offset to start reading from (0 = beginning). Use the `from` value returned by the previous response to continue pagination.
+    pub from: usize,
+    /// Maximum number of items to return (does not affect additions — all items are always added).
+    pub size: usize,
     /// Items to add to the journal
     #[serde(default)]
     pub items: Option<Vec<SyncItemInput>>,
@@ -182,7 +180,7 @@ struct SyncJournalResponse {
     title: String,
     items: Vec<serde_json::Value>,
     added_ids: Vec<String>,
-    cursor: usize,
+    from: usize,
     total: usize,
 }
 
@@ -462,7 +460,7 @@ impl ForayServer {
                 .create(&args.name, title, args.meta)
                 .await
                 .map_err(Self::store_err)?;
-            let p = Pagination::default();
+            let p = Pagination::all();
             let (j, _) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
             let resp = OpenJournalResponse {
                 name: j.name,
@@ -474,7 +472,7 @@ impl ForayServer {
                 serde_json::to_string(&resp).unwrap(),
             )]))
         } else {
-            let p = Pagination::default();
+            let p = Pagination::all();
             let (j, total) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
             let resp = OpenJournalResponse {
                 name: j.name,
@@ -532,28 +530,23 @@ impl ForayServer {
                 .map_err(Self::store_err)?;
         }
 
-        // Load journal and apply cursor
-        let all = Pagination::default();
+        // Load the requested page directly from the store.
+        let pagination = Pagination {
+            from: args.from,
+            size: args.size,
+        };
         let (journal, total) = store
-            .load(&args.name, &all)
+            .load(&args.name, &pagination)
             .await
             .map_err(Self::store_err)?;
 
-        let after = args.cursor.unwrap_or(0);
-        let items_slice = if after < journal.items.len() {
-            &journal.items[after..]
-        } else {
-            &[]
-        };
-
-        let limit = args.limit.unwrap_or(items_slice.len()).min(MAX_LIMIT);
-        let items: Vec<serde_json::Value> = items_slice
+        let items: Vec<serde_json::Value> = journal
+            .items
             .iter()
-            .take(limit)
             .map(|i| serde_json::to_value(i).unwrap())
             .collect();
 
-        let cursor = after + items.len();
+        let from = (args.from.min(total) + items.len()).min(total);
 
         let resp = SyncJournalResponse {
             schema: migrate::CURRENT_SCHEMA,
@@ -561,7 +554,7 @@ impl ForayServer {
             title: journal.title,
             items,
             added_ids,
-            cursor,
+            from,
             total,
         };
         Ok(CallToolResult::success(vec![Content::text(
@@ -576,8 +569,8 @@ impl ForayServer {
         self.preflight(args.nuance.as_deref())?;
         let store = self.resolve_store(args.store.as_deref())?;
         let pagination = Pagination {
-            limit: Some(args.limit.unwrap_or(MAX_LIMIT).min(MAX_LIMIT)),
-            offset: args.offset,
+            from: args.offset.unwrap_or(0),
+            size: args.limit.unwrap_or(MAX_LIMIT).min(MAX_LIMIT),
         };
         let (summaries, total) = store
             .list(&pagination, args.archived)
@@ -660,7 +653,7 @@ impl ForayServer {
 
     #[tool(
         name = "sync_journal",
-        description = "Read and write journal items in one call. Returns items since your last cursor position. Pass items to add them. Pass cursor from the previous response to get only new items — omit cursor for a full read. Response includes cursor for the next call and added_ids for items you added."
+        description = "Read and write journal items in one call. Returns items since your last `from` position. Pass items to add them. Pass `from` from the previous response to get only new items — use `from: 0` to read from the beginning. Response includes `from` for the next call and `added_ids` for items you added. Use `size` to limit the number of items returned — the caller is responsible for choosing a size that fits within their output budget. Compute a safe `size` using `avg_item_size` and `std_item_size` from `list_journals`: `size = floor(output_budget / (avg_item_size + 2 * std_item_size))`. The `from` field is a plain integer offset — `list_journals` already returns `item_count` (= total), so all page offsets (`0`, `size`, `2×size`, …) are known before any sync_journal call and all pages can be requested in parallel."
     )]
     async fn sync_journal(
         &self,
@@ -672,12 +665,8 @@ impl ForayServer {
                 Self::sanitize(args.store.as_deref().unwrap_or("?")),
                 Self::sanitize(&args.name)
             );
-            if let Some(c) = args.cursor {
-                msg.push_str(&format!(" cursor={c}"));
-            }
-            if let Some(l) = args.limit {
-                msg.push_str(&format!(" limit={l}"));
-            }
+            msg.push_str(&format!(" from={}", args.from));
+            msg.push_str(&format!(" size={}", args.size));
             if let Some(ref items) = args.items {
                 msg.push_str(&format!(" +{} items", items.len()));
             }
@@ -1033,17 +1022,11 @@ mod tests {
         assert!(json.get("id").is_none());
 
         // Verify active list no longer contains it.
-        let (active, _) = store
-            .list(&crate::types::Pagination::default(), false)
-            .await
-            .unwrap();
+        let (active, _) = store.list(&Pagination::all(), false).await.unwrap();
         assert!(!active.iter().any(|s| s.name == "arc-test"));
 
         // Verify archived list contains it.
-        let (archived, _) = store
-            .list(&crate::types::Pagination::default(), true)
-            .await
-            .unwrap();
+        let (archived, _) = store.list(&Pagination::all(), true).await.unwrap();
         assert!(archived.iter().any(|s| s.name == "arc-test"));
 
         // Unarchive it.
@@ -1063,10 +1046,7 @@ mod tests {
         assert_eq!(json["unarchived"], "arc-test");
 
         // Verify it is active again.
-        let (active, _) = store
-            .list(&crate::types::Pagination::default(), false)
-            .await
-            .unwrap();
+        let (active, _) = store.list(&Pagination::all(), false).await.unwrap();
         assert!(active.iter().any(|s| s.name == "arc-test"));
     }
 
@@ -1223,27 +1203,28 @@ mod tests {
 
     #[test]
     fn sync_journal_params_store_field() {
-        let p: SyncJournalParams =
-            serde_json::from_str(r#"{"name":"j","cursor":0,"store":"local","nuance":"abc"}"#)
-                .unwrap();
+        let p: SyncJournalParams = serde_json::from_str(
+            r#"{"name":"j","from":0,"size":10,"store":"local","nuance":"abc"}"#,
+        )
+        .unwrap();
         assert_eq!(p.store.as_deref(), Some("local"));
     }
     // ── SyncJournalResponse serialization ──────────────────────────
 
     #[test]
-    fn sync_response_cursor_and_added_ids_present() {
+    fn sync_response_from_and_added_ids_present() {
         let resp = SyncJournalResponse {
             schema: migrate::CURRENT_SCHEMA,
             name: "my-journal".into(),
             title: "My Journal".into(),
             items: vec![],
             added_ids: vec!["abc-123".into()],
-            cursor: 7,
+            from: 7,
             total: 7,
         };
         let json: serde_json::Value = serde_json::to_value(&resp).unwrap();
         assert!(json.get("id").is_none());
-        assert_eq!(json["cursor"], 7);
+        assert_eq!(json["from"], 7);
         assert_eq!(json["added_ids"], serde_json::json!(["abc-123"]));
     }
 

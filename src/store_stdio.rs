@@ -49,7 +49,8 @@ struct StoreInfoWire {
 
 /// Typed wire response for `sync_journal`.
 ///
-/// `adapt_receive` inserts `schema: 0` for pre-versioning servers.
+/// `adapt_receive` inserts `schema: 0` for pre-versioning servers, and
+/// translates `cursor` → `from` for protocol < 1 servers.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
 #[allow(dead_code)]
@@ -59,7 +60,7 @@ struct SyncJournalWire {
     title: String,
     items: Vec<Value>,
     added_ids: Vec<String>,
-    cursor: usize,
+    from: usize,
     total: usize,
 }
 
@@ -607,14 +608,9 @@ impl Store for StdioStore {
         name: &str,
         pagination: &Pagination,
     ) -> Result<(JournalFile, usize), StoreError> {
-        let mut args = serde_json::json!({ "name": name });
-        // `cursor` is the item offset; omit if 0 (server default).
-        if let Some(offset) = pagination.offset.filter(|&o| o > 0) {
-            args["cursor"] = Value::from(offset);
-        }
-        if let Some(limit) = pagination.limit {
-            args["limit"] = Value::from(limit);
-        }
+        let from = pagination.from;
+        let size = pagination.size;
+        let args = serde_json::json!({ "name": name, "from": from, "size": size });
 
         let wire: SyncJournalWire = self.call_mcp("sync_journal", args).await?;
 
@@ -693,7 +689,7 @@ impl Store for StdioStore {
             })
             .collect();
 
-        let args = serde_json::json!({ "name": name, "items": items_json });
+        let args = serde_json::json!({ "name": name, "from": 0, "size": 0, "items": items_json });
         let resp: SyncJournalWire = self.call_mcp("sync_journal", args).await?;
         Ok(resp.total)
     }
@@ -704,11 +700,11 @@ impl Store for StdioStore {
         archived: bool,
     ) -> Result<(Vec<JournalSummary>, usize), StoreError> {
         let mut args = serde_json::json!({ "archived": archived });
-        if let Some(limit) = pagination.limit {
-            args["limit"] = Value::from(limit);
+        if pagination.size != usize::MAX {
+            args["limit"] = Value::from(pagination.size);
         }
-        if let Some(offset) = pagination.offset {
-            args["offset"] = Value::from(offset);
+        if pagination.from > 0 {
+            args["offset"] = Value::from(pagination.from);
         }
 
         let resp: ListJournalsWire = self.call_mcp("list_journals", args).await?;
@@ -717,8 +713,8 @@ impl Store for StdioStore {
     }
 
     async fn exists(&self, name: &str) -> Result<bool, StoreError> {
-        // limit: 0 — we only need to know if the journal exists, not its items.
-        let args = serde_json::json!({ "name": name, "limit": 0 });
+        // size: 0 — we only need to know if the journal exists, not its items.
+        let args = serde_json::json!({ "name": name, "from": 0, "size": 0 });
         match self.call_mcp::<SyncJournalWire>("sync_journal", args).await {
             Ok(_) => Ok(true),
             Err(StoreError::NotFound(_)) => Ok(false),
@@ -817,7 +813,7 @@ mod tests {
 
     #[test]
     fn sync_journal_wire_deserializes_fully_formed_response() {
-        let s = r#"{"schema":1,"name":"j","title":"My Journal","items":[],"added_ids":[],"cursor":0,"total":0}"#;
+        let s = r#"{"schema":1,"name":"j","title":"My Journal","items":[],"added_ids":[],"from":0,"total":0}"#;
         let w: SyncJournalWire = serde_json::from_str(s).unwrap();
         assert_eq!(w.schema, 1);
         assert_eq!(w.name, "j");
@@ -825,7 +821,7 @@ mod tests {
 
     #[test]
     fn sync_journal_wire_rejects_unknown_fields() {
-        let s = r#"{"schema":1,"name":"j","title":"My Journal","items":[],"added_ids":[],"cursor":0,"total":0,"future_field":42}"#;
+        let s = r#"{"schema":1,"name":"j","title":"My Journal","items":[],"added_ids":[],"from":0,"total":0,"future_field":42}"#;
         assert!(serde_json::from_str::<SyncJournalWire>(s).is_err());
     }
 

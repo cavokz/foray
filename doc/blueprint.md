@@ -207,8 +207,8 @@ Prompts are the fallback for LLMs without the companion skill. They provide just
 |------|--------|-------------|
 | `hello` | *(none)* | Establish handshake. Returns `{ version, nuance, protocol, stores }`. Always call first — every session — then pass `nuance` and `store` on subsequent calls. |
 | `open_journal` | `name`, `title?`, `meta?`, `store`, `nuance` | Create or reopen a journal. `title` is required when creating (error if missing), ignored when reopening. Idempotent if journal exists. `meta` sets journal-level metadata. `store` must be a name from the `hello` response. |
-| `sync_journal` | `name`, `cursor?`, `limit?`, `items?`, `store`, `nuance` | Read and write journal items in one call. Returns items since cursor position. `cursor` is the position from the previous sync (omit for full read). `items` is an array of `{ content, item_type?, tags?, meta? }`. Use `meta.ref` for file paths, URLs, ticket links, PR links, or cross-journal references (`foray:name`). `limit` caps returned items (does not affect additions). Returns `cursor` for the next call and `added_ids` for items added by this call. `store` must be a name from the `hello` response. |
-| `list_journals` | `limit?`, `offset?`, `archived?`, `store`, `nuance` | List journals in the selected store. Pass `archived: true` to list archived journals instead of active ones. Paginated: defaults to all. |
+| `sync_journal` | `name`, `from`, `size`, `items?`, `store`, `nuance` | Read and write journal items in one call. `from` is a plain integer offset (0 = start). `size` limits returned items — the caller is responsible for choosing a size that fits within their output budget (does not affect additions). `items` is an array of `{ content, item_type?, tags?, meta? }`. Use `meta.ref` for file paths, URLs, ticket links, PR links, or cross-journal references (`foray:name`). Returns `from` for the next call (= next offset) and `added_ids` for items added by this call. `store` must be a name from the `hello` response. |
+| `list_journals` | `limit?`, `offset?`, `archived?`, `store`, `nuance` | List journals in the selected store. Pass `archived: true` to list archived journals instead of active ones. Paginated: defaults to all. Each entry includes `avg_item_size` and `std_item_size` (serialized JSON byte sizes) — use these to compute a safe `size` for `sync_journal`: `floor(output_budget / (avg_item_size + 2 × std_item_size))`. |
 | `archive_journal` | `name`, `store`, `nuance` | Archive a journal. Archived journals are readable but not writable. |
 | `unarchive_journal` | `name`, `store`, `nuance` | Restore an archived journal, making it writable again. |
 
@@ -250,8 +250,8 @@ Errors include a structured `data` object with machine-readable fields for progr
 ### Tool response formats
 - `hello` → `{ version, nuance, protocol, stores: [{name, description}] }` (e.g. `{ "version": "1.2.3", "nuance": "abc123", "protocol": 1, "stores": [{"name": "local", "description": "Default local journal store"}] }`)
 - `open_journal` → `{ name, title, item_count, created }` (`created: bool` — true if new)
-- `sync_journal` → `{ schema, name, title, items: [...], added_ids: [...], cursor, total }` (`schema` is the wire protocol schema version; `cursor` is the position for the next call; `added_ids` lists IDs assigned to items added by this call in order)
-- `list_journals` → `{ journals: [{ name, title, item_count, schema?, meta?, error? }], total, limit, offset }` (pass `archived: true` to list archived journals; `schema` is the on-disk schema version — present whenever the file is parseable as a JSON object; `error` is present for journals that could not be fully loaded, in which case `title` is empty and `item_count` is 0)
+- `sync_journal` → `{ schema, name, title, items: [...], added_ids: [...], from, total }` (`schema` is the wire protocol schema version; `from` is the next offset for subsequent calls; `added_ids` lists IDs assigned to items added by this call in order)
+- `list_journals` → `{ journals: [{ name, title, item_count, avg_item_size?, std_item_size?, schema?, meta?, error? }], total, limit, offset }` (pass `archived: true` to list archived journals; `avg_item_size` and `std_item_size` are serialized JSON byte sizes — absent for empty journals or old servers; `schema` is the on-disk schema version — present whenever the file is parseable as a JSON object; `error` is present for journals that could not be fully loaded, in which case `title` is empty and `item_count` is 0)
 - `archive_journal` → `{ archived: "<name>" }`
 - `unarchive_journal` → `{ unarchived: "<name>" }`
 
@@ -263,7 +263,7 @@ Each MCP tool invocation is traced to **stderr** (stdout carries the JSON-RPC wi
 |------|----------|
 | `hello` | `hello` |
 | `open_journal` | `open_journal (<store>) <name>` |
-| `sync_journal` | `sync_journal (<store>) <name> [cursor=N] [limit=N] [+N items]` — optional parts omitted when absent |
+| `sync_journal` | `sync_journal (<store>) <name> from=N [size=N] [+N items]` — optional parts omitted when absent |
 | `list_journals` | `list_journals (<store>) [archived] [limit=N] [offset=N]` — optional parts omitted when absent |
 | `archive_journal` | `archive_journal (<store>) <name>` |
 | `unarchive_journal` | `unarchive_journal (<store>) <name>` |
@@ -319,7 +319,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
    - `JournalItem` { id, item_type, content, added_at, tags, meta } — `id` is `item_id()`: consonant-only `xxxx-xxxx-xxxx-xxxx` format (16 chars, ~70 bits)
    - `ItemType` enum { Finding, Decision, Snippet, Note }
    - `JournalSummary` { name, title, item_count, schema?, meta?, error? } — `schema` is the on-disk schema version (present whenever the file is parseable as a JSON object); `error` is set for journals that could not be fully loaded (in which case `title` is empty and `item_count` is 0)
-   - `Pagination` { limit: Option<usize>, offset: Option<usize> }
+   - `Pagination` { from: usize, size: usize }
    - Both `JournalFile`, `JournalItem`, and `JournalSummary` get `#[serde(deny_unknown_fields)]` and `meta: Option<HashMap<String, serde_json::Value>>` for client-specific extensibility
    - `validate_name()` for journal name validation
 2. `store.rs`:
@@ -462,7 +462,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 - **Item counts**: Single count per journal (files are self-contained).
 - **Concurrency**: `add_items` (store method) locks a `{name}.lock` sidecar file via `fs2::lock_exclusive` during read-modify-write. Concurrent adds from multiple MCP server processes or CLI are serialized. Append-only — no conflicts.
 - **Input limits** (server-side, write path): content max 64KB, title non-empty and max 512 chars, max 20 tags each max 64 chars, meta max 8KB serialized. Read path also validates: `read_journal` and `load` reject journals with empty or whitespace-only `name` or `title`; `list_journals` surfaces invalid files as error entries (with `error` set and `schema` populated when the JSON was at least parseable).
-- **Pagination cap**: Server caps `limit` to 500 in both `sync_journal` and `list_journals`.
+- **Pagination cap**: Server caps `limit` to 500 in `list_journals`. `sync_journal` has no server-side size cap — the caller is responsible for sizing requests via the `output_budget` formula.
 - **`ref` in `meta`**: references (file paths, URLs, ticket/PR links, cross-journal `foray:` refs) are stored as `meta["ref"]` on the item. The CLI exposes `--ref` as a convenience flag that populates `meta.ref`. The v0→1 migration moves any top-level `ref` field on existing items into `meta.ref` automatically.
 - **Serde**: strict deserialization (`deny_unknown_fields`), `meta` field for extensibility, `Option` fields skipped when None.
 - **CLI output**: plain text by default, `--json` flag on read commands.

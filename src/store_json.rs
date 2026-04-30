@@ -338,7 +338,7 @@ mod tests {
             .create(&journal.name, journal.title.clone(), journal.meta.clone())
             .await
             .unwrap();
-        let (loaded, total) = store.load("my-ctx", &Pagination::default()).await.unwrap();
+        let (loaded, total) = store.load("my-ctx", &Pagination::all()).await.unwrap();
         assert_eq!(loaded.name, "my-ctx");
         assert_eq!(total, 0);
     }
@@ -354,7 +354,7 @@ mod tests {
     #[tokio::test]
     async fn load_not_found() {
         let (store, _dir) = make_store();
-        let result = store.load("nonexistent", &Pagination::default()).await;
+        let result = store.load("nonexistent", &Pagination::all()).await;
         assert!(matches!(result, Err(StoreError::NotFound(_))));
     }
 
@@ -364,7 +364,7 @@ mod tests {
         store.create("my-ctx", "T".into(), None).await.unwrap();
         let item = make_item("found a bug");
         store.add_items("my-ctx", vec![item]).await.unwrap();
-        let (loaded, total) = store.load("my-ctx", &Pagination::default()).await.unwrap();
+        let (loaded, total) = store.load("my-ctx", &Pagination::all()).await.unwrap();
         assert_eq!(total, 1);
         assert_eq!(loaded.items[0].content, "found a bug");
     }
@@ -381,7 +381,7 @@ mod tests {
         let (store, _dir) = make_store();
         store.create("alpha", "A".into(), None).await.unwrap();
         store.create("beta", "B".into(), None).await.unwrap();
-        let (summaries, total) = store.list(&Pagination::default(), false).await.unwrap();
+        let (summaries, total) = store.list(&Pagination::all(), false).await.unwrap();
         assert_eq!(total, 2);
         assert_eq!(summaries[0].name, "alpha");
         assert_eq!(summaries[1].name, "beta");
@@ -393,10 +393,7 @@ mod tests {
         for name in ["a", "b", "c", "d"] {
             store.create(name, name.into(), None).await.unwrap();
         }
-        let p = Pagination {
-            limit: Some(2),
-            offset: Some(1),
-        };
+        let p = Pagination { from: 1, size: 2 };
         let (page, total) = store.list(&p, false).await.unwrap();
         assert_eq!(total, 4);
         assert_eq!(page.len(), 2);
@@ -419,22 +416,19 @@ mod tests {
 
         store.archive("arch-test").await.unwrap();
 
-        let (loaded, _) = store
-            .load("arch-test", &Pagination::default())
-            .await
-            .unwrap();
+        let (loaded, _) = store.load("arch-test", &Pagination::all()).await.unwrap();
         assert_eq!(loaded.name, "arch-test");
         assert!(matches!(
             store.add_items("arch-test", vec![make_item("x")]).await,
             Err(StoreError::Archived(_))
         ));
-        let (archived_list, _) = store.list(&Pagination::default(), true).await.unwrap();
+        let (archived_list, _) = store.list(&Pagination::all(), true).await.unwrap();
         assert_eq!(archived_list.len(), 1);
-        let (active, _) = store.list(&Pagination::default(), false).await.unwrap();
+        let (active, _) = store.list(&Pagination::all(), false).await.unwrap();
         assert_eq!(active.len(), 0);
 
         store.unarchive("arch-test").await.unwrap();
-        let (active, _) = store.list(&Pagination::default(), false).await.unwrap();
+        let (active, _) = store.list(&Pagination::all(), false).await.unwrap();
         assert_eq!(active.len(), 1);
     }
 
@@ -464,7 +458,7 @@ mod tests {
         store.create("active", "A".into(), None).await.unwrap();
         store.unarchive("active").await.unwrap();
         // still active
-        let (active, _) = store.list(&Pagination::default(), false).await.unwrap();
+        let (active, _) = store.list(&Pagination::all(), false).await.unwrap();
         assert_eq!(active.len(), 1);
     }
 
@@ -584,7 +578,7 @@ mod tests {
         });
         std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
 
-        let (summaries, total) = store.list(&Pagination::default(), false).await.unwrap();
+        let (summaries, total) = store.list(&Pagination::all(), false).await.unwrap();
         assert_eq!(total, 2, "both valid and error journals should appear");
         let valid = summaries.iter().find(|s| s.name == "valid").unwrap();
         assert!(valid.error.is_none(), "valid journal should have no error");
@@ -613,7 +607,7 @@ mod tests {
         });
         std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
 
-        let (summaries, total) = store.list(&Pagination::default(), false).await.unwrap();
+        let (summaries, total) = store.list(&Pagination::all(), false).await.unwrap();
         assert_eq!(total, 2, "both valid and error journals should appear");
         let error_entry = summaries.iter().find(|s| s.name == "empty-title").unwrap();
         assert!(
@@ -749,7 +743,7 @@ mod tests {
         });
         std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
 
-        let (summaries, total) = store.list(&Pagination::default(), false).await.unwrap();
+        let (summaries, total) = store.list(&Pagination::all(), false).await.unwrap();
         assert_eq!(total, 2, "both journals should appear");
         let error_entry = summaries.iter().find(|s| s.name == "future").unwrap();
         assert!(
@@ -770,7 +764,7 @@ mod tests {
         let path = dir.path().join("corrupt.json");
         std::fs::write(&path, b"this is not valid json {{{").unwrap();
 
-        let (summaries, total) = store.list(&Pagination::default(), false).await.unwrap();
+        let (summaries, total) = store.list(&Pagination::all(), false).await.unwrap();
         assert_eq!(total, 2, "both journals should appear");
         let error_entry = summaries.iter().find(|s| s.name == "corrupt").unwrap();
         assert!(
@@ -791,7 +785,7 @@ mod tests {
         let path = dir.path().join("array.json");
         std::fs::write(&path, b"[1, 2, 3]").unwrap();
 
-        let (summaries, total) = store.list(&Pagination::default(), false).await.unwrap();
+        let (summaries, total) = store.list(&Pagination::all(), false).await.unwrap();
         assert_eq!(total, 2, "both journals should appear");
         let error_entry = summaries.iter().find(|s| s.name == "array").unwrap();
         assert!(
@@ -814,10 +808,7 @@ mod tests {
                 .await
                 .unwrap();
         }
-        let p = Pagination {
-            limit: Some(2),
-            offset: Some(1),
-        };
+        let p = Pagination { from: 1, size: 2 };
         let (journal, total) = store.load("pag", &p).await.unwrap();
         assert_eq!(total, 5);
         assert_eq!(journal.items.len(), 2);

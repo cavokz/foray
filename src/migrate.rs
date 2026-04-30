@@ -22,7 +22,7 @@ pub const CURRENT_SCHEMA: u32 = 1;
 /// The wire protocol version produced by this build.
 ///
 /// Tracks envelope-level changes to `SyncJournalResponse` (fields like
-/// `cursor`, `added_ids`, etc.) that are independent of `CURRENT_SCHEMA`.
+/// `from`, `added_ids`, etc.) that are independent of `CURRENT_SCHEMA`.
 /// `StdioStore` checks this at connect time and returns
 /// [`StoreError::ProtocolTooNew`] if the server's protocol is newer.
 pub const CURRENT_PROTOCOL: u32 = 1;
@@ -155,6 +155,7 @@ pub fn adapt_send(server_protocol: u32, tool: &str, mut args: Value) -> Result<V
     // `deny_unknown_fields`:
     //   all tools:          `store` (protocol 0 servers have a single implicit store)
     //   list_journals:      `archived` (archive feature did not exist)
+    //   sync_journal:       `from` renamed from `cursor`, `size` renamed from `limit`
     //   archive_journal:    entire tool did not exist
     //   unarchive_journal:  entire tool did not exist
     if server_protocol < 1 {
@@ -195,6 +196,19 @@ pub fn adapt_send(server_protocol: u32, tool: &str, mut args: Value) -> Result<V
                     }
                 }
             }
+            if tool == "sync_journal" {
+                // `from`/`size` were introduced in protocol 1; translate back to
+                // `cursor`/`limit` for protocol 0 servers.
+                if let Some(from) = obj.remove("from") {
+                    // Only send `cursor` if non-zero; protocol 0 servers default to 0.
+                    if from.as_u64() != Some(0) {
+                        obj.insert("cursor".to_string(), from);
+                    }
+                }
+                if let Some(size) = obj.remove("size") {
+                    obj.insert("limit".to_string(), size);
+                }
+            }
         }
     }
     Ok(args)
@@ -221,9 +235,9 @@ pub fn adapt_receive(
     tool: &str,
     mut response: Value,
 ) -> Result<Value, String> {
-    // Protocol 0 → 1: the following fields were added in this transition:
+    // Protocol 0 → 1: the following fields were added or renamed in this transition:
     //   hello:            `protocol`, `stores`  (version was already present)
-    //   sync_journal:     `schema`
+    //   sync_journal:     `schema`; `cursor` renamed to `from`
     //   open_journal:     `name`, `title`, `item_count`
     //   list_journals:    `limit`, `offset`
     //   archive_journal:  `archived`
@@ -248,6 +262,10 @@ pub fn adapt_receive(
             }
             "sync_journal" => {
                 obj.entry("schema").or_insert_with(|| Value::from(0u32));
+                // `cursor` was renamed to `from` in protocol 1.
+                if let Some(cursor) = obj.remove("cursor") {
+                    obj.entry("from").or_insert(cursor);
+                }
             }
             "open_journal" => {
                 obj.entry("name")
@@ -598,13 +616,16 @@ mod tests {
 
     #[test]
     fn adapt_receive_sync_journal_inserts_schema_for_protocol_0() {
-        // v0.2.0 sync_journal response has no `schema`.
+        // v0.2.0 sync_journal response has no `schema` and uses `cursor` not `from`.
         let raw = json!({
             "name": "j", "title": "My Journal",
             "items": [], "added_ids": [], "cursor": 0, "total": 0
         });
         let result = adapt_receive(0, "sync_journal", raw).unwrap();
         assert_eq!(result["schema"], json!(0));
+        // cursor → from rename also applied in the protocol 0 → 1 transition.
+        assert!(result.get("cursor").is_none());
+        assert_eq!(result["from"], json!(0));
     }
 
     #[test]
@@ -626,5 +647,62 @@ mod tests {
     fn adapt_receive_non_object_returns_err() {
         let raw = json!([1, 2, 3]);
         assert!(adapt_receive(0, "hello", raw).is_err());
+    }
+
+    #[test]
+    fn adapt_send_sync_journal_translates_from_size_for_protocol_0() {
+        let args = json!({ "name": "j", "from": 10, "size": 5 });
+        let result = adapt_send(0, "sync_journal", args).unwrap();
+        assert!(
+            result.get("from").is_none(),
+            "from should be translated away"
+        );
+        assert!(
+            result.get("size").is_none(),
+            "size should be translated away"
+        );
+        assert_eq!(result["cursor"], json!(10));
+        assert_eq!(result["limit"], json!(5));
+    }
+
+    #[test]
+    fn adapt_send_sync_journal_omits_cursor_when_from_is_zero_for_protocol_0() {
+        // Protocol 0 servers default cursor to 0; omit it to avoid sending an
+        // unexpected field on servers that use `deny_unknown_fields`.
+        let args = json!({ "name": "j", "from": 0, "size": 5 });
+        let result = adapt_send(0, "sync_journal", args).unwrap();
+        assert!(
+            result.get("cursor").is_none(),
+            "cursor should be omitted when from=0"
+        );
+        assert_eq!(result["limit"], json!(5));
+    }
+
+    #[test]
+    fn adapt_send_sync_journal_noop_for_protocol_1() {
+        let args = json!({ "name": "j", "from": 10, "size": 5 });
+        let result = adapt_send(1, "sync_journal", args.clone()).unwrap();
+        assert_eq!(result, args);
+    }
+
+    #[test]
+    fn adapt_receive_sync_journal_translates_cursor_to_from_for_protocol_0() {
+        let raw = json!({
+            "schema": 1, "name": "j", "title": "T",
+            "items": [], "added_ids": [], "cursor": 22, "total": 100
+        });
+        let result = adapt_receive(0, "sync_journal", raw).unwrap();
+        assert!(result.get("cursor").is_none());
+        assert_eq!(result["from"], json!(22));
+    }
+
+    #[test]
+    fn adapt_receive_sync_journal_passthrough_for_protocol_1() {
+        let raw = json!({
+            "schema": 1, "name": "j", "title": "T",
+            "items": [], "added_ids": [], "from": 22, "total": 100
+        });
+        let result = adapt_receive(1, "sync_journal", raw.clone()).unwrap();
+        assert_eq!(result, raw);
     }
 }

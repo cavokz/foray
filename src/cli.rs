@@ -464,8 +464,8 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
         } => {
             let journal_name = resolve_journal(cli.journal.as_deref(), name.as_deref())?;
             let pagination = Pagination {
-                limit: *limit,
-                offset: *offset,
+                from: offset.unwrap_or(0),
+                size: limit.unwrap_or(usize::MAX),
             };
             let (journal, total) = store.load(&journal_name, &pagination).await?;
             if *json {
@@ -485,10 +485,13 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 let mut seen = total;
                 loop {
                     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                    let all = Pagination::default();
+                    let all = Pagination {
+                        from: seen,
+                        size: usize::MAX,
+                    };
                     let (journal, new_total) = store.load(&journal_name, &all).await?;
                     if new_total > seen {
-                        for item in &journal.items[seen..] {
+                        for item in &journal.items {
                             if *json {
                                 println!("{}", serde_json::to_string(item).unwrap());
                             } else {
@@ -561,7 +564,7 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             completion,
         } => {
             if *completion {
-                let (summaries, _) = store.list(&Pagination::default(), *archived).await?;
+                let (summaries, _) = store.list(&Pagination::all(), *archived).await?;
                 for s in &summaries {
                     if s.error.is_none() {
                         println!("{}", s.name);
@@ -570,8 +573,8 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 return Ok(());
             }
             let pagination = Pagination {
-                limit: *limit,
-                offset: *offset,
+                from: offset.unwrap_or(0),
+                size: limit.unwrap_or(usize::MAX),
             };
             let (summaries, total) = store.list(&pagination, *archived).await?;
 
@@ -604,7 +607,7 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             println!("Unarchived: {name}");
         }
         Commands::Export { name, file } => {
-            let (journal, _) = store.load(name, &Pagination::default()).await?;
+            let (journal, _) = store.load(name, &Pagination::all()).await?;
             let data = serde_json::to_string_pretty(&journal)?;
             match file {
                 Some(path) => std::fs::write(path, format!("{data}\n"))?,
