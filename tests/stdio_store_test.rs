@@ -59,7 +59,7 @@ async fn stdio_store_create_load_list() {
 
     // ── load ─────────────────────────────────────────────────────────
     let (loaded, item_total) = store
-        .load("remote-test", &Pagination::default())
+        .load("remote-test", &Pagination::all())
         .await
         .expect("load should succeed");
 
@@ -74,17 +74,14 @@ async fn stdio_store_create_load_list() {
     assert!(!store.exists("no-such-journal").await.unwrap());
 
     // ── load not found ───────────────────────────────────────────────
-    let not_found = store.load("no-such-journal", &Pagination::default()).await;
+    let not_found = store.load("no-such-journal", &Pagination::all()).await;
     assert!(
         matches!(not_found, Err(foray::store::StoreError::NotFound(_))),
         "expected NotFound, got {not_found:?}"
     );
 
     // ── list ─────────────────────────────────────────────────────────
-    let (summaries, list_total) = store
-        .list(&Pagination::default(), false)
-        .await
-        .expect("list should succeed");
+    let (summaries, list_total) = store.list(false).await.expect("list should succeed");
 
     assert_eq!(list_total, 1);
     assert_eq!(summaries.len(), 1);

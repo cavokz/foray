@@ -46,12 +46,6 @@ pub enum Commands {
         /// Follow: watch for new items in real time
         #[arg(short, long)]
         follow: bool,
-        /// Maximum number of items
-        #[arg(long)]
-        limit: Option<usize>,
-        /// Skip N items
-        #[arg(long)]
-        offset: Option<usize>,
     },
     /// Add an item to the current journal
     Add {
@@ -89,14 +83,8 @@ pub enum Commands {
         /// Show archived journals
         #[arg(long)]
         archived: bool,
-        /// Maximum number of journals
-        #[arg(long)]
-        limit: Option<usize>,
-        /// Skip N journals
-        #[arg(long)]
-        offset: Option<usize>,
         /// Output bare journal names for shell completion (one per line)
-        #[arg(long, conflicts_with_all = ["json", "limit", "offset"])]
+        #[arg(long, conflicts_with = "json")]
         completion: bool,
     },
     /// Archive a journal
@@ -455,19 +443,9 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
         Commands::Completions { .. } => {
             unreachable!("completions is handled in main")
         }
-        Commands::Show {
-            name,
-            json,
-            follow,
-            limit,
-            offset,
-        } => {
+        Commands::Show { name, json, follow } => {
             let journal_name = resolve_journal(cli.journal.as_deref(), name.as_deref())?;
-            let pagination = Pagination {
-                limit: *limit,
-                offset: *offset,
-            };
-            let (journal, total) = store.load(&journal_name, &pagination).await?;
+            let (journal, total) = store.load(&journal_name, &Pagination::all()).await?;
             if *json {
                 for item in &journal.items {
                     println!("{}", serde_json::to_string(item)?);
@@ -485,10 +463,13 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 let mut seen = total;
                 loop {
                     tokio::time::sleep(std::time::Duration::from_millis(500)).await;
-                    let all = Pagination::default();
+                    let all = Pagination {
+                        from: seen,
+                        size: usize::MAX,
+                    };
                     let (journal, new_total) = store.load(&journal_name, &all).await?;
                     if new_total > seen {
-                        for item in &journal.items[seen..] {
+                        for item in &journal.items {
                             if *json {
                                 println!("{}", serde_json::to_string(item).unwrap());
                             } else {
@@ -556,12 +537,11 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
         Commands::List {
             json,
             archived,
-            limit,
-            offset,
             completion,
         } => {
+            let (summaries, total) = store.list(*archived).await?;
+
             if *completion {
-                let (summaries, _) = store.list(&Pagination::default(), *archived).await?;
                 for s in &summaries {
                     if s.error.is_none() {
                         println!("{}", s.name);
@@ -569,11 +549,6 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 }
                 return Ok(());
             }
-            let pagination = Pagination {
-                limit: *limit,
-                offset: *offset,
-            };
-            let (summaries, total) = store.list(&pagination, *archived).await?;
 
             if *json {
                 println!(
@@ -604,7 +579,7 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             println!("Unarchived: {name}");
         }
         Commands::Export { name, file } => {
-            let (journal, _) = store.load(name, &Pagination::default()).await?;
+            let (journal, _) = store.load(name, &Pagination::all()).await?;
             let data = serde_json::to_string_pretty(&journal)?;
             match file {
                 Some(path) => std::fs::write(path, format!("{data}\n"))?,

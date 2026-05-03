@@ -108,12 +108,10 @@ pub struct SyncItemInput {
 pub struct SyncJournalParams {
     /// Journal name
     pub name: String,
-    /// Position from previous sync response — return only items after this position (omit for full read)
-    #[serde(default)]
-    pub cursor: Option<usize>,
-    /// Maximum number of items to return (does not affect additions — all items are always added)
-    #[serde(default)]
-    pub limit: Option<usize>,
+    /// Item offset to start reading from (0 = beginning). Use the `from` value returned by the previous response to continue pagination.
+    pub from: usize,
+    /// Maximum number of items to return (does not affect additions — all items are always added).
+    pub size: usize,
     /// Items to add to the journal
     #[serde(default)]
     pub items: Option<Vec<SyncItemInput>>,
@@ -130,12 +128,6 @@ pub struct SyncJournalParams {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 pub struct ListJournalsParams {
-    /// Maximum number of journals to return
-    #[serde(default)]
-    pub limit: Option<usize>,
-    /// Number of journals to skip
-    #[serde(default)]
-    pub offset: Option<usize>,
     /// List archived journals instead of active ones
     #[serde(default)]
     pub archived: bool,
@@ -182,7 +174,7 @@ struct SyncJournalResponse {
     title: String,
     items: Vec<serde_json::Value>,
     added_ids: Vec<String>,
-    cursor: usize,
+    from: usize,
     total: usize,
 }
 
@@ -190,8 +182,6 @@ struct SyncJournalResponse {
 struct ListJournalsResponse {
     journals: Vec<serde_json::Value>,
     total: usize,
-    limit: Option<usize>,
-    offset: Option<usize>,
 }
 
 // ── Prompt parameter types ──────────────────────────────────────────
@@ -218,7 +208,6 @@ pub struct SummarizeParams {
 
 // ── Server ──────────────────────────────────────────────────────────
 
-const MAX_LIMIT: usize = 500;
 const MAX_CONTENT: usize = 64 * 1024;
 const MAX_TITLE: usize = 512;
 const MAX_TAGS: usize = 20;
@@ -459,22 +448,20 @@ impl ForayServer {
             let title = title.to_string();
             validate_meta(&args.meta)?;
             store
-                .create(&args.name, title, args.meta)
+                .create(&args.name, title.clone(), args.meta)
                 .await
                 .map_err(Self::store_err)?;
-            let p = Pagination::default();
-            let (j, _) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
             let resp = OpenJournalResponse {
-                name: j.name,
-                title: j.title,
-                item_count: j.items.len(),
+                name: args.name,
+                title,
+                item_count: 0,
                 created: true,
             };
             Ok(CallToolResult::success(vec![Content::text(
                 serde_json::to_string(&resp).unwrap(),
             )]))
         } else {
-            let p = Pagination::default();
+            let p = Pagination { from: 0, size: 0 };
             let (j, total) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
             let resp = OpenJournalResponse {
                 name: j.name,
@@ -532,28 +519,23 @@ impl ForayServer {
                 .map_err(Self::store_err)?;
         }
 
-        // Load journal and apply cursor
-        let all = Pagination::default();
+        // Load the requested page directly from the store.
+        let pagination = Pagination {
+            from: args.from,
+            size: args.size,
+        };
         let (journal, total) = store
-            .load(&args.name, &all)
+            .load(&args.name, &pagination)
             .await
             .map_err(Self::store_err)?;
 
-        let after = args.cursor.unwrap_or(0);
-        let items_slice = if after < journal.items.len() {
-            &journal.items[after..]
-        } else {
-            &[]
-        };
-
-        let limit = args.limit.unwrap_or(items_slice.len()).min(MAX_LIMIT);
-        let items: Vec<serde_json::Value> = items_slice
+        let items: Vec<serde_json::Value> = journal
+            .items
             .iter()
-            .take(limit)
             .map(|i| serde_json::to_value(i).unwrap())
             .collect();
 
-        let cursor = after + items.len();
+        let from = (args.from.min(total) + items.len()).min(total);
 
         let resp = SyncJournalResponse {
             schema: migrate::CURRENT_SCHEMA,
@@ -561,7 +543,7 @@ impl ForayServer {
             title: journal.title,
             items,
             added_ids,
-            cursor,
+            from,
             total,
         };
         Ok(CallToolResult::success(vec![Content::text(
@@ -575,26 +557,14 @@ impl ForayServer {
     ) -> Result<CallToolResult, ErrorData> {
         self.preflight(args.nuance.as_deref())?;
         let store = self.resolve_store(args.store.as_deref())?;
-        let pagination = Pagination {
-            limit: Some(args.limit.unwrap_or(MAX_LIMIT).min(MAX_LIMIT)),
-            offset: args.offset,
-        };
-        let (summaries, total) = store
-            .list(&pagination, args.archived)
-            .await
-            .map_err(Self::store_err)?;
+        let (summaries, total) = store.list(args.archived).await.map_err(Self::store_err)?;
 
         let journals: Vec<serde_json::Value> = summaries
             .iter()
             .map(|s| serde_json::to_value(s).unwrap())
             .collect();
 
-        let resp = ListJournalsResponse {
-            journals,
-            total,
-            limit: args.limit,
-            offset: args.offset,
-        };
+        let resp = ListJournalsResponse { journals, total };
         Ok(CallToolResult::success(vec![Content::text(
             serde_json::to_string(&resp).unwrap(),
         )]))
@@ -660,7 +630,7 @@ impl ForayServer {
 
     #[tool(
         name = "sync_journal",
-        description = "Read and write journal items in one call. Returns items since your last cursor position. Pass items to add them. Pass cursor from the previous response to get only new items — omit cursor for a full read. Response includes cursor for the next call and added_ids for items you added."
+        description = "Read and write journal items in one call. Returns items since your last `from` position. Pass items to add them. Pass `from` from the previous response to get only new items — use `from: 0` to read from the beginning. Response includes `from` for the next call and `added_ids` for items you added. Use `size` to limit the number of items returned — the caller is responsible for choosing a size that fits within their output budget. Compute a safe `size` using `avg_item_size` and `std_item_size` from `list_journals`: `size = floor(output_budget / (avg_item_size + 2 * std_item_size))`. The `from` field is a plain integer offset — `list_journals` already returns `item_count` (= total), so all page offsets (`0`, `size`, `2×size`, …) are known before any sync_journal call and all pages can be requested in parallel."
     )]
     async fn sync_journal(
         &self,
@@ -672,12 +642,8 @@ impl ForayServer {
                 Self::sanitize(args.store.as_deref().unwrap_or("?")),
                 Self::sanitize(&args.name)
             );
-            if let Some(c) = args.cursor {
-                msg.push_str(&format!(" cursor={c}"));
-            }
-            if let Some(l) = args.limit {
-                msg.push_str(&format!(" limit={l}"));
-            }
+            msg.push_str(&format!(" from={}", args.from));
+            msg.push_str(&format!(" size={}", args.size));
             if let Some(ref items) = args.items {
                 msg.push_str(&format!(" +{} items", items.len()));
             }
@@ -690,28 +656,17 @@ impl ForayServer {
 
     #[tool(
         name = "list_journals",
-        description = "List journals. Pass `archived: true` to list archived journals instead of active ones. Paginated: defaults to first 500."
+        description = "List journals. Pass `archived: true` to list archived journals instead of active ones. Returns all journals in one call. Each entry includes `avg_item_size` (average serialized JSON byte size of all items) and `std_item_size` (standard deviation) — use these to compute a safe sync_journal size: floor(output_budget / (avg_item_size + 2 * std_item_size)). `avg_item_size` is absent for empty journals or old servers; `std_item_size` is also absent for single-item journals. When absent, use size: 5 as a safe default."
     )]
     async fn list_journals(
         &self,
         Parameters(args): Parameters<ListJournalsParams>,
     ) -> Result<CallToolResult, ErrorData> {
-        {
-            let mut msg = format!(
-                "list_journals ({})",
-                Self::sanitize(args.store.as_deref().unwrap_or("?"))
-            );
-            if args.archived {
-                msg.push_str(" archived");
-            }
-            if let Some(l) = args.limit {
-                msg.push_str(&format!(" limit={l}"));
-            }
-            if let Some(o) = args.offset {
-                msg.push_str(&format!(" offset={o}"));
-            }
-            eprintln!("{msg}");
-        }
+        eprintln!(
+            "list_journals ({}){}",
+            Self::sanitize(args.store.as_deref().unwrap_or("?")),
+            if args.archived { " archived" } else { "" }
+        );
         self.do_list_journals(args)
             .await
             .inspect_err(|e| eprintln!("error: {}", Self::sanitize(&e.message)))
@@ -1033,17 +988,11 @@ mod tests {
         assert!(json.get("id").is_none());
 
         // Verify active list no longer contains it.
-        let (active, _) = store
-            .list(&crate::types::Pagination::default(), false)
-            .await
-            .unwrap();
+        let (active, _) = store.list(false).await.unwrap();
         assert!(!active.iter().any(|s| s.name == "arc-test"));
 
         // Verify archived list contains it.
-        let (archived, _) = store
-            .list(&crate::types::Pagination::default(), true)
-            .await
-            .unwrap();
+        let (archived, _) = store.list(true).await.unwrap();
         assert!(archived.iter().any(|s| s.name == "arc-test"));
 
         // Unarchive it.
@@ -1063,10 +1012,7 @@ mod tests {
         assert_eq!(json["unarchived"], "arc-test");
 
         // Verify it is active again.
-        let (active, _) = store
-            .list(&crate::types::Pagination::default(), false)
-            .await
-            .unwrap();
+        let (active, _) = store.list(false).await.unwrap();
         assert!(active.iter().any(|s| s.name == "arc-test"));
     }
 
@@ -1223,27 +1169,28 @@ mod tests {
 
     #[test]
     fn sync_journal_params_store_field() {
-        let p: SyncJournalParams =
-            serde_json::from_str(r#"{"name":"j","cursor":0,"store":"local","nuance":"abc"}"#)
-                .unwrap();
+        let p: SyncJournalParams = serde_json::from_str(
+            r#"{"name":"j","from":0,"size":10,"store":"local","nuance":"abc"}"#,
+        )
+        .unwrap();
         assert_eq!(p.store.as_deref(), Some("local"));
     }
     // ── SyncJournalResponse serialization ──────────────────────────
 
     #[test]
-    fn sync_response_cursor_and_added_ids_present() {
+    fn sync_response_from_and_added_ids_present() {
         let resp = SyncJournalResponse {
             schema: migrate::CURRENT_SCHEMA,
             name: "my-journal".into(),
             title: "My Journal".into(),
             items: vec![],
             added_ids: vec!["abc-123".into()],
-            cursor: 7,
+            from: 7,
             total: 7,
         };
         let json: serde_json::Value = serde_json::to_value(&resp).unwrap();
         assert!(json.get("id").is_none());
-        assert_eq!(json["cursor"], 7);
+        assert_eq!(json["from"], 7);
         assert_eq!(json["added_ids"], serde_json::json!(["abc-123"]));
     }
 
