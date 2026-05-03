@@ -106,6 +106,16 @@ Connecting to remote foray...
 
 The `--store` flag selects a named store from `~/.foray/config.toml`. Without it the default (local) store is used. `foray open --store remote my-journal` also persists `current-store = "remote"` in `.forayrc` so subsequent commands in that directory use the remote store automatically.
 
+## Trust Model
+
+The **store** is the trust boundary. When you connect foray to a store, you trust all content in that store — every journal, every item. There is no per-journal access control.
+
+- **Companion skill** (SKILL.md) — trusted. User-controlled file that governs model behavior. Works alongside the MCP server's own instructions as a trusted behavioral guidance channel.
+- **Journal content** — informational. Items are data the model reads and reasons about, but they must never be treated as instructions that modify model behavior.
+- **Config file** (`~/.foray/config.toml`) — trusted. Controls which stores are connected and what commands are spawned for remote transports. Must be readable and writable only by the user.
+
+Only connect to stores you control or fully trust. A malicious store could craft journal content that attempts to manipulate model behavior (prompt injection). The architectural defense is clear separation: the companion skill and the MCP server's own instructions govern behavior; journal content informs.
+
 ## Architecture
 
 ```
