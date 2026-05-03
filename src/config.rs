@@ -2,27 +2,27 @@ use crate::migrate;
 use crate::store::{Store, StoreError};
 use crate::store_json::JsonFileStore;
 use crate::store_stdio::StdioStore;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 // ── Config file types ───────────────────────────────────────────────
 
-#[derive(Debug, Deserialize, Default)]
+#[derive(Debug, Deserialize, Serialize, Default)]
 #[serde(deny_unknown_fields)]
 struct RawConfig {
     #[serde(default)]
     stores: BTreeMap<String, RawStoreConfig>,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Serialize)]
 #[serde(deny_unknown_fields, tag = "type")]
 enum RawStoreConfig {
     #[serde(rename = "json_file")]
     JsonFile {
-        /// Absolute path to the journals directory.
-        path: PathBuf,
+        /// Absolute path to the journals directory (must be valid UTF-8; TOML guarantees this).
+        path: String,
         /// Human-readable description — required; helps the model suggest the right store.
         description: String,
     },
@@ -45,6 +45,15 @@ enum RawStoreConfig {
         #[serde(default)]
         store: Option<String>,
     },
+}
+
+impl RawStoreConfig {
+    fn description(&self) -> &str {
+        match self {
+            RawStoreConfig::JsonFile { description, .. } => description,
+            RawStoreConfig::ForayStdio { description, .. } => description,
+        }
+    }
 }
 
 // ── StoreRegistry ───────────────────────────────────────────────────
@@ -89,88 +98,129 @@ impl StoreRegistry {
         }
 
         let mut stores = Vec::with_capacity(raw.stores.len());
-        let mut fingerprints = Vec::with_capacity(raw.stores.len());
         // BTreeMap iteration is sorted by key → deterministic nuance
-        for (name, entry) in raw.stores {
-            let (store, description): (Arc<dyn Store>, String) = match entry {
-                RawStoreConfig::JsonFile { path, description } => {
-                    if !path.is_absolute() {
+        for (name, entry) in &raw.stores {
+            let store: Arc<dyn Store> = match entry {
+                RawStoreConfig::JsonFile { path, .. } => {
+                    let path_buf = PathBuf::from(path);
+                    if !path_buf.is_absolute() {
                         return Err(StoreError::Io(std::io::Error::new(
                             std::io::ErrorKind::InvalidData,
-                            format!(
-                                "store '{name}': path must be absolute, got '{}'",
-                                path.display()
-                            ),
+                            format!("store '{name}': path must be absolute, got '{path}'"),
                         )));
                     }
-                    fingerprints.push(format!("{}={}", name, path.display()));
-                    (Arc::new(JsonFileStore::new(path)), description)
+                    Arc::new(JsonFileStore::new(path_buf))
                 }
                 RawStoreConfig::ForayStdio {
                     command,
                     args,
-                    description,
                     store,
-                } => {
-                    fingerprints.push(format!("{}={} {}", name, command, args.join(" ")));
-                    (
-                        Arc::new(StdioStore::new(command, args, vec![], store)),
-                        description,
-                    )
-                }
+                    ..
+                } => Arc::new(StdioStore::new(
+                    command.clone(),
+                    args.clone(),
+                    vec![],
+                    store.clone(),
+                )),
             };
             stores.push(StoreEntry {
-                name,
-                description,
+                name: name.clone(),
+                description: entry.description().to_string(),
                 store,
             });
         }
 
-        fingerprints.push(format!("schema={}", migrate::CURRENT_SCHEMA));
-        fingerprints.push(format!("protocol={}", migrate::CURRENT_PROTOCOL));
-        let nuance = compute_nuance(&fingerprints);
+        let nuance = Self::compute_nuance_from_config(
+            &raw,
+            migrate::CURRENT_SCHEMA,
+            migrate::CURRENT_PROTOCOL,
+        );
         Ok(Self { stores, nuance })
+    }
+
+    fn compute_nuance_from_config(raw: &RawConfig, schema: u32, protocol: u32) -> String {
+        let config_json =
+            serde_json::to_string(raw).expect("RawConfig serialization is infallible");
+        compute_nuance(&[
+            config_json,
+            format!("schema={schema}"),
+            format!("protocol={protocol}"),
+        ])
     }
 
     /// Single implicit `local` `JsonFileStore` at `~/.foray/journals/`.
     pub fn implicit_local() -> Result<Self, StoreError> {
         let base_dir = JsonFileStore::default_dir()?;
-        let path_str = base_dir.display().to_string();
-        let store: Arc<dyn Store> = Arc::new(JsonFileStore::new(base_dir));
-        let nuance = compute_nuance(&[
-            format!("local={path_str}"),
-            format!("schema={}", migrate::CURRENT_SCHEMA),
-            format!("protocol={}", migrate::CURRENT_PROTOCOL),
-        ]);
-        Ok(Self {
-            stores: vec![StoreEntry {
-                name: "local".to_string(),
-                description: "Default local journal store".to_string(),
-                store,
-            }],
-            nuance,
-        })
+        let store: Arc<dyn Store> = Arc::new(JsonFileStore::new(base_dir.clone()));
+        let path_str = base_dir.to_str().ok_or_else(|| {
+            StoreError::Io(std::io::Error::new(
+                std::io::ErrorKind::InvalidData,
+                format!(
+                    "default journal path is not valid UTF-8: {}",
+                    base_dir.display()
+                ),
+            ))
+        })?;
+        let raw = RawConfig {
+            stores: [(
+                "local".to_string(),
+                RawStoreConfig::JsonFile {
+                    path: path_str.to_string(),
+                    description: "Default local journal store".to_string(),
+                },
+            )]
+            .into(),
+        };
+        let nuance = Self::compute_nuance_from_config(
+            &raw,
+            migrate::CURRENT_SCHEMA,
+            migrate::CURRENT_PROTOCOL,
+        );
+        let stores = raw
+            .stores
+            .iter()
+            .map(|(name, entry)| StoreEntry {
+                name: name.clone(),
+                description: entry.description().to_string(),
+                store: store.clone(),
+            })
+            .collect();
+        Ok(Self { stores, nuance })
     }
 
     /// Construct a single-store registry backed by `base_dir`.
     /// For use in tests — avoids depending on the user's home directory.
     #[cfg(test)]
     pub fn for_test(base_dir: std::path::PathBuf) -> Self {
-        let path_str = base_dir.display().to_string();
-        let store: Arc<dyn Store> = Arc::new(JsonFileStore::new(base_dir));
-        let nuance = compute_nuance(&[
-            format!("local={path_str}"),
-            format!("schema={}", migrate::CURRENT_SCHEMA),
-            format!("protocol={}", migrate::CURRENT_PROTOCOL),
-        ]);
-        Self {
-            stores: vec![StoreEntry {
-                name: "local".to_string(),
-                description: "Test store".to_string(),
-                store,
-            }],
-            nuance,
-        }
+        let store: Arc<dyn Store> = Arc::new(JsonFileStore::new(base_dir.clone()));
+        let raw = RawConfig {
+            stores: [(
+                "local".to_string(),
+                RawStoreConfig::JsonFile {
+                    path: base_dir
+                        .to_str()
+                        .expect("test dir is valid UTF-8")
+                        .to_string(),
+                    description: "Test store".to_string(),
+                },
+            )]
+            .into(),
+        };
+        let nuance = Self::compute_nuance_from_config(
+            &raw,
+            migrate::CURRENT_SCHEMA,
+            migrate::CURRENT_PROTOCOL,
+        );
+        let stores = raw
+            .stores
+            .iter()
+            .map(|(name, entry)| StoreEntry {
+                name: name.clone(),
+                description: entry.description().to_string(),
+                store: store.clone(),
+            })
+            .collect();
+        Self { stores, nuance }
     }
 
     /// Construct a two-store registry. For use in tests only.
@@ -178,27 +228,48 @@ impl StoreRegistry {
     pub fn for_test_two(base_dir1: std::path::PathBuf, base_dir2: std::path::PathBuf) -> Self {
         let store1: Arc<dyn Store> = Arc::new(JsonFileStore::new(base_dir1.clone()));
         let store2: Arc<dyn Store> = Arc::new(JsonFileStore::new(base_dir2.clone()));
-        let nuance = compute_nuance(&[
-            format!("store1={}", base_dir1.display()),
-            format!("store2={}", base_dir2.display()),
-            format!("schema={}", migrate::CURRENT_SCHEMA),
-            format!("protocol={}", migrate::CURRENT_PROTOCOL),
-        ]);
-        Self {
-            stores: vec![
-                StoreEntry {
-                    name: "store1".to_string(),
-                    description: "Test store 1".to_string(),
-                    store: store1,
-                },
-                StoreEntry {
-                    name: "store2".to_string(),
-                    description: "Test store 2".to_string(),
-                    store: store2,
-                },
-            ],
-            nuance,
-        }
+        let raw = RawConfig {
+            stores: [
+                (
+                    "store1".to_string(),
+                    RawStoreConfig::JsonFile {
+                        path: base_dir1
+                            .to_str()
+                            .expect("test dir is valid UTF-8")
+                            .to_string(),
+                        description: "Test store 1".to_string(),
+                    },
+                ),
+                (
+                    "store2".to_string(),
+                    RawStoreConfig::JsonFile {
+                        path: base_dir2
+                            .to_str()
+                            .expect("test dir is valid UTF-8")
+                            .to_string(),
+                        description: "Test store 2".to_string(),
+                    },
+                ),
+            ]
+            .into(),
+        };
+        let nuance = Self::compute_nuance_from_config(
+            &raw,
+            migrate::CURRENT_SCHEMA,
+            migrate::CURRENT_PROTOCOL,
+        );
+        let arc_stores = [store1, store2];
+        let stores = raw
+            .stores
+            .iter()
+            .zip(arc_stores)
+            .map(|((name, entry), store)| StoreEntry {
+                name: name.clone(),
+                description: entry.description().to_string(),
+                store,
+            })
+            .collect();
+        Self { stores, nuance }
     }
 
     /// Look up a store by name. Returns `None` if not found.
@@ -249,7 +320,6 @@ fn config_path() -> Result<PathBuf, StoreError> {
 }
 
 fn compute_nuance(fingerprints: &[String]) -> String {
-    // Sort internally so callers don't need to guarantee order.
     // Using a simple FNV-1a 64-bit hash — no crypto needed, just stability.
     let mut sorted = fingerprints.to_vec();
     sorted.sort_unstable();
@@ -270,49 +340,53 @@ fn compute_nuance(fingerprints: &[String]) -> String {
 mod tests {
     use super::*;
 
+    fn make_config(path: &str) -> RawConfig {
+        RawConfig {
+            stores: [(
+                "local".to_string(),
+                RawStoreConfig::JsonFile {
+                    path: path.to_string(),
+                    description: "Local".to_string(),
+                },
+            )]
+            .into(),
+        }
+    }
+
     #[test]
     fn nuance_is_stable() {
-        let a = compute_nuance(&["local=/home/user/.foray/journals".to_string()]);
-        let b = compute_nuance(&["local=/home/user/.foray/journals".to_string()]);
+        let raw = make_config("/home/user/.foray/journals");
+        let a = StoreRegistry::compute_nuance_from_config(&raw, 1, 1);
+        let b = StoreRegistry::compute_nuance_from_config(&raw, 1, 1);
         assert_eq!(a, b);
     }
 
     #[test]
-    fn nuance_differs_on_change() {
-        let a = compute_nuance(&["local=/home/user/.foray/journals".to_string()]);
-        let b = compute_nuance(&["work=/home/user/.foray/work".to_string()]);
+    fn nuance_differs_on_config_change() {
+        // Two distinct configs produce distinct nuances — proves the serialized
+        // config feeds into the hash rather than being discarded.
+        let a =
+            StoreRegistry::compute_nuance_from_config(&make_config("/home/user/.foray/a"), 1, 1);
+        let b =
+            StoreRegistry::compute_nuance_from_config(&make_config("/home/user/.foray/b"), 1, 1);
         assert_ne!(a, b);
     }
 
     #[test]
     fn nuance_differs_on_schema_change() {
-        // Same config, different schema version — nuance must differ so
-        // clients re-handshake after a binary upgrade that bumps the schema.
-        let a = compute_nuance(&[
-            "local=/home/user/.foray/journals".to_string(),
-            "schema=1".to_string(),
-        ]);
-        let b = compute_nuance(&[
-            "local=/home/user/.foray/journals".to_string(),
-            "schema=2".to_string(),
-        ]);
+        // Schema version participates directly in compute_nuance_from_config.
+        let raw = make_config("/home/user/.foray/journals");
+        let a = StoreRegistry::compute_nuance_from_config(&raw, 1, 1);
+        let b = StoreRegistry::compute_nuance_from_config(&raw, 2, 1);
         assert_ne!(a, b);
     }
 
     #[test]
     fn nuance_differs_on_protocol_change() {
-        // Same config and schema, different protocol version — nuance must differ
-        // so clients re-handshake after a binary upgrade that bumps the protocol.
-        let a = compute_nuance(&[
-            "local=/home/user/.foray/journals".to_string(),
-            "schema=1".to_string(),
-            "protocol=1".to_string(),
-        ]);
-        let b = compute_nuance(&[
-            "local=/home/user/.foray/journals".to_string(),
-            "schema=1".to_string(),
-            "protocol=2".to_string(),
-        ]);
+        // Protocol version participates directly in compute_nuance_from_config.
+        let raw = make_config("/home/user/.foray/journals");
+        let a = StoreRegistry::compute_nuance_from_config(&raw, 1, 1);
+        let b = StoreRegistry::compute_nuance_from_config(&raw, 1, 2);
         assert_ne!(a, b);
     }
 
@@ -367,6 +441,24 @@ mod tests {
         assert_eq!(registry.entries().len(), 1);
         assert_eq!(registry.entries()[0].name, "work");
         assert_eq!(registry.entries()[0].description, "Work journals");
+    }
+
+    #[test]
+    fn load_from_foray_stdio_store() {
+        // Verifies that a foray_stdio entry is parsed correctly and that
+        // the store name and description are captured in the registry.
+        // (args and store hint are internal to StdioStore — not exposed by the registry.)
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        std::fs::write(
+            &config_path,
+            "[stores.remote]\ntype = \"foray_stdio\"\ncommand = \"ssh\"\nargs = [\"user@host\", \"--\", \"foray\"]\ndescription = \"Remote store\"\nstore = \"work\"\n",
+        )
+        .unwrap();
+        let registry = StoreRegistry::load_from(&config_path).unwrap();
+        assert_eq!(registry.entries().len(), 1);
+        assert_eq!(registry.entries()[0].name, "remote");
+        assert_eq!(registry.entries()[0].description, "Remote store");
     }
 
     #[test]
