@@ -258,6 +258,8 @@ pub fn adapt_receive(
                          "description": "implicit store (protocol 0 server)"}
                     ])
                 });
+                obj.entry("skill_uri")
+                    .or_insert_with(|| Value::String(String::new()));
             }
             "sync_journal" => {
                 obj.entry("schema").or_insert_with(|| Value::from(0u32));
@@ -593,6 +595,7 @@ mod tests {
         );
         assert!(result["stores"][0]["description"].is_string());
         assert_eq!(result["nuance"], json!("abc"));
+        assert!(result["skill_uri"].as_str() == Some(""));
     }
 
     #[test]

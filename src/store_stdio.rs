@@ -26,7 +26,8 @@ use crate::types::{JournalFile, JournalItem, JournalSummary, Pagination};
 ///
 /// Fields must match the current server's `HelloResponse` exactly.
 /// `adapt_receive` normalises old server responses to this shape before
-/// deserialization, so `deny_unknown_fields` is safe and guarantees that
+/// deserialization — including injecting missing fields for older protocol
+/// versions — so `deny_unknown_fields` is safe and guarantees that
 /// `adapt_receive` tells the whole compatibility story.
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -37,6 +38,8 @@ struct HelloWire {
     #[allow(dead_code)]
     protocol: u32,
     stores: Vec<StoreInfoWire>,
+    #[allow(dead_code)]
+    skill_uri: String,
 }
 
 #[derive(Deserialize)]
@@ -780,12 +783,23 @@ mod tests {
 
     #[test]
     fn hello_wire_deserializes_fully_formed_response() {
-        let s = r#"{"version":"1.0","nuance":"abc","protocol":1,"stores":[{"name":"local","description":"Local store"}]}"#;
+        let s = r#"{"version":"1.0","nuance":"abc","protocol":1,"stores":[{"name":"local","description":"Local store"}],"skill_uri":"foray://skill"}"#;
         let h: HelloWire = serde_json::from_str(s).unwrap();
         assert_eq!(h.protocol, 1);
         assert_eq!(h.nuance, "abc");
         assert_eq!(h.stores.len(), 1);
         assert_eq!(h.stores[0].name, "local");
+        assert_eq!(h.skill_uri, "foray://skill");
+    }
+
+    #[test]
+    fn hello_wire_deserializes_empty_skill_uri() {
+        // adapt_receive injects skill_uri:"" for protocol 0 servers that
+        // predate MCP resources. Verify HelloWire accepts an empty string.
+        let s = r#"{"version":"0.2.0","nuance":"abc","protocol":0,"stores":[{"name":"local","description":"implicit store (protocol 0 server)"}],"skill_uri":""}"#;
+        let h: HelloWire = serde_json::from_str(s).unwrap();
+        assert_eq!(h.nuance, "abc");
+        assert!(h.skill_uri.is_empty());
     }
 
     #[test]
