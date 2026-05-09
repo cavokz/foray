@@ -33,6 +33,21 @@ pub const CURRENT_PROTOCOL: u32 = 1;
 /// a `store` argument.
 pub const PROTOCOL_0_IMPLICIT_STORE: &str = "local";
 
+/// Typed error returned by [`adapt_receive`].
+///
+/// Lets callers convert each variant to the appropriate [`StoreError`] without
+/// re-parsing strings.
+///
+/// [`StoreError`]: crate::store::StoreError
+#[derive(Debug)]
+pub enum AdaptError {
+    /// The response was not a JSON object — adaptation is impossible.
+    NonObject(String),
+    /// Protocol 0 server signalled that the journal already exists
+    /// (`created: false` in the `open_journal` / `create_journal` response).
+    AlreadyExists(String),
+}
+
 /// Result of running [`migrate`].
 pub enum MigrateResult {
     /// The value was already at the current schema — returned unchanged.
@@ -136,6 +151,16 @@ fn v0_to_v1(mut obj: Map<String, Value>) -> Map<String, Value> {
     obj
 }
 
+/// Return the wire tool name to use when calling a server at `server_protocol`.
+///
+/// Protocol 0 servers do not know `create_journal`; translate to `open_journal`.
+pub fn adapt_tool(server_protocol: u32, tool: &'static str) -> &'static str {
+    if server_protocol < 1 && tool == "create_journal" {
+        return "open_journal";
+    }
+    tool
+}
+
 /// Adapt outbound request arguments before sending to a remote server with an
 /// older protocol version.
 ///
@@ -158,6 +183,7 @@ pub fn adapt_send(server_protocol: u32, tool: &str, mut args: Value) -> Result<V
     //   sync_journal:       `from` renamed from `cursor`, `size` renamed from `limit`
     //   archive_journal:    entire tool did not exist
     //   unarchive_journal:  entire tool did not exist
+    //   create_journal:     renamed from `open_journal` (tool name rewrite in adapt_tool)
     if server_protocol < 1 {
         match tool {
             "archive_journal" | "unarchive_journal" => {
@@ -228,23 +254,26 @@ pub fn adapt_send(server_protocol: u32, tool: &str, mut args: Value) -> Result<V
 /// current adaptation rules, and *Bumping the protocol version* for the
 /// checklist to follow when adding a new protocol version.
 ///
-/// Returns `Err(String)` if the response is not a JSON object (adaptation is
-/// not possible) or if a required field cannot be synthesised.
+/// Returns `Err(`[`AdaptError`]`)` if the response is not a JSON object
+/// (adaptation is not possible) or if a protocol-level conflict is detected
+/// (e.g. `created: false` from a protocol 0 `create_journal` response).
 pub fn adapt_receive(
     server_protocol: u32,
     tool: &str,
     mut response: Value,
-) -> Result<Value, String> {
+) -> Result<Value, AdaptError> {
     // Protocol 0 → 1: the following fields were added or renamed in this transition:
     //   hello:            `protocol`, `stores`  (version was already present)
     //   sync_journal:     `schema`; `cursor` renamed to `from`
-    //   open_journal:     `name`, `title`, `item_count`
+    //   create_journal:   v0 response had extra `item_count`, `created` — strip both; `created: false` returns Err
     //   archive_journal:  `archived`
     //   unarchive_journal:`unarchived`
     if server_protocol < 1 {
-        let obj = response
-            .as_object_mut()
-            .ok_or_else(|| format!("adapt_receive({tool}): response is not a JSON object"))?;
+        let obj = response.as_object_mut().ok_or_else(|| {
+            AdaptError::NonObject(format!(
+                "adapt_receive({tool}): response is not a JSON object"
+            ))
+        })?;
         match tool {
             "hello" => {
                 obj.entry("version")
@@ -268,13 +297,24 @@ pub fn adapt_receive(
                     obj.entry("from").or_insert(cursor);
                 }
             }
-            "open_journal" => {
+            "create_journal" => {
+                // v0 servers returned `name`, `title`, `item_count`, `created`.
+                // Map `created: false` (already existed) to an error so the caller can return
+                // AlreadyExists. Strip both `item_count` and `created` from the success path
+                // so the adapted response is identical to a v1 server response.
                 obj.entry("name")
                     .or_insert_with(|| Value::String(String::new()));
                 obj.entry("title")
                     .or_insert_with(|| Value::String(String::new()));
-                obj.entry("item_count")
-                    .or_insert_with(|| Value::from(0usize));
+                obj.remove("item_count");
+                if let Some(Value::Bool(false)) = obj.remove("created") {
+                    let name = obj
+                        .get("name")
+                        .and_then(Value::as_str)
+                        .unwrap_or("")
+                        .to_string();
+                    return Err(AdaptError::AlreadyExists(name));
+                }
             }
             "archive_journal" => {
                 obj.entry("archived")
@@ -547,7 +587,7 @@ mod tests {
     #[test]
     fn adapt_send_errors_on_unknown_store_for_protocol_0() {
         let args = json!({ "store": "remote", "name": "j" });
-        let err = adapt_send(0, "open_journal", args).unwrap_err();
+        let err = adapt_send(0, "create_journal", args).unwrap_err();
         assert!(err.contains("store 'remote' not found"), "got: {err}");
     }
 
@@ -575,11 +615,29 @@ mod tests {
     }
 
     #[test]
-    fn adapt_send_noop_for_protocol_0_open_journal_with_implicit_store() {
+    fn adapt_send_noop_for_protocol_0_create_journal_with_implicit_store() {
         let args = json!({ "store": PROTOCOL_0_IMPLICIT_STORE, "name": "foo" });
-        let result = adapt_send(0, "open_journal", args).unwrap();
+        let result = adapt_send(0, "create_journal", args).unwrap();
         assert!(result.get("store").is_none(), "store should be stripped");
         assert_eq!(result["name"], json!("foo"));
+    }
+
+    // ── adapt_tool ────────────────────────────────────────────────────
+
+    #[test]
+    fn adapt_tool_rewrites_create_journal_for_protocol_0() {
+        assert_eq!(adapt_tool(0, "create_journal"), "open_journal");
+    }
+
+    #[test]
+    fn adapt_tool_keeps_create_journal_for_protocol_1() {
+        assert_eq!(adapt_tool(1, "create_journal"), "create_journal");
+    }
+
+    #[test]
+    fn adapt_tool_leaves_other_tools_unchanged_for_protocol_0() {
+        assert_eq!(adapt_tool(0, "sync_journal"), "sync_journal");
+        assert_eq!(adapt_tool(0, "list_journals"), "list_journals");
     }
 
     // ── adapt_receive ─────────────────────────────────────────────────
@@ -713,6 +771,39 @@ mod tests {
             "items": [], "added_ids": [], "from": 22, "total": 100
         });
         let result = adapt_receive(1, "sync_journal", raw.clone()).unwrap();
+        assert_eq!(result, raw);
+    }
+
+    #[test]
+    fn adapt_receive_create_journal_strips_item_count_and_created_for_protocol_0() {
+        let raw = json!({ "name": "j", "title": "T", "item_count": 0, "created": true });
+        let result = adapt_receive(0, "create_journal", raw).unwrap();
+        assert!(
+            result.get("item_count").is_none(),
+            "item_count should be stripped"
+        );
+        assert!(
+            result.get("created").is_none(),
+            "created should be stripped on success"
+        );
+        assert_eq!(result["name"], json!("j"));
+        assert_eq!(result["title"], json!("T"));
+    }
+
+    #[test]
+    fn adapt_receive_create_journal_errors_on_created_false_for_protocol_0() {
+        let raw = json!({ "name": "j", "title": "T", "item_count": 1, "created": false });
+        let err = adapt_receive(0, "create_journal", raw).unwrap_err();
+        assert!(
+            matches!(err, AdaptError::AlreadyExists(ref n) if n == "j"),
+            "expected AlreadyExists(\"j\")"
+        );
+    }
+
+    #[test]
+    fn adapt_receive_create_journal_passthrough_for_protocol_1() {
+        let raw = json!({ "name": "j", "title": "T" });
+        let result = adapt_receive(1, "create_journal", raw.clone()).unwrap();
         assert_eq!(result, raw);
     }
 }

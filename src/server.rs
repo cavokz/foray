@@ -1,7 +1,7 @@
 use crate::config::StoreRegistry;
 use crate::migrate;
 use crate::store::{Store, StoreError};
-use crate::types::{ItemType, JournalItem, Pagination, item_id, validate_name};
+use crate::types::{ItemType, JournalItem, Pagination, item_id, validate_name, validate_title};
 use chrono::Utc;
 use rmcp::handler::server::wrapper::Parameters;
 use rmcp::model::{
@@ -69,12 +69,11 @@ pub struct UnarchiveJournalParams {
 
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
-pub struct OpenJournalParams {
+pub struct CreateJournalParams {
     /// Journal name ([a-z0-9_-], max 64 chars)
     pub name: String,
-    /// Title for new journals (required when creating, ignored when reopening)
-    #[serde(default)]
-    pub title: Option<String>,
+    /// Title for the new journal
+    pub title: String,
     /// Journal-level metadata (free-form key-value pairs)
     #[serde(default)]
     pub meta: Option<HashMap<String, serde_json::Value>>,
@@ -162,11 +161,9 @@ struct StoreInfo {
 }
 
 #[derive(Serialize)]
-struct OpenJournalResponse {
+struct CreateJournalResponse {
     name: String,
     title: String,
-    item_count: usize,
-    created: bool,
 }
 
 #[derive(Serialize)]
@@ -212,7 +209,6 @@ pub struct SummarizeParams {
 // ── Server ──────────────────────────────────────────────────────────
 
 const MAX_CONTENT: usize = 64 * 1024;
-const MAX_TITLE: usize = 512;
 const MAX_TAGS: usize = 20;
 const MAX_TAG_LEN: usize = 64;
 const MAX_META: usize = 8 * 1024;
@@ -258,7 +254,7 @@ You have access to foray, a persistent journal system for capturing findings, de
 and context across sessions. \
 Always call `hello` first to obtain the nuance token and available stores list. \
 Then pass both `nuance` and a `store` name (from the `hello` stores list) on every subsequent tool call. \
-Use `list_journals` to see existing journals, `open_journal` to create or resume one, \
+Use `list_journals` to see existing journals, `create_journal` to start a new one, \
 and `sync_journal` to read and write items.\n\n\
 If the foray companion skill is not already loaded, read MCP resource `foray://skill` for full \
 workflow guidance — it teaches you when and how to use journal tools effectively, including \
@@ -428,59 +424,28 @@ impl ForayServer {
         )]))
     }
 
-    async fn do_open_journal(&self, args: OpenJournalParams) -> Result<CallToolResult, ErrorData> {
+    async fn do_create_journal(
+        &self,
+        args: CreateJournalParams,
+    ) -> Result<CallToolResult, ErrorData> {
         self.preflight(args.nuance.as_deref())?;
 
         validate_name(&args.name).map_err(|e| ErrorData::invalid_params(e, None))?;
         let store = self.resolve_store(args.store.as_deref())?;
 
-        let exists = store.exists(&args.name).await.map_err(Self::store_err)?;
-
-        if !exists {
-            let title = args.title.ok_or_else(|| {
-                ErrorData::invalid_params("title is required when creating a new journal", None)
-            })?;
-            let title = title.trim();
-            if title.is_empty() {
-                return Err(ErrorData::invalid_params("title must not be empty", None));
-            }
-            if title.len() > MAX_TITLE {
-                return Err(ErrorData::invalid_params(
-                    format!(
-                        "title exceeds {MAX_TITLE} char limit ({} chars)",
-                        title.len()
-                    ),
-                    None,
-                ));
-            }
-            let title = title.to_string();
-            validate_meta(&args.meta)?;
-            store
-                .create(&args.name, title.clone(), args.meta)
-                .await
-                .map_err(Self::store_err)?;
-            let resp = OpenJournalResponse {
-                name: args.name,
-                title,
-                item_count: 0,
-                created: true,
-            };
-            Ok(CallToolResult::success(vec![Content::text(
-                serde_json::to_string(&resp).unwrap(),
-            )]))
-        } else {
-            let p = Pagination { from: 0, size: 0 };
-            let (j, total) = store.load(&args.name, &p).await.map_err(Self::store_err)?;
-            let resp = OpenJournalResponse {
-                name: j.name,
-                title: j.title,
-                item_count: total,
-                created: false,
-            };
-            Ok(CallToolResult::success(vec![Content::text(
-                serde_json::to_string(&resp).unwrap(),
-            )]))
-        }
+        let title = validate_title(&args.title).map_err(|e| ErrorData::invalid_params(e, None))?;
+        validate_meta(&args.meta)?;
+        store
+            .create(&args.name, title.clone(), args.meta)
+            .await
+            .map_err(Self::store_err)?;
+        let resp = CreateJournalResponse {
+            name: args.name,
+            title,
+        };
+        Ok(CallToolResult::success(vec![Content::text(
+            serde_json::to_string(&resp).unwrap(),
+        )]))
     }
 
     async fn do_sync_journal(&self, args: SyncJournalParams) -> Result<CallToolResult, ErrorData> {
@@ -619,19 +584,19 @@ impl ForayServer {
     }
 
     #[tool(
-        name = "open_journal",
-        description = "Create or reopen a journal. title is required when creating (error if missing), ignored when reopening. Idempotent if journal exists."
+        name = "create_journal",
+        description = "Create a new journal. title is required. Returns AlreadyExists if the journal already exists."
     )]
-    async fn open_journal(
+    async fn create_journal(
         &self,
-        Parameters(args): Parameters<OpenJournalParams>,
+        Parameters(args): Parameters<CreateJournalParams>,
     ) -> Result<CallToolResult, ErrorData> {
         eprintln!(
-            "open_journal ({}) {}",
+            "create_journal ({}) {}",
             Self::sanitize(args.store.as_deref().unwrap_or("?")),
             Self::sanitize(&args.name)
         );
-        self.do_open_journal(args)
+        self.do_create_journal(args)
             .await
             .inspect_err(|e| eprintln!("error: {}", Self::sanitize(&e.message)))
     }
@@ -734,7 +699,7 @@ impl ForayServer {
                 First call `hello` to get the nuance token. \
                 Then check for existing journals with `list_journals` (pass nuance). \
                 Then create a new journal named \"{}\" with title \"{}\" using \
-                `open_journal` (pass nuance). \
+                `create_journal` (pass nuance). \
                 Record items as you work with `sync_journal` (always pass nuance).",
                 args.name, args.title
             ),
@@ -995,6 +960,15 @@ mod tests {
             "expected 'already exists' in message, got: {}",
             err.message
         );
+        assert_eq!(
+            err.data.as_ref().and_then(|d| d["type"].as_str()),
+            Some("journal_already_exists")
+        );
+        assert_eq!(
+            err.data.as_ref().and_then(|d| d["name"].as_str()),
+            Some("my-journal")
+        );
+        assert!(err.data.as_ref().and_then(|d| d["hint"].as_str()).is_some());
     }
 
     #[test]
@@ -1176,20 +1150,20 @@ mod tests {
         assert_eq!(json["stores"][0]["name"], "local");
     }
 
-    // ── open_journal title validation ──────────────────────────────
+    // ── create_journal title validation ──────────────────────────────
 
     #[tokio::test]
-    async fn open_journal_rejects_empty_title() {
+    async fn create_journal_rejects_empty_title() {
         let server = test_server();
         let nuance = server.registry.nuance.clone();
-        let args = Parameters(OpenJournalParams {
+        let args = Parameters(CreateJournalParams {
             name: "new-journal".into(),
-            title: Some("".into()),
+            title: "".into(),
             meta: None,
             store: Some("local".into()),
             nuance: Some(nuance),
         });
-        let err = server.open_journal(args).await.unwrap_err();
+        let err = server.create_journal(args).await.unwrap_err();
         assert!(
             err.message.contains("empty"),
             "expected 'empty' in message, got: {}",
@@ -1198,30 +1172,61 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn open_journal_rejects_whitespace_only_title() {
+    async fn create_journal_rejects_whitespace_only_title() {
         let server = test_server();
         let nuance = server.registry.nuance.clone();
-        let args = Parameters(OpenJournalParams {
+        let args = Parameters(CreateJournalParams {
             name: "new-journal".into(),
-            title: Some("   ".into()),
+            title: "   ".into(),
             meta: None,
             store: Some("local".into()),
             nuance: Some(nuance),
         });
-        let err = server.open_journal(args).await.unwrap_err();
+        let err = server.create_journal(args).await.unwrap_err();
         assert!(
             err.message.contains("empty"),
             "expected 'empty' in message, got: {}",
             err.message
+        );
+    }
+
+    #[tokio::test]
+    async fn create_journal_rejects_duplicate() {
+        let server = test_server();
+        let nuance = server.registry.nuance.clone();
+        let make_args = |nuance: String| {
+            Parameters(CreateJournalParams {
+                name: "dup-journal".into(),
+                title: "Dup".into(),
+                meta: None,
+                store: Some("local".into()),
+                nuance: Some(nuance),
+            })
+        };
+        server
+            .create_journal(make_args(nuance.clone()))
+            .await
+            .expect("first create should succeed");
+        let err = server.create_journal(make_args(nuance)).await.unwrap_err();
+        assert_eq!(
+            err.data.as_ref().and_then(|d| d["type"].as_str()),
+            Some("journal_already_exists"),
+            "expected structured journal_already_exists error, got: {:?}",
+            err
+        );
+        assert_eq!(
+            err.data.as_ref().and_then(|d| d["name"].as_str()),
+            Some("dup-journal")
         );
     }
 
     // ── Tool param store field deserialization ─────────────────────
 
     #[test]
-    fn open_journal_params_store_field() {
-        let p: OpenJournalParams =
-            serde_json::from_str(r#"{"name":"j","store":"local","nuance":"abc"}"#).unwrap();
+    fn create_journal_params_store_field() {
+        let p: CreateJournalParams =
+            serde_json::from_str(r#"{"name":"j","title":"T","store":"local","nuance":"abc"}"#)
+                .unwrap();
         assert_eq!(p.store.as_deref(), Some("local"));
         assert_eq!(p.nuance.as_deref(), Some("abc"));
     }

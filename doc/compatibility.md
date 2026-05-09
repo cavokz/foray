@@ -56,8 +56,8 @@ When connected to a protocol 0 server, `adapt_send` and `adapt_receive` wrap eve
 | `list_journals` with `archived: true` | Send | Cannot adapt — archive feature did not exist in v0.2.0 | Error: *"archived journals not supported by protocol 0 server; upgrade the remote foray"* |
 | `archive_journal` / `unarchive_journal` | Send | Tool did not exist in v0.2.0 | Error: *"'archive_journal' is not supported by protocol 0 server; upgrade the remote foray"* |
 | `hello` response missing `protocol`, `stores` | Receive | `adapt_receive` injects `protocol: 0`, synthesises `stores: [{name:"local", …}]` | Transparent |
-| `sync_journal` response missing `id` | Receive | `adapt_receive` injects `id: "<unknown>"` | Transparent (callers see `<unknown>` as journal ID) |
-| `open_journal` response missing `name`, `title`, `item_count` | Receive | `adapt_receive` injects empty/zero defaults | Transparent |
+| `create_journal` | Send | Rewrites tool name to `open_journal` (via `adapt_tool`) | Transparent |
+| `create_journal` response `item_count`, `created` | Receive | `adapt_receive` strips `item_count`; maps `created: false` → `AdaptError::AlreadyExists` → `StoreError::AlreadyExists`; strips `created` on success | Transparent on success; error on conflict |
 | `list_journals` response missing `limit`, `offset` | Receive | `adapt_receive` injects `null` for both | Transparent |
 
 ---
@@ -100,7 +100,7 @@ Protocol bumps affect the wire envelope between `StdioStore` and the foray MCP s
 
 ## `deny_unknown_fields` — The Enforcement Backstop
 
-All wire structs (`HelloWire`, `SyncJournalWire`, `OpenJournalWire`, etc.) use `#[serde(deny_unknown_fields)]`. This turns adaptation gaps into loud failures rather than silent data loss.
+All wire structs (`HelloWire`, `SyncJournalWire`, `CreateJournalWire`, etc.) use `#[serde(deny_unknown_fields)]`. This turns adaptation gaps into loud failures rather than silent data loss.
 
 | Scenario | Effect |
 |---|---|
