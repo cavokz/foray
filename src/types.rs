@@ -176,6 +176,24 @@ pub fn item_id() -> String {
     format!("{}-{}-{}-{}", &c[..4], &c[4..8], &c[8..12], &c[12..16])
 }
 
+const MAX_TITLE: usize = 512;
+
+/// Validate and normalise a journal title: trim whitespace, non-empty, max 512 Unicode chars.
+/// Returns the trimmed title on success.
+pub fn validate_title(title: &str) -> Result<String, String> {
+    let trimmed = title.trim();
+    if trimmed.is_empty() {
+        return Err("title must not be empty".into());
+    }
+    let char_count = trimmed.chars().count();
+    if char_count > MAX_TITLE {
+        return Err(format!(
+            "title exceeds {MAX_TITLE} char limit ({char_count} chars)",
+        ));
+    }
+    Ok(trimmed.to_string())
+}
+
 /// Validate a journal name: `[a-z0-9_-]`, non-empty, max 64 chars.
 pub fn validate_name(name: &str) -> Result<(), String> {
     if name.is_empty() {
@@ -196,6 +214,56 @@ pub fn validate_name(name: &str) -> Result<(), String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn valid_titles() {
+        let t = validate_title("My Journal").unwrap();
+        assert_eq!(t, "My Journal");
+    }
+
+    #[test]
+    fn title_trimmed() {
+        let t = validate_title("  spaces  ").unwrap();
+        assert_eq!(t, "spaces");
+    }
+
+    #[test]
+    fn title_rejects_empty() {
+        let e = validate_title("").unwrap_err();
+        assert!(e.contains("empty"), "{e}");
+    }
+
+    #[test]
+    fn title_rejects_whitespace_only() {
+        let e = validate_title("   ").unwrap_err();
+        assert!(e.contains("empty"), "{e}");
+    }
+
+    #[test]
+    fn title_rejects_too_long() {
+        let long = "a".repeat(MAX_TITLE + 1);
+        let e = validate_title(&long).unwrap_err();
+        assert!(e.contains("exceeds"), "{e}");
+    }
+
+    #[test]
+    fn title_accepts_max_len() {
+        let exact = "a".repeat(MAX_TITLE);
+        assert!(validate_title(&exact).is_ok());
+    }
+
+    #[test]
+    fn title_counts_unicode_chars_not_bytes() {
+        // "é" is 2 bytes but 1 char — 512 of them must be accepted, 513 rejected.
+        let ok = "é".repeat(MAX_TITLE);
+        assert!(
+            validate_title(&ok).is_ok(),
+            "512 multibyte chars should be accepted"
+        );
+        let too_long = "é".repeat(MAX_TITLE + 1);
+        let e = validate_title(&too_long).unwrap_err();
+        assert!(e.contains("exceeds"), "{e}");
+    }
 
     #[test]
     fn valid_names() {

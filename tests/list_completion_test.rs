@@ -22,10 +22,10 @@ fn run_foray(home: &std::path::Path, args: &[&str]) -> std::process::Output {
 }
 
 fn create_journal(home: &std::path::Path, name: &str, title: &str) {
-    let out = run_foray(home, &["open", name, "--title", title]);
+    let out = run_foray(home, &["create", name, "--title", title]);
     assert!(
         out.status.success(),
-        "open failed: {}",
+        "create failed: {}",
         String::from_utf8_lossy(&out.stderr)
     );
 }

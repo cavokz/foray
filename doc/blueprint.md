@@ -5,6 +5,8 @@ A **Rust MCP server + CLI** that gives any AI assistant persistent investigation
 
 **Tagline:** *"Start with a foray. Keep the trail."*
 
+**Related docs:** [sequences.md](sequences.md) — runtime flow diagrams (hello, create_journal, sync_journal, StdioStore connect, protocol 0 compat, schema migration). [compatibility.md](compatibility.md) — schema and protocol versioning rules.
+
 ## Positioning
 
 **Problem**: AI assistants lose context between sessions. When a conversation ends, findings, decisions, and in-progress work vanish. And when multiple assistants — or people — work across clients and machines, their context stays siloed.
@@ -66,8 +68,8 @@ No project concept. No global active state.
 | Surface | Mechanism | Set by |
 |---------|-----------|--------|
 | **MCP server** | Fully stateless — every tool takes explicit journal name | N/A |
-| **CLI journal** | Resolution chain: `--journal` > `FORAY_JOURNAL` > `.forayrc current-journal` walk-up > error | User / `foray open` |
-| **CLI store** | Resolution chain: `--store` > `FORAY_STORE` > `.forayrc current-store` walk-up > registry default (single-store) or error | User / `foray open` |
+| **CLI journal** | Resolution chain: `--journal` > `FORAY_JOURNAL` > `.forayrc current-journal` walk-up > error | User |
+| **CLI store** | Resolution chain: `--store` > `FORAY_STORE` > `.forayrc current-store` walk-up > registry default (single-store) or error | User |
 
 ### `.forayrc` (TOML)
 ```toml
@@ -76,10 +78,9 @@ current-store = "remote"
 root = true
 ```
 - `current-journal` — optional, journal name for CLI resolution
-- `current-store` — optional, store name for CLI resolution; written by `foray open --store <name>`
+- `current-store` — optional, store name for CLI resolution
 - `root = true` — optional, stops the upward directory walk
 - First `.forayrc` with the relevant key wins; `root = true` halts the walk regardless
-- `foray open` writes/updates `current-journal` (and `current-store` when `--store` was given) in `.forayrc` in current directory
 - Users can `.gitignore` or commit it
 
 ## Storage (default: `JsonFileStore`)
@@ -184,7 +185,7 @@ The `initialize` response includes `serverInfo` with:
 ### Server Instructions (bootstrap)
 Sent to every client on initialization via the MCP `instructions` field:
 
-> You have access to foray, a persistent journal system for capturing findings, decisions, and context across sessions. Always call `hello` first to obtain the nuance token and available stores list. Then pass both `nuance` and a `store` name (from the `hello` stores list) on every subsequent tool call. Use `list_journals` to see existing journals, `open_journal` to create or resume one, and `sync_journal` to read and write items.
+> You have access to foray, a persistent journal system for capturing findings, decisions, and context across sessions. Always call `hello` first to obtain the nuance token and available stores list. Then pass both `nuance` and a `store` name (from the `hello` stores list) on every subsequent tool call. Use `list_journals` to see existing journals, `create_journal` to create a new one, and `sync_journal` to read and write items.
 >
 > If the foray companion skill is not already loaded, read MCP resource `foray://skill` for full workflow guidance — it teaches you when and how to use journal tools effectively, including pagination, parallelism, corrections, and how to anchor findings to source code.
 >
@@ -208,7 +209,7 @@ Prompts are the fallback for LLMs without the companion skill. They provide just
 | Tool | Params | Description |
 |------|--------|-------------|
 | `hello` | *(none)* | Establish handshake. Returns `{ version, nuance, protocol, stores, skill_uri }`. Always call first — every session — then pass `nuance` and `store` on subsequent calls. `skill_uri` is the MCP resource URI for the companion skill (`foray://skill`). |
-| `open_journal` | `name`, `title?`, `meta?`, `store`, `nuance` | Create or reopen a journal. `title` is required when creating (error if missing), ignored when reopening. Idempotent if journal exists. `meta` sets journal-level metadata. `store` must be a name from the `hello` response. |
+| `create_journal` | `name`, `title`, `meta?`, `store`, `nuance` | Create a new journal. `title` is required (non-empty, error if missing). Returns `AlreadyExists` if the journal already exists. `meta` sets journal-level metadata. `store` must be a name from the `hello` response. |
 | `sync_journal` | `name`, `from`, `size`, `items?`, `store`, `nuance` | Read and write journal items in one call. `from` is a plain integer offset (0 = start). `size` limits returned items — the caller is responsible for choosing a size that fits within their output budget (does not affect additions). `items` is an array of `{ content, item_type?, tags?, meta? }`. Use `meta.ref` for file paths, URLs, ticket links, PR links, or cross-journal references (`foray:name`). Returns `from` for the next call (= next offset) and `added_ids` for items added by this call. `store` must be a name from the `hello` response. |
 | `list_journals` | `archived?`, `store`, `nuance` | List journals in the selected store. Pass `archived: true` to list archived journals instead of active ones. Returns all journals in one call. Each entry includes `avg_item_size` and `std_item_size` (serialized JSON byte sizes) — use these to compute a safe `size` for `sync_journal`: `floor(output_budget / (avg_item_size + 2 × std_item_size))`. |
 | `archive_journal` | `name`, `store`, `nuance` | Archive a journal. Archived journals are readable but not writable. |
@@ -218,11 +219,11 @@ All tools return JSON. No in-memory state. Every tool that operates on a journal
 
 **Append-only design**: journals are append-only. Wrong findings are corrected by adding a new item explaining the correction, not by deleting. This preserves the full trail, prevents re-exploring dead ends, and avoids conflicts in cross-client scenarios.
 
-### `open_journal` behavior
+### `create_journal` behavior
 | `name` exists? | Result |
 |---|---|
-| No | Create empty journal (`title` required, error if missing) |
-| Yes | Return existing (idempotent, `title` ignored) |
+| No | Create empty journal (`title` required, error if missing or whitespace-only) |
+| Yes | Error `AlreadyExists` |
 
 ### Nuance + Preflight
 
@@ -251,7 +252,7 @@ Errors include a structured `data` object with machine-readable fields for progr
 
 ### Tool response formats
 - `hello` → `{ version, nuance, protocol, stores: [{name, description}], skill_uri }` (e.g. `{ "version": "1.2.3", "nuance": "abc123", "protocol": 1, "stores": [{"name": "local", "description": "Default local journal store"}], "skill_uri": "foray://skill" }`). `skill_uri` is the MCP resource URI for the companion skill — clients can fetch it via `resources/read` when the skill is not installed locally. Protocol 0 servers don't emit this field; `adapt_receive` synthesises it as `""`.
-- `open_journal` → `{ name, title, item_count, created }` (`created: bool` — true if new)
+- `create_journal` → `{ name, title }` (name and title of the created journal)
 - `sync_journal` → `{ schema, name, title, items: [...], added_ids: [...], from, total }` (`schema` is the wire protocol schema version; `from` is the next offset for subsequent calls; `added_ids` lists IDs assigned to items added by this call in order)
 - `list_journals` → `{ journals: [{ name, title, item_count, avg_item_size?, std_item_size?, schema?, meta?, error? }], total }` (pass `archived: true` to list archived journals; `avg_item_size` and `std_item_size` are serialized JSON byte sizes — `avg_item_size` absent for empty journals or old servers; `std_item_size` also absent for single-item journals; `schema` is the on-disk schema version — present whenever the file is parseable as a JSON object; `error` is present for journals that could not be fully loaded, in which case `title` is empty and `item_count` is 0)
 - `archive_journal` → `{ archived: "<name>" }`
@@ -264,7 +265,7 @@ Each MCP tool invocation is traced to **stderr** (stdout carries the JSON-RPC wi
 | Tool | Log line |
 |------|----------|
 | `hello` | `hello` |
-| `open_journal` | `open_journal (<store>) <name>` |
+| `create_journal` | `create_journal (<store>) <name>` |
 | `sync_journal` | `sync_journal (<store>) <name> from=N size=N [+N items]` — `+N items` omitted when absent |
 | `list_journals` | `list_journals (<store>) [archived]` |
 | `archive_journal` | `archive_journal (<store>) <name>` |
@@ -276,7 +277,7 @@ Each MCP tool invocation is traced to **stderr** (stdout carries the JSON-RPC wi
 foray serve                          # Start MCP stdio server
 foray show [name] [--json]  # Full journal with items
 foray add <content> [--type TYPE] [--ref REF] [--tags CSV] [--meta KEY=VALUE]...
-foray open <name> [--title "..."] [--meta KEY=VALUE]...  # Create or reopen. --title required for new journals.
+foray create <name> --title "..." [--meta KEY=VALUE]...  # Always creates; --title required.
 foray list [--json] [--archived] [--completion]  # List journals. --archived shows archived. --json outputs {"total": N, "journals": [...]}. --completion outputs bare names (for shell scripts).
 foray archive <name>                   # Archive a journal
 foray unarchive <name>                 # Unarchive a journal
@@ -293,8 +294,8 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 
 `foray list --completion` outputs bare journal names one per line. Respects `--archived` and `--store`. Used internally by dynamic completion and usable independently in shell scripts. Covered by integration tests in `tests/list_completion_test.rs`.
 
-`open` creates the journal, writes `.forayrc` in cwd.
-- `foray open deep-dive --title "Explore DB connection pooling theory"` → create empty journal, write `.forayrc`
+`foray create` creates the journal.
+- `foray create deep-dive --title "Explore DB connection pooling theory"` → create empty journal
 
 **Journal resolution for CLI** (show, add):
 1. `--journal` flag if provided
@@ -341,7 +342,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
    - `nuance` is a FNV-1a hash of the full parsed config serialized to JSON (capturing all fields of all stores automatically) plus `"schema=N"` and `"protocol=N"` — deterministic, stable across restarts, changes when any config field, schema, or protocol version changes. The implicit local store is represented as a synthetic single-entry `RawConfig` through the same code path. `RawConfig` and `RawStoreConfig` derive both `Deserialize` and `Serialize`.
    - `StoreRegistry::get(name)` — look up by name; `default_store()` — first entry; `names_hint()` — comma-joined names for error messages
    - `StoreRegistry::load()` — public constructor; `StoreRegistry::implicit_local()` — fallback constructor
-5. `store_stdio.rs` — `StdioStore`: spawns subprocess via rmcp `TokioChildProcess` (stderr piped), performs MCP `initialize` handshake via `serve_client`, caches remote `nuance` + `store_name` + `protocol` obtained from `hello`. Checks `hello.protocol` against `migrate::CURRENT_PROTOCOL` at connect time — returns `StoreError::ProtocolTooNew` if the server's protocol is newer. Subprocess stderr handling is split by phase: during the `serve_client` handshake the stderr handle is held locally — on failure it is drained with a 500 ms `tokio::time::timeout` (EOF is immediate if the process died; the timeout bounds the wait if it is still alive), forwarded to the server log via `eprint!("[remote stderr] …")`, and the captured output is appended to the error (e.g. `ssh: connect to host … No route to host`). After a successful handshake a background task takes ownership of the stderr handle, forwards every chunk to the server log via `eprint!("[remote stderr] …")`, and accumulates output into a bounded 4 KB buffer; on a transport failure in `call_mcp` the buffer contents are appended to the error. The buffer is cleared on every successful tool call so stale output does not bleed into future errors. All `Store` trait methods map to MCP tool calls via a generic `call_mcp::<T>` that wraps each outbound call with `migrate::adapt_send(server_protocol, tool, args)` and each inbound response with `migrate::adapt_receive(server_protocol, tool, raw_json)` before typed deserialization. Wire structs all use `#[serde(deny_unknown_fields)]` — this is intentional: any field added in a future protocol must be declared in the struct *and* synthesised by `adapt_receive` for old servers, guaranteeing `adapt_receive` tells the whole compatibility story. Typed wire structs: `HelloWire`, `SyncJournalWire`, `OpenJournalWire`, `ListJournalsWire`, `ArchiveWire`, `UnarchiveWire`. Connection is lazily established and cached in `Mutex<Option<Connection>>`; `Peer<RoleClient>` is cloned out before `.await` to avoid holding the lock across the await point.
+5. `store_stdio.rs` — `StdioStore`: spawns subprocess via rmcp `TokioChildProcess` (stderr piped), performs MCP `initialize` handshake via `serve_client`, caches remote `nuance` + `store_name` + `protocol` obtained from `hello`. Checks `hello.protocol` against `migrate::CURRENT_PROTOCOL` at connect time — returns `StoreError::ProtocolTooNew` if the server's protocol is newer. Subprocess stderr handling is split by phase: during the `serve_client` handshake the stderr handle is held locally — on failure it is drained with a 500 ms `tokio::time::timeout` (EOF is immediate if the process died; the timeout bounds the wait if it is still alive), forwarded to the server log via `eprint!("[remote stderr] …")`, and the captured output is appended to the error (e.g. `ssh: connect to host … No route to host`). After a successful handshake a background task takes ownership of the stderr handle, forwards every chunk to the server log via `eprint!("[remote stderr] …")`, and accumulates output into a bounded 4 KB buffer; on a transport failure in `call_mcp` the buffer contents are appended to the error. The buffer is cleared on every successful tool call so stale output does not bleed into future errors. All `Store` trait methods map to MCP tool calls via a generic `call_mcp::<T>` that wraps each outbound call with `migrate::adapt_send(server_protocol, tool, args)` and each inbound response with `migrate::adapt_receive(server_protocol, tool, raw_json)` before typed deserialization. Wire structs all use `#[serde(deny_unknown_fields)]` — this is intentional: any field added in a future protocol must be declared in the struct *and* synthesised by `adapt_receive` for old servers, guaranteeing `adapt_receive` tells the whole compatibility story. Typed wire structs: `HelloWire`, `SyncJournalWire`, `CreateJournalWire`, `ListJournalsWire`, `ArchiveWire`, `UnarchiveWire`. Connection is lazily established and cached in `Mutex<Option<Connection>>`; `Peer<RoleClient>` is cloned out before `.await` to avoid holding the lock across the await point.
 
    **Trust model**: `StdioStore` spawns arbitrary commands from `~/.foray/config.toml` by design — this is the mechanism that enables SSH remotes and other transports. The config file must be user-controlled; its integrity is the security boundary. Foray does not sandbox or validate the spawned command. The file should be readable and writable only by the user.
 
@@ -352,8 +353,8 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 2. `resolve_store(store_name: Option<&str>)` — returns `invalid_params` error (with store names hint) if `None` (`store` is required); else calls `registry.get(name)` or `invalid_params` error with store names hint if unknown.
 3. Server `instructions` field — bootstrap hint directing LLMs without the companion skill to fetch the `foray://skill` MCP resource for full workflow guidance.
 4. 3 MCP prompts: `start_journal`, `resume_journal`, `summarize`.
-5. 6 tools via `#[tool_router]`. Every tool that operates on a journal takes explicit `name`, `store`, and `nuance` params. Tools that take a journal `name` (`open_journal`, `sync_journal`, `archive_journal`, `unarchive_journal`) validate it with `validate_name()` and return `invalid_params` on violation before any store access.
-6. `open_journal` implements create-or-reopen (idempotent) logic.
+5. 6 tools via `#[tool_router]`. Every tool that operates on a journal takes explicit `name`, `store`, and `nuance` params. Tools that take a journal `name` (`create_journal`, `sync_journal`, `archive_journal`, `unarchive_journal`) validate it with `validate_name()` and return `invalid_params` on violation before any store access.
+6. `create_journal` implements strict create-only semantics — returns `AlreadyExists` if the journal already exists.
 7. 1 MCP resource: `foray://skill` — the companion skill (`skills/foray/SKILL.md`) embedded at compile time via `include_str!`. Returned as `text/markdown`. Advertised in `ServerCapabilities` via `enable_resources()`. The `hello` response includes `skill_uri: "foray://skill"` so agents can discover and fetch it after the initial handshake.
 
 ### Phase 4: CLI + Main *(parallel with Phase 3)*
@@ -363,7 +364,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 4. `find_forayrc(start_dir) -> Option<String>` — walk up from cwd looking for `.forayrc`, parse TOML, return `current-journal` value. Stop at `root = true` or filesystem root.
 5. `find_store_in_forayrc(start_dir) -> Option<String>` — same walk, returns `current-store` value.
 6. `main.rs` — parse CLI, load `StoreRegistry`, call `resolve_store()`, route subcommands. `serve` → MCP server. Everything else → resolve journal + store via chains, call store, format output.
-7. `open` handler: create journal, write `.forayrc` in cwd (includes `current-store` if `--store` was passed).
+7. `create` handler: create journal, return success.
 
 ### Phase 5: Setup Guide + Companion Skill + README + Config
 
@@ -386,7 +387,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
     - `user-invocable: true` (auto-triggered by the agent and also available as a slash command)
 
     **Use cases the skill should guide:**
-    - **Starting an investigation** — user says "I need to figure out why X." LLM suggests `open_journal`, starts adding findings as it discovers things.
+    - **Starting an investigation** — user says "I need to figure out why X." LLM suggests `create_journal`, starts adding findings as it discovers things.
     - **Resuming work** — new chat session, user says "continue on the auth thing." LLM calls `list_journals`, finds the journal, calls `sync_journal` to reload, picks up where it left off.
     - **Multiple journals** — LLM creates separate journals for distinct threads of investigation. Agents move items between journals via `sync_journal` as needed.
     - **Passive recording** — during code review or debugging, LLM spots important things and adds findings/decisions to the current journal without being asked.
@@ -395,7 +396,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 
     **Behavioral rules:**
     - Call `list_journals` before creating new journals, suggest existing ones
-    - When opening an existing journal, omit `title`. When creating, always provide `title`.
+    - When creating a new journal, always provide `title`.
     - Use `meta.ref` for file paths, URLs, ticket links, PR links
     - When adding items in a version-controlled checkout, set `meta.vcs-repo` (remote URL), `meta.vcs-branch`, and `meta.vcs-revision` (commit SHA, changelist number, etc.) on the item — anchors each `meta.ref` to an exact codebase state
     - To cross-reference another journal, use `meta.ref: "foray:journal-name"` as a free-form notation
@@ -413,25 +414,25 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 
 ### Phase 6: CI + Test + Polish
 1. `.github/workflows/ci.yml` — 3-platform matrix (ubuntu, macos, windows)
-2. Unit tests: store CRUD, journal resolution chain, forayrc walk-up, open_journal behavior
+2. Unit tests: store CRUD, journal resolution chain, forayrc walk-up, create_journal behavior
 3. `cargo fmt --all -- --check`, `cargo clippy --all-targets -- -D warnings`, `cargo test`
 4. Manual smoke test: CLI + MCP integration
 5. Demo video (5 min)
 
 ## Verification
-1. `cargo test` — store CRUD, journal resolution, forayrc walk-up, open_journal
+1. `cargo test` — store CRUD, journal resolution, forayrc walk-up, create_journal
 2. `cargo build --release` — clean binary
 3. CLI smoke test:
-   - `foray open auth-triage --title "Auth cache investigation"` → creates journal + `.forayrc`
-   - `foray add "found bug" --type finding` → uses .forayrc
-   - `foray add "race condition" --type finding` → adds to auth-triage
+   - `foray create auth-triage --title "Auth cache investigation"` → creates journal
+   - `foray add "found bug" --type finding --journal auth-triage` → adds item (explicit journal)
+   - `FORAY_JOURNAL=auth-triage foray add "race condition" --type finding` → adds via env
    - `foray show auth-triage` → shows items
    - `foray list` → journal list
    - `FORAY_JOURNAL=other foray show` → env override
    - `foray show --journal explicit` → flag override
 4. MCP integration:
    - Configure in VS Code → tools appear
-   - `open_journal(name: "auth-triage", title: "Auth cache investigation")` → creates journal
+   - `create_journal(name: "auth-triage", title: "Auth cache investigation")` → creates journal
    - `sync_journal(name: "auth-triage", items: [{ content: "..." }])` → adds item
    - `list_journals` → flat list
 5. Companion skill auto-triggers in VS Code
@@ -439,11 +440,11 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 ## Decisions
 - No project concept — flat namespace, descriptive journal names
 - No `.active` file — server is fully stateless, CLI uses .forayrc + env + flag
-- `open_journal(name, title?)` — single tool for create and reopen. Idempotent.
-- `.forayrc` — TOML, `current-journal` + `root`, searched cwd-upward. Written by `foray open`.
+- `create_journal(name, title)` — strict create-only, `AlreadyExists` if already present. `title` always mandatory.
+- `.forayrc` — TOML, `current-journal` + `root`, searched cwd-upward. Written manually by the user.
 - `#[serde(deny_unknown_fields)]` + `meta: Option<HashMap>` on JournalFile + JournalItem — strict schema with extensibility via meta
 - Store trait is pure CRUD — no session/active state
-- Journal creation requires explicit `open_journal` — `sync_journal` with items to non-existent journal is an error
+- Journal creation requires explicit `create_journal` — `sync_journal` with items to non-existent journal is an error
 - Companion skill encodes behavioral rules (suggest existing journals, append corrections not deletions)
 - **Binary = stable platform, skill = evolving product**: binary rarely changes (6 tools, storage), skill evolves with better prompting and use case patterns. Distributed independently.
 - **No `foray skill` command**: companion skill is downloaded from GitHub, not embedded in binary
@@ -452,7 +453,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 - Rust with official `rmcp` SDK, stdio transport, pluggable journal store (ships with `JsonFileStore`: JSON files, atomic writes)
 - **Out of scope**: UI, auto-summarization, remote sync, `edit_item` tool, `remove_item` tool
 - **Append-only journals**: wrong findings are corrected by adding a new item, not deleting. Preserves the trail, prevents re-exploring dead ends, avoids cross-client conflicts.
-- **Archive**: MCP tools `archive_journal` and `unarchive_journal` (also available via CLI). Archived journals are readable; `sync_journal` writes with items error while a journal is archived, while `open_journal` reopens archived journals idempotently. `unarchive_journal` can also restore explicitly. `list_journals` with `archived: true` lists archived journals. `JsonFileStore` implements this by moving files to an `archive/` subdirectory. `StdioStore` implements all archive operations via MCP tool calls.
+- **Archive**: MCP tools `archive_journal` and `unarchive_journal` (also available via CLI). Archived journals are readable; `sync_journal` writes with items error while a journal is archived. `unarchive_journal` restores explicitly. `list_journals` with `archived: true` lists archived journals. `JsonFileStore` implements this by moving files to an `archive/` subdirectory. `StdioStore` implements all archive operations via MCP tool calls.
 - **Companion skill**: `user-invocable: true` — auto-triggered by the agent when foray tools are in use, and also available as a slash command for explicit invocation
 - **Name**: "foray" — short, memorable, evocative of venturing into new territory. Tagline: "Start with a foray. Keep the trail."
 - **Positioning**: Not "another memory tool" (100+ exist). Persistent, cross-client context fusion via plain JSON files.
@@ -464,7 +465,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 
 ## Resolved Design Questions
 - **Journal name validation**: Strict `[a-z0-9_-]` only. Reject everything else at creation time.
-- **First use**: Explicit — `sync_journal` with items to non-existent journal is an error. Use `open_journal` first.
+- **First use**: Explicit — `sync_journal` with items to non-existent journal is an error. Use `create_journal` first.
 - **Item counts**: Single count per journal (files are self-contained).
 - **Concurrency**: `add_items` (store method) locks a `{name}.lock` sidecar file via `fs2::lock_exclusive` during read-modify-write. Concurrent adds from multiple MCP server processes or CLI are serialized. Append-only — no conflicts.
 - **Input limits** (server-side, write path): content max 64KB, title non-empty and max 512 chars, max 20 tags each max 64 chars, meta max 8KB serialized. Read path also validates: `read_journal` and `load` reject journals with empty or whitespace-only `name` or `title`; `list_journals` surfaces invalid files as error entries (with `error` set and `schema` populated when the JSON was at least parseable).

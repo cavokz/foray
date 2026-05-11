@@ -16,7 +16,7 @@ use tokio::io::AsyncReadExt;
 use tokio::process::Command;
 use tokio::sync::Mutex;
 
-use crate::migrate::{self, MigrateResult};
+use crate::migrate::{self, AdaptError, MigrateResult};
 use crate::store::{Store, StoreError};
 use crate::types::{JournalFile, JournalItem, JournalSummary, Pagination};
 
@@ -69,14 +69,11 @@ struct SyncJournalWire {
 
 #[derive(Deserialize)]
 #[serde(deny_unknown_fields)]
-struct OpenJournalWire {
+struct CreateJournalWire {
     #[allow(dead_code)]
     name: String,
     #[allow(dead_code)]
     title: String,
-    #[allow(dead_code)]
-    item_count: usize,
-    created: bool,
 }
 
 #[derive(Deserialize)]
@@ -303,7 +300,16 @@ impl StdioStore {
         // serde before check_protocol runs. Checking on the raw protocol value
         // ensures ProtocolTooNew is always surfaced correctly.
         check_protocol(server_protocol)?;
-        let adapted = migrate::adapt_receive(server_protocol, "hello", raw).map_err(io_err)?;
+        let adapted =
+            migrate::adapt_receive(server_protocol, "hello", raw).map_err(|e| match e {
+                AdaptError::NonObject(msg) => io_err(msg),
+                // AlreadyExists is only meaningful for create-style flows; receiving
+                // it here indicates a bug in adapt_receive.
+                AdaptError::AlreadyExists(name) => io_err(format!(
+                    "invariant violated: adapt_receive returned AlreadyExists({name:?}) for \
+                     the hello tool, which has no already-exists semantics"
+                )),
+            })?;
         let hello: HelloWire =
             serde_json::from_value(adapted).map_err(|e| io_err(e.to_string()))?;
 
@@ -373,20 +379,27 @@ impl StdioStore {
         args["nuance"] = Value::String(nuance);
         args["store"] = Value::String(store_name);
         let args = migrate::adapt_send(server_protocol, tool, args).map_err(io_err)?;
+        let wire_tool = migrate::adapt_tool(server_protocol, tool);
 
         let arguments = match args {
             Value::Object(map) => map,
             _ => serde_json::Map::new(),
         };
 
-        let params = CallToolRequestParams::new(tool).with_arguments(arguments);
+        let params = CallToolRequestParams::new(wire_tool).with_arguments(arguments);
 
         match peer.call_tool(params).await {
             Ok(result) => {
                 let text =
                     first_text(&result.content).ok_or_else(|| io_err("empty tool response"))?;
                 let raw: Value = serde_json::from_str(text).map_err(|e| io_err(e.to_string()))?;
-                let adapted = migrate::adapt_receive(server_protocol, tool, raw).map_err(io_err)?;
+                let adapted = match migrate::adapt_receive(server_protocol, tool, raw) {
+                    Ok(v) => v,
+                    Err(AdaptError::AlreadyExists(name)) => {
+                        return Err(StoreError::AlreadyExists(name));
+                    }
+                    Err(AdaptError::NonObject(e)) => return Err(io_err(e)),
+                };
                 let value = serde_json::from_value(adapted).map_err(|e| io_err(e.to_string()))?;
                 // Clear the stderr buffer only after full success so that
                 // parse/adapt failures don't silently discard stderr context.
@@ -571,9 +584,6 @@ fn classify_mcp_error(e: &ErrorData) -> StoreError {
     if let Some(rest) = msg.strip_prefix("journal not found:") {
         return StoreError::NotFound(rest.trim().to_string());
     }
-    if let Some(rest) = msg.strip_prefix("journal already exists:") {
-        return StoreError::AlreadyExists(rest.trim().to_string());
-    }
     if let Some(rest) = msg.strip_prefix("journal is archived:") {
         return StoreError::Archived(rest.trim().to_string());
     }
@@ -594,12 +604,9 @@ impl Store for StdioStore {
         if let Some(meta) = meta {
             args["meta"] = serde_json::to_value(meta).unwrap_or_default();
         }
-        let resp: OpenJournalWire = self.call_mcp("open_journal", args).await?;
-        // `created: false` means the journal already existed — treat as conflict.
-        if !resp.created {
-            return Err(StoreError::AlreadyExists(name.to_string()));
-        }
-        Ok(())
+        self.call_mcp::<CreateJournalWire>("create_journal", args)
+            .await
+            .map(|_| ())
     }
 
     async fn load(
@@ -698,16 +705,6 @@ impl Store for StdioStore {
         let resp: ListJournalsWire = self.call_mcp("list_journals", args).await?;
         let total = resp.total;
         Ok((resp.journals, total))
-    }
-
-    async fn exists(&self, name: &str) -> Result<bool, StoreError> {
-        // size: 0 — we only need to know if the journal exists, not its items.
-        let args = serde_json::json!({ "name": name, "from": 0, "size": 0 });
-        match self.call_mcp::<SyncJournalWire>("sync_journal", args).await {
-            Ok(_) => Ok(true),
-            Err(StoreError::NotFound(_)) => Ok(false),
-            Err(e) => Err(e),
-        }
     }
 
     async fn delete(&self, _name: &str) -> Result<(), StoreError> {

@@ -2,20 +2,19 @@
 
 [![crates.io](https://img.shields.io/crates/v/foray.svg)](https://crates.io/crates/foray)
 
-*Start with a foray. Fork it when it branches. Keep the trail.*
+*Start with a foray. Keep the trail.*
 
-An MCP server + CLI that gives AI assistants persistent, forkable journals. Use it for debugging, planning, design, feature work — any conversation worth continuing later.
+An MCP server + CLI that gives AI assistants persistent journals. Use it for debugging, planning, design, feature work — any conversation worth continuing later.
 
 ## Problem
 
-AI assistants lose context between sessions. When a conversation ends, findings, decisions, and in-progress work vanish. When work branches into multiple directions, there's no way to explore one without losing the other. And when multiple assistants — or people — work across clients and machines, their context stays siloed.
+AI assistants lose context between sessions. When a conversation ends, findings, decisions, and in-progress work vanish. When multiple assistants — or people — work across clients and machines, their context stays siloed.
 
 ## Why It Matters
 
-foray gives AI assistants a persistent, forkable journal backed by plain JSON files. Start a journal, record items as you work, fork when it branches, pick it back up in any session or client.
+foray gives AI assistants a persistent journal backed by plain JSON files. Start a journal, record items as you work, pick it back up in any session or client.
 
 - **Persistent context** — findings, decisions, and work-in-progress survive across sessions
-- **Forking with lineage** — branch without losing the original thread; compare paths side-by-side
 - **Cross-client** — VS Code, Cursor, Claude Desktop share the same journals simultaneously
 - **Human-editable** — plain JSON files you can `cat`, `jq`, `grep`, hand-edit
 - **Distributable** — local JSON store today; SSH and team backends planned, so intelligence isn't trapped on one machine
@@ -35,8 +34,8 @@ Then direct your AI assistant to fetch the [Setup Guide](https://raw.githubuserc
 | Tool | Description |
 |------|-------------|
 | `hello` | Handshake — call first every session, returns `{version, nuance, stores}` |
-| `open_journal` | Create, fork, or reopen a journal |
-| `sync_journal` | Read and/or write items (cursor-based) |
+| `create_journal` | Create a new journal |
+| `sync_journal` | Read and/or write items (offset-based) |
 | `list_journals` | List active or archived journals |
 | `archive_journal` | Archive a journal (readable but not writable) |
 | `unarchive_journal` | Restore an archived journal |
@@ -54,24 +53,15 @@ Then direct your AI assistant to fetch the [Setup Guide](https://raw.githubuserc
 Create a journal:
 
 ```
-$ foray open auth-triage --title "Auth cache investigation"
+$ foray create auth-triage --title "Auth cache investigation"
 Created journal: auth-triage
-Set active journal in .forayrc
 ```
 
-Add findings (uses `.forayrc` created by open):
+Add findings:
 
 ```
 $ foray add "Race condition in session.go:142" --type finding --ref src/auth/session.go:142
 Added to auth-triage (1 items)
-```
-
-Fork when the investigation branches:
-
-```
-$ foray open db-theory --title "DB pooling theory" --fork auth-triage
-Forked auth-triage → db-theory (1 items)
-Set active journal in .forayrc
 ```
 
 View a journal:
@@ -86,14 +76,6 @@ Items:   1 / 1
   ref: src/auth/session.go:142
 ```
 
-List all journals with fork lineage:
-
-```
-$ foray list --tree
-auth-triage
-└── db-theory
-```
-
 Work against a remote foray instance configured in `~/.foray/config.toml`:
 
 ```
@@ -104,7 +86,7 @@ Connecting to remote foray...
   db-theory (5 items) DB pooling theory
 ```
 
-The `--store` flag selects a named store from `~/.foray/config.toml`. Without it the default (local) store is used. `foray open --store remote my-journal` also persists `current-store = "remote"` in `.forayrc` so subsequent commands in that directory use the remote store automatically.
+The `--store` flag selects a named store from `~/.foray/config.toml`. Without it the default (local) store is used. Use `--store remote` with any command to target the remote store, or set `FORAY_STORE=remote` in your environment.
 
 ## Trust Model
 

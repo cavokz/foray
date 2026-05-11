@@ -69,12 +69,28 @@ async fn stdio_store_create_load_list() {
     assert_eq!(loaded.items.len(), 1);
     assert_eq!(loaded.items[0].content, "hello from remote");
 
-    // ── exists ────────────────────────────────────────────────────────
-    assert!(store.exists("remote-test").await.unwrap());
-    assert!(!store.exists("no-such-journal").await.unwrap());
+    // ── exists (via load) ─────────────────────────────────────────────
+    assert!(
+        store
+            .load("remote-test", &Pagination { from: 0, size: 0 })
+            .await
+            .is_ok(),
+        "remote-test should exist"
+    );
+    assert!(
+        matches!(
+            store
+                .load("no-such-journal", &Pagination { from: 0, size: 0 })
+                .await,
+            Err(foray::store::StoreError::NotFound(_))
+        ),
+        "no-such-journal should not exist"
+    );
 
     // ── load not found ───────────────────────────────────────────────
-    let not_found = store.load("no-such-journal", &Pagination::all()).await;
+    let not_found = store
+        .load("no-such-journal", &Pagination { from: 0, size: 0 })
+        .await;
     assert!(
         matches!(not_found, Err(foray::store::StoreError::NotFound(_))),
         "expected NotFound, got {not_found:?}"

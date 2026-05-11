@@ -273,10 +273,6 @@ impl Store for JsonFileStore {
         Ok(())
     }
 
-    async fn exists(&self, name: &str) -> Result<bool, StoreError> {
-        Ok(self.find(name).is_some())
-    }
-
     async fn archive(&self, name: &str) -> Result<(), StoreError> {
         let active = self.journal_path(name);
         if !active.exists() {
@@ -403,7 +399,10 @@ mod tests {
         let (store, _dir) = make_store();
         store.create("to-delete", "D".into(), None).await.unwrap();
         store.delete("to-delete").await.unwrap();
-        assert!(!store.exists("to-delete").await.unwrap());
+        assert!(matches!(
+            store.load("to-delete", &Pagination::all()).await,
+            Err(StoreError::NotFound(_))
+        ));
     }
 
     #[tokio::test]

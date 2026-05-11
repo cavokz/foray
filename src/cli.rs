@@ -1,7 +1,9 @@
 use crate::config::StoreRegistry;
 use crate::migrate::{self, MigrateResult};
 use crate::store::Store;
-use crate::types::{ItemType, JournalFile, JournalItem, Pagination, item_id, validate_name};
+use crate::types::{
+    ItemType, JournalFile, JournalItem, Pagination, item_id, validate_name, validate_title,
+};
 use chrono::Utc;
 use clap::{Parser, Subcommand};
 use clap_complete::Shell;
@@ -64,13 +66,13 @@ pub enum Commands {
         #[arg(long = "meta", value_name = "KEY=VALUE")]
         meta: Vec<String>,
     },
-    /// Create or open a journal, set it as active in .forayrc
-    Open {
+    /// Create a new journal
+    Create {
         /// Journal name
         name: String,
-        /// Title (required for new journals)
+        /// Title (required)
         #[arg(long)]
-        title: Option<String>,
+        title: String,
         /// Metadata key=value pairs
         #[arg(long = "meta", value_name = "KEY=VALUE")]
         meta: Vec<String>,
@@ -194,7 +196,7 @@ pub fn resolve_journal(
     } else {
         anyhow::bail!(
             "no journal specified. Use --journal <name>, set FORAY_JOURNAL, \
-             or run `foray open <name>` to create a .forayrc"
+             or add `current-journal = <name>` to a .forayrc file"
         )
     };
     validate_name(&name).map_err(|e| anyhow::anyhow!(e))?;
@@ -513,26 +515,12 @@ pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             let count = store.add_items(&journal_name, vec![item]).await?;
             println!("Added to {journal_name} ({count} items)");
         }
-        Commands::Open { name, title, meta } => {
+        Commands::Create { name, title, meta } => {
             validate_name(name).map_err(|e| anyhow::anyhow!(e))?;
             let meta = parse_meta(meta);
-            let exists = store.exists(name).await?;
-
-            if exists {
-                println!("Journal already exists: {name}");
-            } else {
-                let title = title.as_ref().ok_or_else(|| {
-                    anyhow::anyhow!("--title is required when creating a new journal")
-                })?;
-                let title = title.trim();
-                if title.is_empty() {
-                    anyhow::bail!("--title must not be empty");
-                }
-                store.create(name, title.to_string(), meta).await?;
-                println!("Created journal: {name}");
-            }
-            write_forayrc(name, cli.store.as_deref())?;
-            println!("Set active journal in .forayrc");
+            let title = validate_title(title).map_err(|e| anyhow::anyhow!(e))?;
+            store.create(name, title, meta).await?;
+            println!("Created journal: {name}");
         }
         Commands::List {
             json,
@@ -849,14 +837,14 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn open_rejects_empty_title() {
+    async fn create_rejects_empty_title() {
         let _guard = SERIAL_LOCK.lock().await;
         let dir = tempfile::TempDir::new().unwrap();
         let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
         let _cwd = CwdGuard::set(dir.path());
-        let cli = make_cli(Commands::Open {
+        let cli = make_cli(Commands::Create {
             name: "my-journal".to_string(),
-            title: Some("".to_string()),
+            title: "".to_string(),
             meta: vec![],
         });
         let err = run(&cli, &store).await.unwrap_err();
@@ -864,17 +852,40 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn open_rejects_whitespace_only_title() {
+    async fn create_rejects_whitespace_only_title() {
         let _guard = SERIAL_LOCK.lock().await;
         let dir = tempfile::TempDir::new().unwrap();
         let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
         let _cwd = CwdGuard::set(dir.path());
-        let cli = make_cli(Commands::Open {
+        let cli = make_cli(Commands::Create {
             name: "my-journal".to_string(),
-            title: Some("   ".to_string()),
+            title: "   ".to_string(),
             meta: vec![],
         });
         let err = run(&cli, &store).await.unwrap_err();
         assert!(err.to_string().contains("must not be empty"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn create_rejects_duplicate_journal() {
+        let _guard = SERIAL_LOCK.lock().await;
+        let dir = tempfile::TempDir::new().unwrap();
+        let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
+        let _cwd = CwdGuard::set(dir.path());
+        let make = || {
+            make_cli(Commands::Create {
+                name: "my-journal".to_string(),
+                title: "My Journal".to_string(),
+                meta: vec![],
+            })
+        };
+        run(&make(), &store)
+            .await
+            .expect("first create should succeed");
+        let err = run(&make(), &store).await.unwrap_err();
+        assert!(
+            err.to_string().to_lowercase().contains("already exists"),
+            "expected 'already exists' in error, got: {err}"
+        );
     }
 }

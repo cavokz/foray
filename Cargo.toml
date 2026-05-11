@@ -2,7 +2,7 @@
 name = "foray"
 version = "0.3.0-dev"
 edition = "2024"
-description = "Persistent, forkable journals for AI agents — shareable across machines and teams"
+description = "Persistent journals for AI agents — shareable across machines and teams"
 license = "Apache-2.0"
 repository = "https://github.com/cavokz/foray"
 keywords = ["mcp", "journal", "ai-agents", "llm", "context"]
