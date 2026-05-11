@@ -123,7 +123,7 @@ struct Connection {
 /// The subprocess is spawned lazily on the first store operation and reused
 /// for all subsequent calls. Dropping the `StdioStore` shuts down the
 /// subprocess via the `RunningService` drop guard.
-pub struct StdioStore {
+pub(crate) struct StdioStore {
     command: String,
     args: Vec<String>,
     /// Environment variable overrides passed to the subprocess.
@@ -135,7 +135,7 @@ pub struct StdioStore {
 }
 
 impl StdioStore {
-    pub fn new(
+    pub(crate) fn new(
         command: String,
         args: Vec<String>,
         env: Vec<(String, String)>,
@@ -457,15 +457,6 @@ impl StdioStore {
             }
         }
     }
-
-    /// Poison the cached nuance for testing reconnect behaviour.
-    #[cfg(test)]
-    pub async fn poison_nuance(&self) {
-        let mut guard = self.conn.lock().await;
-        if let Some(conn) = guard.as_mut() {
-            conn.nuance = "poisoned-nuance".to_string();
-        }
-    }
 }
 
 // ── Helpers ──────────────────────────────────────────────────────────
@@ -730,7 +721,26 @@ impl Store for StdioStore {
 mod tests {
     use super::*;
 
-    // ── connect: stderr propagation ───────────────────────────────────
+    /// Returns the path to the `foray` binary under test.
+    ///
+    /// `CARGO_BIN_EXE_*` is only set for integration tests (tests/ dir).
+    /// Unit tests use `current_exe` to navigate up from the test runner to the
+    /// sibling binary in the same Cargo output directory.
+    fn foray_bin_path() -> String {
+        let mut path = std::env::current_exe().expect("current_exe should be available");
+        path.pop(); // remove test binary name
+        if path.ends_with("deps") {
+            path.pop(); // step out of deps/ into target/debug/ (or release/)
+        }
+        path.push("foray");
+        #[cfg(windows)]
+        path.set_extension("exe");
+        assert!(
+            path.exists(),
+            "foray binary not found at {path:?} — run `cargo build` before `cargo test`"
+        );
+        path.to_string_lossy().into_owned()
+    }
 
     /// A subprocess that writes to stderr and exits non-zero should produce
     /// an I/O error whose message includes the stderr output.
@@ -859,5 +869,111 @@ mod tests {
             ),
             "unexpected: {err:?}"
         );
+    }
+
+    // ── integration: StdioStore → foray serve ────────────────────────
+
+    /// Spawn `foray serve` in an isolated home directory, then exercise
+    /// `create`, `load`, and `list` through a `StdioStore`.
+    #[tokio::test]
+    async fn stdio_store_create_load_list() {
+        use crate::store::StoreError;
+        use crate::types::{ItemType, JournalItem, Pagination, item_id};
+        use chrono::Utc;
+
+        // Isolated home dir so the subprocess doesn't touch ~.
+        let home = tempfile::TempDir::new().unwrap();
+        let home_str = home.path().to_str().unwrap().to_string();
+
+        #[allow(unused_mut)]
+        let mut env_overrides = vec![("HOME".to_string(), home_str.clone())];
+        // On Windows, home::home_dir() checks USERPROFILE, not HOME.
+        #[cfg(windows)]
+        env_overrides.push(("USERPROFILE".to_string(), home_str));
+
+        let store = StdioStore::new(
+            foray_bin_path(),
+            vec![],
+            env_overrides,
+            None, // use first store from hello
+        );
+
+        // ── create ────────────────────────────────────────────────────────
+        store
+            .create("remote-test", "Remote Test Journal".into(), None)
+            .await
+            .expect("create should succeed");
+
+        // Creating the same journal again must error with AlreadyExists.
+        let err = store
+            .create("remote-test", "Dup".into(), None)
+            .await
+            .unwrap_err();
+        assert!(
+            matches!(err, StoreError::AlreadyExists(_)),
+            "expected AlreadyExists, got {err:?}"
+        );
+
+        // ── add_items ────────────────────────────────────────────────────
+        let item = JournalItem {
+            id: item_id(),
+            item_type: ItemType::Finding,
+            content: "hello from remote".to_string(),
+            tags: None,
+            added_at: Utc::now(),
+            meta: None,
+        };
+        let total = store
+            .add_items("remote-test", vec![item])
+            .await
+            .expect("add_items should succeed");
+        assert_eq!(total, 1, "journal should now have 1 item");
+
+        // ── load ─────────────────────────────────────────────────────────
+        let (loaded, item_total) = store
+            .load("remote-test", &Pagination::all())
+            .await
+            .expect("load should succeed");
+
+        assert_eq!(loaded.name, "remote-test");
+        assert_eq!(loaded.title, "Remote Test Journal");
+        assert_eq!(item_total, 1);
+        assert_eq!(loaded.items.len(), 1);
+        assert_eq!(loaded.items[0].content, "hello from remote");
+
+        // ── exists (via load) ─────────────────────────────────────────────
+        assert!(
+            store
+                .load("remote-test", &Pagination { from: 0, size: 0 })
+                .await
+                .is_ok(),
+            "remote-test should exist"
+        );
+        assert!(
+            matches!(
+                store
+                    .load("no-such-journal", &Pagination { from: 0, size: 0 })
+                    .await,
+                Err(StoreError::NotFound(_))
+            ),
+            "no-such-journal should not exist"
+        );
+
+        // ── load not found ───────────────────────────────────────────────
+        let not_found = store
+            .load("no-such-journal", &Pagination { from: 0, size: 0 })
+            .await;
+        assert!(
+            matches!(not_found, Err(StoreError::NotFound(_))),
+            "expected NotFound, got {not_found:?}"
+        );
+
+        // ── list ─────────────────────────────────────────────────────────
+        let (summaries, list_total) = store.list(false).await.expect("list should succeed");
+
+        assert_eq!(list_total, 1);
+        assert_eq!(summaries.len(), 1);
+        assert_eq!(summaries[0].name, "remote-test");
+        assert_eq!(summaries[0].item_count, 1);
     }
 }

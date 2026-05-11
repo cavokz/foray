@@ -17,23 +17,23 @@ use std::path::PathBuf;
 
 #[derive(Parser)]
 #[command(name = "foray", version, about = "Persistent investigation journals")]
-pub struct Cli {
+pub(crate) struct Cli {
     /// Override journal name (skips env + .forayrc resolution)
     #[arg(long, global = true)]
     #[cfg_attr(feature = "dynamic-completion", arg(add = ArgValueCompleter::new(complete_journal_names)))]
-    pub journal: Option<String>,
+    pub(crate) journal: Option<String>,
 
     /// Override store name (skips env + .forayrc resolution)
     #[arg(long, global = true)]
     #[cfg_attr(feature = "dynamic-completion", arg(add = ArgValueCompleter::new(complete_store_names)))]
-    pub store: Option<String>,
+    pub(crate) store: Option<String>,
 
     #[command(subcommand)]
-    pub command: Commands,
+    pub(crate) command: Commands,
 }
 
 #[derive(Subcommand)]
-pub enum Commands {
+pub(crate) enum Commands {
     /// Start MCP stdio server
     Serve,
     /// Show a journal with all items
@@ -179,10 +179,7 @@ ACTIVATION (completes subcommands, flags, store names and journal names):
 }
 
 /// Resolve journal name from CLI flag, env, or .forayrc walk-up.
-pub fn resolve_journal(
-    cli_flag: Option<&str>,
-    explicit_name: Option<&str>,
-) -> anyhow::Result<String> {
+fn resolve_journal(cli_flag: Option<&str>, explicit_name: Option<&str>) -> anyhow::Result<String> {
     let name = if let Some(name) = explicit_name {
         name.to_string()
     } else if let Some(name) = cli_flag {
@@ -204,7 +201,7 @@ pub fn resolve_journal(
 }
 
 /// Walk up from `start_dir` looking for `.forayrc` with `current-journal`.
-pub fn find_forayrc(start_dir: &std::path::Path) -> Option<String> {
+fn find_forayrc(start_dir: &std::path::Path) -> Option<String> {
     let mut dir = start_dir.to_path_buf();
     loop {
         let rc_path = dir.join(".forayrc");
@@ -228,7 +225,7 @@ pub fn find_forayrc(start_dir: &std::path::Path) -> Option<String> {
 
 /// Resolve which store to use: CLI flag > FORAY_STORE env > .forayrc current-store >
 /// implicit default (only when exactly one store is configured) > error.
-pub fn resolve_store<'a>(
+pub(crate) fn resolve_store<'a>(
     registry: &'a StoreRegistry,
     cli_flag: Option<&str>,
 ) -> anyhow::Result<&'a dyn Store> {
@@ -263,7 +260,7 @@ pub fn resolve_store<'a>(
 }
 
 /// Walk up from `start_dir` looking for `.forayrc` with `current-store`.
-pub fn find_store_in_forayrc(start_dir: &std::path::Path) -> Option<String> {
+fn find_store_in_forayrc(start_dir: &std::path::Path) -> Option<String> {
     let mut dir = start_dir.to_path_buf();
     loop {
         let rc_path = dir.join(".forayrc");
@@ -286,7 +283,8 @@ pub fn find_store_in_forayrc(start_dir: &std::path::Path) -> Option<String> {
 }
 
 /// Write or update `.forayrc` in the current directory.
-pub fn write_forayrc(name: &str, store: Option<&str>) -> anyhow::Result<()> {
+#[cfg(test)]
+fn write_forayrc(name: &str, store: Option<&str>) -> anyhow::Result<()> {
     let rc_path = std::env::current_dir()?.join(".forayrc");
     let mut table = if rc_path.is_file() {
         let contents = std::fs::read_to_string(&rc_path)?;
@@ -303,7 +301,7 @@ pub fn write_forayrc(name: &str, store: Option<&str>) -> anyhow::Result<()> {
 }
 
 /// Parse `--meta KEY=VALUE` pairs into a HashMap.
-pub fn parse_meta(pairs: &[String]) -> Option<HashMap<String, serde_json::Value>> {
+fn parse_meta(pairs: &[String]) -> Option<HashMap<String, serde_json::Value>> {
     if pairs.is_empty() {
         return None;
     }
@@ -437,7 +435,7 @@ fn print_item(item: &JournalItem) {
 }
 
 /// Execute a CLI command against the store.
-pub async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
+pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
     match &cli.command {
         Commands::Serve => {
             unreachable!("serve is handled in main")

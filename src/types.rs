@@ -7,7 +7,7 @@ use std::collections::HashMap;
 /// Allowed item types in a journal.
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(rename_all = "snake_case")]
-pub enum ItemType {
+pub(crate) enum ItemType {
     Finding,
     Decision,
     Snippet,
@@ -17,34 +17,34 @@ pub enum ItemType {
 /// A single entry inside a journal.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct JournalItem {
-    pub id: String,
+pub(crate) struct JournalItem {
+    pub(crate) id: String,
     #[serde(rename = "type")]
-    pub item_type: ItemType,
-    pub content: String,
+    pub(crate) item_type: ItemType,
+    pub(crate) content: String,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub tags: Option<Vec<String>>,
-    pub added_at: DateTime<Utc>,
+    pub(crate) tags: Option<Vec<String>>,
+    pub(crate) added_at: DateTime<Utc>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub meta: Option<HashMap<String, serde_json::Value>>,
+    pub(crate) meta: Option<HashMap<String, serde_json::Value>>,
 }
 
 /// The top-level journal file stored on disk.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct JournalFile {
+pub(crate) struct JournalFile {
     /// Schema version. Always call [`crate::migrate::migrate`] before deserializing —
     /// migration guarantees this field is present and at the current version.
-    pub schema: u32,
-    pub name: String,
-    pub title: String,
-    pub items: Vec<JournalItem>,
+    pub(crate) schema: u32,
+    pub(crate) name: String,
+    pub(crate) title: String,
+    pub(crate) items: Vec<JournalItem>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub meta: Option<HashMap<String, serde_json::Value>>,
+    pub(crate) meta: Option<HashMap<String, serde_json::Value>>,
 }
 
 impl JournalFile {
-    pub fn new(
+    pub(crate) fn new(
         name: &str,
         title: String,
         meta: Option<HashMap<String, serde_json::Value>>,
@@ -62,24 +62,24 @@ impl JournalFile {
 /// Summary returned by `list_journals`.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct JournalSummary {
-    pub name: String,
-    pub title: String,
-    pub item_count: usize,
+pub(crate) struct JournalSummary {
+    pub(crate) name: String,
+    pub(crate) title: String,
+    pub(crate) item_count: usize,
     /// Average serialized byte size of items in this journal.
     /// `None` if the journal is empty or the server does not report it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub avg_item_size: Option<usize>,
+    pub(crate) avg_item_size: Option<usize>,
     /// Standard deviation of serialized item sizes.
     /// `None` for journals with 0 or 1 items, or if the server does not report it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
-    pub std_item_size: Option<usize>,
+    pub(crate) std_item_size: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub schema: Option<u32>,
+    pub(crate) schema: Option<u32>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub meta: Option<HashMap<String, serde_json::Value>>,
+    pub(crate) meta: Option<HashMap<String, serde_json::Value>>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub error: Option<String>,
+    pub(crate) error: Option<String>,
 }
 
 impl From<&JournalFile> for JournalSummary {
@@ -136,15 +136,15 @@ impl From<&JournalFile> for JournalSummary {
 
 /// Pagination parameters for `sync_journal` (load) operations.
 #[derive(Debug, Clone)]
-pub struct Pagination {
-    pub from: usize,
-    pub size: usize,
+pub(crate) struct Pagination {
+    pub(crate) from: usize,
+    pub(crate) size: usize,
 }
 
 impl Pagination {
     /// Returns a `Pagination` that spans all items: starts at offset 0 with no
     /// size limit (`size = usize::MAX`).
-    pub fn all() -> Self {
+    pub(crate) fn all() -> Self {
         Self {
             from: 0,
             size: usize::MAX,
@@ -152,7 +152,7 @@ impl Pagination {
     }
 
     /// Apply pagination to a slice, returning the page and total count.
-    pub fn apply<T: Clone>(&self, items: &[T]) -> (Vec<T>, usize) {
+    pub(crate) fn apply<T: Clone>(&self, items: &[T]) -> (Vec<T>, usize) {
         let total = items.len();
         let offset = self.from.min(total);
         let remaining = &items[offset..];
@@ -171,7 +171,7 @@ fn random_consonants(n: usize) -> String {
 }
 
 /// Generate an item ID in `xxxx-xxxx-xxxx-xxxx` format (16 consonants, 4 groups of 4).
-pub fn item_id() -> String {
+pub(crate) fn item_id() -> String {
     let c = random_consonants(16);
     format!("{}-{}-{}-{}", &c[..4], &c[4..8], &c[8..12], &c[12..16])
 }
@@ -180,7 +180,7 @@ const MAX_TITLE: usize = 512;
 
 /// Validate and normalise a journal title: trim whitespace, non-empty, max 512 Unicode chars.
 /// Returns the trimmed title on success.
-pub fn validate_title(title: &str) -> Result<String, String> {
+pub(crate) fn validate_title(title: &str) -> Result<String, String> {
     let trimmed = title.trim();
     if trimmed.is_empty() {
         return Err("title must not be empty".into());
@@ -195,7 +195,7 @@ pub fn validate_title(title: &str) -> Result<String, String> {
 }
 
 /// Validate a journal name: `[a-z0-9_-]`, non-empty, max 64 chars.
-pub fn validate_name(name: &str) -> Result<(), String> {
+pub(crate) fn validate_name(name: &str) -> Result<(), String> {
     if name.is_empty() {
         return Err("journal name cannot be empty".into());
     }

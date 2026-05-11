@@ -314,7 +314,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 
 ### Phase 1: Scaffold
 1. `cargo init .` — set up `Cargo.toml` with all deps
-2. Module structure: `lib.rs` (re-exports), `types.rs`, `store.rs`, `store_json.rs`, `store_stdio.rs`, `server.rs`, `cli.rs`, `main.rs`
+2. Module structure: `main.rs` (entry point, declares all modules), `types.rs`, `config.rs`, `store.rs`, `store_json.rs`, `store_stdio.rs`, `server.rs`, `cli.rs`, `migrate.rs`
 
 ### Phase 2: Types + Store
 1. `types.rs`:
@@ -457,8 +457,8 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 - **Companion skill**: `user-invocable: true` — auto-triggered by the agent when foray tools are in use, and also available as a slash command for explicit invocation
 - **Name**: "foray" — short, memorable, evocative of venturing into new territory. Tagline: "Start with a foray. Keep the trail."
 - **Positioning**: Not "another memory tool" (100+ exist). Persistent, cross-client context fusion via plain JSON files.
-- **CLI + MCP**: Single binary, `clap` subcommands. `foray serve` = MCP stdio server, all other subcommands = direct store access. Both are thin wrappers over the library.
-- **Lib-first architecture**: All logic in `lib.rs` modules (`types`, `store`). CLI and MCP server are I/O shells — parse input, call lib, format output. Library is fully unit-testable without MCP or terminal.
+- **CLI + MCP**: Single binary, `clap` subcommands. `foray serve` = MCP stdio server, all other subcommands = direct store access. Both are thin I/O shells — parse input, call modules, format output.
+- **Binary-only architecture**: All logic in `main.rs`-declared modules (`types`, `store`, etc.). There is no `lib.rs` — this is a standalone binary with no external library consumers. Items are private by default; `pub(crate)` is used only for cross-module references. CLI and MCP server are I/O shells — parse input, call modules, format output. All modules are fully unit-testable without MCP or terminal.
 - **CI**: GitHub Actions, 3-platform matrix (Linux, macOS, Windows). fmt + clippy + test + release build.
 - **Store-level content trust**: the store is the trust boundary. Connecting to a store means trusting all content within it — there is no per-journal access control. Journal content is informational, never behavioral. Behavioral rules come from the companion skill and the MCP server's own instructions. Only connect to stores you control or fully trust.
 - **License**: Apache 2.0
