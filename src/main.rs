@@ -1,9 +1,18 @@
+mod cli;
+mod config;
+mod migrate;
+mod server;
+mod store;
+mod store_json;
+mod store_stdio;
+mod types;
+
 use clap::{CommandFactory, Parser};
 #[cfg(feature = "dynamic-completion")]
 use clap_complete::env::CompleteEnv;
-use foray::cli::{Cli, Commands, resolve_store};
-use foray::config::StoreRegistry;
-use foray::server::ForayServer;
+use cli::{Cli, Commands, resolve_store};
+use config::StoreRegistry;
+use server::ForayServer;
 
 #[tokio::main(flavor = "current_thread")]
 async fn main() -> anyhow::Result<()> {
@@ -41,6 +50,6 @@ async fn main() -> anyhow::Result<()> {
     }
 
     let store = resolve_store(&registry, cli.store.as_deref())?;
-    foray::cli::run(&cli, store).await?;
+    cli::run(&cli, store).await?;
     Ok(())
 }

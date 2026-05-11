@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use thiserror::Error;
 
 #[derive(Debug, Error)]
-pub enum StoreError {
+pub(crate) enum StoreError {
     #[error("journal not found: {0}")]
     NotFound(String),
     #[error("journal already exists: {0}")]
@@ -27,7 +27,7 @@ pub enum StoreError {
 
 /// Where a schema-too-new condition was detected.
 #[derive(Debug, Clone, Copy)]
-pub enum SchemaOrigin {
+pub(crate) enum SchemaOrigin {
     /// Detected reading a storage file (server binary is older than the file).
     Storage,
     /// Detected reading a wire response (client binary is older than the server).
@@ -36,7 +36,7 @@ pub enum SchemaOrigin {
 
 /// Backend-agnostic journal storage.
 #[async_trait]
-pub trait Store: Send + Sync {
+pub(crate) trait Store: Send + Sync {
     async fn load(
         &self,
         name: &str,
@@ -50,6 +50,7 @@ pub trait Store: Send + Sync {
     ) -> Result<(), StoreError>;
     async fn add_items(&self, name: &str, items: Vec<JournalItem>) -> Result<usize, StoreError>;
     async fn list(&self, archived: bool) -> Result<(Vec<JournalSummary>, usize), StoreError>;
+    #[allow(dead_code)]
     async fn delete(&self, name: &str) -> Result<(), StoreError>;
     async fn archive(&self, name: &str) -> Result<(), StoreError>;
     async fn unarchive(&self, name: &str) -> Result<(), StoreError>;

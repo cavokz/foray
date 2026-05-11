@@ -17,7 +17,7 @@
 use serde_json::{Map, Value};
 
 /// The schema version produced by this build.
-pub const CURRENT_SCHEMA: u32 = 1;
+pub(crate) const CURRENT_SCHEMA: u32 = 1;
 
 /// The wire protocol version produced by this build.
 ///
@@ -25,13 +25,13 @@ pub const CURRENT_SCHEMA: u32 = 1;
 /// `from`, `added_ids`, etc.) that are independent of `CURRENT_SCHEMA`.
 /// `StdioStore` checks this at connect time and returns
 /// [`StoreError::ProtocolTooNew`] if the server's protocol is newer.
-pub const CURRENT_PROTOCOL: u32 = 1;
+pub(crate) const CURRENT_PROTOCOL: u32 = 1;
 
 /// Synthetic store name injected into `hello` responses from protocol 0
 /// servers that do not emit a `stores` list. `adapt_send` strips the `store`
 /// param when it matches this value, since protocol 0 servers do not accept
 /// a `store` argument.
-pub const PROTOCOL_0_IMPLICIT_STORE: &str = "local";
+pub(crate) const PROTOCOL_0_IMPLICIT_STORE: &str = "local";
 
 /// Typed error returned by [`adapt_receive`].
 ///
@@ -40,7 +40,7 @@ pub const PROTOCOL_0_IMPLICIT_STORE: &str = "local";
 ///
 /// [`StoreError`]: crate::store::StoreError
 #[derive(Debug)]
-pub enum AdaptError {
+pub(crate) enum AdaptError {
     /// The response was not a JSON object — adaptation is impossible.
     NonObject(String),
     /// Protocol 0 server signalled that the journal already exists
@@ -49,7 +49,7 @@ pub enum AdaptError {
 }
 
 /// Result of running [`migrate`].
-pub enum MigrateResult {
+pub(crate) enum MigrateResult {
     /// The value was already at the current schema — returned unchanged.
     Current(Value),
     /// The value was migrated — the caller should rewrite the file.
@@ -67,7 +67,7 @@ pub enum MigrateResult {
 /// See `doc/compatibility.md` — *Axis 1 — Schema* for detection/resolution
 /// scenarios, and *Bumping the schema version* for the checklist to follow
 /// when adding a new schema version.
-pub fn migrate(value: Value) -> MigrateResult {
+pub(crate) fn migrate(value: Value) -> MigrateResult {
     let schema = value
         .get("schema")
         .and_then(Value::as_u64)
@@ -154,7 +154,7 @@ fn v0_to_v1(mut obj: Map<String, Value>) -> Map<String, Value> {
 /// Return the wire tool name to use when calling a server at `server_protocol`.
 ///
 /// Protocol 0 servers do not know `create_journal`; translate to `open_journal`.
-pub fn adapt_tool(server_protocol: u32, tool: &'static str) -> &'static str {
+pub(crate) fn adapt_tool(server_protocol: u32, tool: &'static str) -> &'static str {
     if server_protocol < 1 && tool == "create_journal" {
         return "open_journal";
     }
@@ -175,7 +175,11 @@ pub fn adapt_tool(server_protocol: u32, tool: &'static str) -> &'static str {
 /// See `doc/compatibility.md` — *Protocol 0 (v0.2.0 Servers)* for the
 /// current adaptation rules, and *Bumping the protocol version* for the
 /// checklist to follow when adding a new protocol version.
-pub fn adapt_send(server_protocol: u32, tool: &str, mut args: Value) -> Result<Value, String> {
+pub(crate) fn adapt_send(
+    server_protocol: u32,
+    tool: &str,
+    mut args: Value,
+) -> Result<Value, String> {
     // Protocol 0 → 1: several params were added that old servers reject via
     // `deny_unknown_fields`:
     //   all tools:          `store` (protocol 0 servers have a single implicit store)
@@ -257,7 +261,7 @@ pub fn adapt_send(server_protocol: u32, tool: &str, mut args: Value) -> Result<V
 /// Returns `Err(`[`AdaptError`]`)` if the response is not a JSON object
 /// (adaptation is not possible) or if a protocol-level conflict is detected
 /// (e.g. `created: false` from a protocol 0 `create_journal` response).
-pub fn adapt_receive(
+pub(crate) fn adapt_receive(
     server_protocol: u32,
     tool: &str,
     mut response: Value,

@@ -8,16 +8,16 @@ use std::io::Write;
 use std::path::{Path, PathBuf};
 
 /// Flat-file JSON store at `~/.foray/journals/`.
-pub struct JsonFileStore {
+pub(crate) struct JsonFileStore {
     base_dir: PathBuf,
 }
 
 impl JsonFileStore {
-    pub fn new(base_dir: PathBuf) -> Self {
+    pub(crate) fn new(base_dir: PathBuf) -> Self {
         Self { base_dir }
     }
 
-    pub fn default_dir() -> Result<PathBuf, StoreError> {
+    pub(crate) fn default_dir() -> Result<PathBuf, StoreError> {
         Ok(home::home_dir()
             .ok_or_else(|| {
                 StoreError::Io(std::io::Error::new(
@@ -66,7 +66,7 @@ impl JsonFileStore {
         None
     }
 
-    pub fn read_journal(&self, path: &Path) -> Result<JournalFile, StoreError> {
+    pub(crate) fn read_journal(&self, path: &Path) -> Result<JournalFile, StoreError> {
         let data = fs::read_to_string(path)?;
         let raw: serde_json::Value = serde_json::from_str(&data)?;
         self.parse_journal(raw)

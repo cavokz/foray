@@ -60,23 +60,23 @@ impl RawStoreConfig {
 
 /// A named collection of stores, ordered by store name (BTreeMap key order) for a stable, deterministic nuance.
 #[derive(Clone)]
-pub struct StoreRegistry {
+pub(crate) struct StoreRegistry {
     stores: Vec<StoreEntry>,
     /// Stable fingerprint derived from the config (sorted store names+paths).
-    pub nuance: String,
+    pub(crate) nuance: String,
 }
 
 #[derive(Clone)]
-pub struct StoreEntry {
-    pub name: String,
-    pub description: String,
-    pub store: Arc<dyn Store>,
+pub(crate) struct StoreEntry {
+    pub(crate) name: String,
+    pub(crate) description: String,
+    store: Arc<dyn Store>,
 }
 
 impl StoreRegistry {
     /// Build a registry from `~/.foray/config.toml`.
     /// Falls back to a single implicit `local` store if the file is absent or has no stores.
-    pub fn load() -> Result<Self, StoreError> {
+    pub(crate) fn load() -> Result<Self, StoreError> {
         Self::load_from(&config_path()?)
     }
 
@@ -149,7 +149,7 @@ impl StoreRegistry {
     }
 
     /// Single implicit `local` `JsonFileStore` at `~/.foray/journals/`.
-    pub fn implicit_local() -> Result<Self, StoreError> {
+    pub(crate) fn implicit_local() -> Result<Self, StoreError> {
         let base_dir = JsonFileStore::default_dir()?;
         let store: Arc<dyn Store> = Arc::new(JsonFileStore::new(base_dir.clone()));
         let path_str = base_dir.to_str().ok_or_else(|| {
@@ -191,7 +191,7 @@ impl StoreRegistry {
     /// Construct a single-store registry backed by `base_dir`.
     /// For use in tests — avoids depending on the user's home directory.
     #[cfg(test)]
-    pub fn for_test(base_dir: std::path::PathBuf) -> Self {
+    pub(crate) fn for_test(base_dir: std::path::PathBuf) -> Self {
         let store: Arc<dyn Store> = Arc::new(JsonFileStore::new(base_dir.clone()));
         let raw = RawConfig {
             stores: [(
@@ -225,7 +225,10 @@ impl StoreRegistry {
 
     /// Construct a two-store registry. For use in tests only.
     #[cfg(test)]
-    pub fn for_test_two(base_dir1: std::path::PathBuf, base_dir2: std::path::PathBuf) -> Self {
+    pub(crate) fn for_test_two(
+        base_dir1: std::path::PathBuf,
+        base_dir2: std::path::PathBuf,
+    ) -> Self {
         let store1: Arc<dyn Store> = Arc::new(JsonFileStore::new(base_dir1.clone()));
         let store2: Arc<dyn Store> = Arc::new(JsonFileStore::new(base_dir2.clone()));
         let raw = RawConfig {
@@ -273,7 +276,7 @@ impl StoreRegistry {
     }
 
     /// Look up a store by name. Returns `None` if not found.
-    pub fn get(&self, name: &str) -> Option<&Arc<dyn Store>> {
+    pub(crate) fn get(&self, name: &str) -> Option<&Arc<dyn Store>> {
         self.stores
             .iter()
             .find(|e| e.name == name)
@@ -281,22 +284,17 @@ impl StoreRegistry {
     }
 
     /// The default store (first in registry).
-    pub fn default_store(&self) -> &Arc<dyn Store> {
+    pub(crate) fn default_store(&self) -> &Arc<dyn Store> {
         &self.stores[0].store
     }
 
-    /// Default store name.
-    pub fn default_store_name(&self) -> &str {
-        &self.stores[0].name
-    }
-
     /// All store entries (name + description), for listing.
-    pub fn entries(&self) -> &[StoreEntry] {
+    pub(crate) fn entries(&self) -> &[StoreEntry] {
         &self.stores
     }
 
     /// All store names joined, for hint messages.
-    pub fn names_hint(&self) -> String {
+    pub(crate) fn names_hint(&self) -> String {
         self.stores
             .iter()
             .map(|e| e.name.as_str())
