@@ -5,6 +5,8 @@ A **Rust MCP server + CLI** that gives any AI assistant persistent investigation
 
 **Tagline:** *"Start with a foray. Keep the trail."*
 
+**Related docs:** [sequences.md](sequences.md) — runtime flow diagrams (hello, create_journal, sync_journal, StdioStore connect, protocol 0 compat, schema migration). [compatibility.md](compatibility.md) — schema and protocol versioning rules.
+
 ## Positioning
 
 **Problem**: AI assistants lose context between sessions. When a conversation ends, findings, decisions, and in-progress work vanish. And when multiple assistants — or people — work across clients and machines, their context stays siloed.
