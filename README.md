@@ -29,16 +29,61 @@ Or download a pre-built binary from [GitHub Releases](https://github.com/cavokz/
 
 Then direct your AI assistant to fetch the [Setup Guide](https://raw.githubusercontent.com/cavokz/foray/main/SETUP.md) and follow the steps for itself.
 
+## Journal Format
+
+Each journal is a named list of items. Items have a type, free-form content, optional tags, and an optional `meta` map for structured references:
+
+```json
+{
+  "schema": 1,
+  "name": "auth-triage",
+  "title": "Auth cache investigation",
+  "meta": { "created_by": "vscode-copilot" },
+  "items": [
+    {
+      "id": "gfnd-cpht-xvmr-sjlk",
+      "type": "finding",
+      "content": "Race condition in session.go:142 — lock released before cache write completes",
+      "tags": ["auth", "race-condition"],
+      "added_at": "2026-04-15T10:15:00Z",
+      "meta": { "ref": "src/auth/session.go:142", "confidence": "high" }
+    },
+    {
+      "id": "dcis-wqmp-bnrt-ylhv",
+      "type": "decision",
+      "content": "Fix by holding the lock through the cache write, not just the read",
+      "tags": ["auth"],
+      "added_at": "2026-04-15T10:42:00Z",
+      "meta": {}
+    }
+  ]
+}
+```
+
+`type` is one of `finding`, `decision`, `snippet`, or `note`. `meta` is free-form — use `meta.ref` for file paths, URLs, or ticket links.
+
 ## MCP Tools
 
 | Tool | Description |
 |------|-------------|
-| `hello` | Handshake — call first every session, returns `{version, nuance, stores}` |
+| `hello` | Handshake — call first every session, returns `{version, nuance, protocol, stores, skill_uri}` |
 | `create_journal` | Create a new journal |
-| `sync_journal` | Read and/or write items (offset-based) |
+| `sync_journal` | Read and/or write items in one call (see below) |
 | `list_journals` | List active or archived journals |
 | `archive_journal` | Archive a journal (readable but not writable) |
 | `unarchive_journal` | Restore an archived journal |
+
+### How `sync_journal` works
+
+`sync_journal` is the workhorse tool — a single call that can read items, write items, or both at once.
+
+- **`from`** — item-count offset into the journal (`0` = beginning). Pass `0` on the first call; use the `from` value from the response to get the next page.
+- **`size`** — maximum number of items to return. Pick a value that fits your context window; does not affect writes.
+- **`items`** — optional array of items to append. Additions always happen, regardless of `size`.
+
+The response includes the new `from` offset for the next call and the IDs assigned to any items you added.
+
+**Typical pattern**: call with `from: 0` to start reading from the beginning; use the `from` value in each response to fetch the next page. For large journals, repeat until `from` equals the total item count. To append without re-reading, pass `size: 0` with your `items`.
 
 ## MCP Prompts
 
@@ -87,6 +132,8 @@ Connecting to remote foray...
 ```
 
 The `--store` flag selects a named store from `~/.foray/config.toml`. Without it the default (local) store is used. Use `--store remote` with any command to target the remote store, or set `FORAY_STORE=remote` in your environment.
+
+`foray add` and `foray show` use the same read/append semantics as `sync_journal` — `add` appends one item, `show` reads all items.
 
 ## Trust Model
 
