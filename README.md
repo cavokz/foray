@@ -93,6 +93,20 @@ $ foray export auth-triage > auth-triage.json
 $ foray export --archived old-investigation > old-investigation.json
 ```
 
+Import a journal from a JSON file (or stdin):
+
+```
+$ foray import auth-triage < auth-triage.json          # create new
+$ foray import auth-triage --merge < patch.json        # merge into existing
+$ foray import old-investigation --archived < old.json # import as archived
+```
+
+To transfer a journal to a remote store, pipe export into import over SSH:
+
+```
+$ foray export auth-triage | ssh host foray import auth-triage
+```
+
 Work against a remote foray instance configured in `~/.foray/config.toml`:
 
 ```

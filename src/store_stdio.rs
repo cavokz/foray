@@ -703,6 +703,19 @@ impl Store for StdioStore {
         Ok(resp.total)
     }
 
+    async fn import(
+        &self,
+        _name: &str,
+        _journal: JournalFile,
+        _merge: bool,
+        _archived: bool,
+    ) -> Result<(usize, usize), StoreError> {
+        Err(io_err(
+            "import is not supported by remote stores; use pipes instead: \
+             foray export <name> | ssh host foray import <name>",
+        ))
+    }
+
     async fn list(&self) -> Result<(Vec<JournalSummary>, usize), StoreError> {
         // Protocol 0 servers have only active journals and don't accept `archived`
         // as a filter — a single call is sufficient. adapt_receive tags all entries

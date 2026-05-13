@@ -260,6 +260,60 @@ impl Store for JsonFileStore {
         Ok(count)
     }
 
+    async fn import(
+        &self,
+        name: &str,
+        journal: JournalFile,
+        merge: bool,
+        archived: bool,
+    ) -> Result<(usize, usize), StoreError> {
+        if merge {
+            let path = self.journal_path(name);
+            if !path.exists() {
+                return Err(StoreError::NotFound(name.into()));
+            }
+            let _lock = self.with_lock(name)?;
+            let mut dest = self.read_journal(&path)?;
+            dest.name = name.to_string();
+            let existing_ids: std::collections::HashSet<&str> =
+                dest.items.iter().map(|i| i.id.as_str()).collect();
+            let mut skipped = 0usize;
+            let to_add: Vec<JournalItem> = journal
+                .items
+                .into_iter()
+                .filter(|i| {
+                    if existing_ids.contains(i.id.as_str()) {
+                        skipped += 1;
+                        false
+                    } else {
+                        true
+                    }
+                })
+                .collect();
+            let added = to_add.len();
+            dest.items.extend(to_add);
+            self.write_journal(&path, &dest)?;
+            Ok((added, skipped))
+        } else {
+            let path = self.journal_path(name);
+            if path.exists() || self.archive_path(name).exists() {
+                return Err(StoreError::AlreadyExists(name.to_string()));
+            }
+            let mut new_journal = JournalFile::new(name, journal.title, journal.meta);
+            let added = journal.items.len();
+            new_journal.items = journal.items;
+            let dest_path = if archived {
+                let archive_dir = self.base_dir.join("archive");
+                fs::create_dir_all(&archive_dir)?;
+                archive_dir.join(format!("{name}.json"))
+            } else {
+                path
+            };
+            self.write_journal(&dest_path, &new_journal)?;
+            Ok((added, 0))
+        }
+    }
+
     async fn list(&self) -> Result<(Vec<JournalSummary>, usize), StoreError> {
         let mut summaries = self.list_dir(&self.base_dir)?;
         for s in &mut summaries {

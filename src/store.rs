@@ -64,6 +64,23 @@ pub(crate) trait Store: Send + Sync {
         items: Vec<JournalItem>,
         archived: bool,
     ) -> Result<usize, StoreError>;
+    /// Import a journal from an external [`JournalFile`].
+    ///
+    /// - `merge: false` — create a new journal (fails if it already exists).
+    ///   Source `title` and `meta` are used. `archived` controls whether the
+    ///   new journal is created in archived state.
+    /// - `merge: true` — append items to an existing active journal, skipping
+    ///   any whose `id` already exists in the destination. Source `title`,
+    ///   `meta`, and `archived` are ignored.
+    ///
+    /// Returns `(added, skipped)`.
+    async fn import(
+        &self,
+        name: &str,
+        journal: JournalFile,
+        merge: bool,
+        archived: bool,
+    ) -> Result<(usize, usize), StoreError>;
     async fn list(&self) -> Result<(Vec<JournalSummary>, usize), StoreError>;
     async fn delete(&self, name: &str, archived: bool) -> Result<(), StoreError>;
     async fn archive(&self, name: &str) -> Result<(), StoreError>;
