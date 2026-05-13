@@ -86,6 +86,13 @@ Items:   3 / 3
 ...
 ```
 
+Export a journal to a JSON file (or stdout):
+
+```
+$ foray export auth-triage > auth-triage.json
+$ foray export --archived old-investigation > old-investigation.json
+```
+
 Work against a remote foray instance configured in `~/.foray/config.toml`:
 
 ```

@@ -125,6 +125,9 @@ pub(crate) enum Commands {
         /// Output file (default: stdout)
         #[arg(long)]
         file: Option<PathBuf>,
+        /// Export an archived journal
+        #[arg(long)]
+        archived: bool,
     },
     /// Import journal JSON from stdin or file
     Import {
@@ -593,8 +596,24 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             store.unarchive(name).await?;
             println!("Unarchived: {name}");
         }
-        Commands::Export { name, file } => {
-            let (journal, _) = store.load(name, &Pagination::all(), false).await?;
+        Commands::Export {
+            name,
+            file,
+            archived,
+        } => {
+            validate_name(name).map_err(|e| anyhow::anyhow!(e))?;
+            let (journal, _) = store
+                .load(name, &Pagination::all(), *archived)
+                .await
+                .map_err(|e| match e {
+                    crate::store::StoreError::NotFound(_) if *archived => {
+                        anyhow::anyhow!("journal '{name}' not found in archived location; it may be active (omit --archived)")
+                    }
+                    crate::store::StoreError::NotFound(_) => {
+                        anyhow::anyhow!("journal '{name}' not found; it may be archived (use --archived)")
+                    }
+                    e => e.into(),
+                })?;
             let data = serde_json::to_string_pretty(&journal)?;
             match file {
                 Some(path) => std::fs::write(path, format!("{data}\n"))?,
