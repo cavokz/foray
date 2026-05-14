@@ -19,6 +19,8 @@ pub(crate) enum StoreError {
     },
     #[error("wire protocol {found} is too new (max supported: {max})")]
     ProtocolTooNew { found: u32, max: u32 },
+    #[error("operation not supported on remote stores: {0}")]
+    Unsupported(String),
     #[error("I/O error: {0}")]
     Io(#[from] std::io::Error),
     #[error("JSON error: {0}")]
@@ -50,8 +52,7 @@ pub(crate) trait Store: Send + Sync {
     ) -> Result<(), StoreError>;
     async fn add_items(&self, name: &str, items: Vec<JournalItem>) -> Result<usize, StoreError>;
     async fn list(&self, archived: bool) -> Result<(Vec<JournalSummary>, usize), StoreError>;
-    #[allow(dead_code)]
-    async fn delete(&self, name: &str) -> Result<(), StoreError>;
+    async fn delete(&self, name: &str, archived: bool) -> Result<(), StoreError>;
     async fn archive(&self, name: &str) -> Result<(), StoreError>;
     async fn unarchive(&self, name: &str) -> Result<(), StoreError>;
 }

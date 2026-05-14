@@ -88,6 +88,18 @@ Connecting to remote foray...
 
 The `--store` flag selects a named store from `~/.foray/config.toml`. Without it the default (local) store is used. Use `--store remote` with any command to target the remote store, or set `FORAY_STORE=remote` in your environment.
 
+Delete a journal permanently:
+
+```
+$ foray delete auth-triage
+Deleted: auth-triage
+
+$ foray delete old-investigation --archived   # delete from archived location
+Deleted: old-investigation
+```
+
+`foray delete` looks only in the expected location (active or archived). If the journal is not there, it returns an error — it does not probe the other location.
+
 ## Trust Model
 
 The **store** is the trust boundary. When you connect foray to a store, you trust all content in that store — every journal, every item. There is no per-journal access control.
