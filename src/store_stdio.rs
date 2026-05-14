@@ -485,13 +485,6 @@ fn io_err(msg: impl Into<String>) -> StoreError {
     StoreError::Io(io::Error::other(msg.into()))
 }
 
-fn unsupported_err(op: &str) -> StoreError {
-    StoreError::Io(io::Error::new(
-        io::ErrorKind::Unsupported,
-        format!("StdioStore: '{op}' is not exposed by the remote MCP server"),
-    ))
-}
-
 /// Returns true if the error message indicates a stale nuance token.
 fn is_nuance_mismatch(msg: &str) -> bool {
     msg.contains("call 'hello' to get the current nuance")
@@ -698,8 +691,8 @@ impl Store for StdioStore {
         Ok((resp.journals, total))
     }
 
-    async fn delete(&self, _name: &str) -> Result<(), StoreError> {
-        Err(unsupported_err("delete"))
+    async fn delete(&self, _name: &str, _archived: bool) -> Result<(), StoreError> {
+        Err(StoreError::Unsupported("delete".into()))
     }
 
     async fn archive(&self, name: &str) -> Result<(), StoreError> {

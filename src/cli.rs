@@ -89,6 +89,16 @@ pub(crate) enum Commands {
         #[arg(long, conflicts_with = "json")]
         completion: bool,
     },
+    /// Delete a journal permanently
+    Delete {
+        /// Journal name
+        #[arg()]
+        #[cfg_attr(feature = "dynamic-completion", arg(add = ArgValueCompleter::new(complete_journal_names)))]
+        name: String,
+        /// Delete an archived journal
+        #[arg(long)]
+        archived: bool,
+    },
     /// Archive a journal
     Archive {
         /// Journal name
@@ -555,6 +565,10 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                     }
                 }
             }
+        }
+        Commands::Delete { name, archived } => {
+            store.delete(name, *archived).await?;
+            println!("Deleted: {name}");
         }
         Commands::Archive { name } => {
             store.archive(name).await?;

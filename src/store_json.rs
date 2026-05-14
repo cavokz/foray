@@ -265,10 +265,15 @@ impl Store for JsonFileStore {
         Ok((summaries, total))
     }
 
-    async fn delete(&self, name: &str) -> Result<(), StoreError> {
-        let (path, _) = self
-            .find(name)
-            .ok_or_else(|| StoreError::NotFound(name.into()))?;
+    async fn delete(&self, name: &str, archived: bool) -> Result<(), StoreError> {
+        let path = if archived {
+            self.archive_path(name)
+        } else {
+            self.journal_path(name)
+        };
+        if !path.exists() {
+            return Err(StoreError::NotFound(name.into()));
+        }
         fs::remove_file(path)?;
         Ok(())
     }
@@ -398,9 +403,35 @@ mod tests {
     async fn delete_journal() {
         let (store, _dir) = make_store();
         store.create("to-delete", "D".into(), None).await.unwrap();
-        store.delete("to-delete").await.unwrap();
+        store.delete("to-delete", false).await.unwrap();
         assert!(matches!(
             store.load("to-delete", &Pagination::all()).await,
+            Err(StoreError::NotFound(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn delete_archived_journal() {
+        let (store, _dir) = make_store();
+        store.create("to-delete", "D".into(), None).await.unwrap();
+        store.archive("to-delete").await.unwrap();
+        assert!(matches!(
+            store.delete("to-delete", false).await,
+            Err(StoreError::NotFound(_))
+        ));
+        store.delete("to-delete", true).await.unwrap();
+        assert!(matches!(
+            store.load("to-delete", &Pagination::all()).await,
+            Err(StoreError::NotFound(_))
+        ));
+    }
+
+    #[tokio::test]
+    async fn delete_wrong_location_errors() {
+        let (store, _dir) = make_store();
+        store.create("to-delete", "D".into(), None).await.unwrap();
+        assert!(matches!(
+            store.delete("to-delete", true).await,
             Err(StoreError::NotFound(_))
         ));
     }
