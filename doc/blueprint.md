@@ -210,7 +210,7 @@ Prompts are the fallback for LLMs without the companion skill. They provide just
 |------|--------|-------------|
 | `hello` | *(none)* | Establish handshake. Returns `{ version, nuance, protocol, stores, skill_uri }`. Always call first — every session — then pass `nuance` and `store` on subsequent calls. `skill_uri` is the MCP resource URI for the companion skill (`foray://skill`). |
 | `create_journal` | `name`, `title`, `meta?`, `store`, `nuance` | Create a new journal. `title` is required (non-empty, error if missing). Returns `AlreadyExists` if the journal already exists. `meta` sets journal-level metadata. `store` must be a name from the `hello` response. |
-| `sync_journal` | `name`, `from`, `size`, `items?`, `store`, `nuance` | Read and write journal items in one call. `from` is a plain integer offset (0 = start). `size` limits returned items — the caller is responsible for choosing a size that fits within their output budget (does not affect additions). `items` is an array of `{ content, item_type?, tags?, meta? }`. Use `meta.ref` for file paths, URLs, ticket links, PR links, or cross-journal references (`foray:name`). Returns `from` for the next call (= next offset) and `added_ids` for items added by this call. `store` must be a name from the `hello` response. |
+| `sync_journal` | `name`, `from`, `size`, `archived`, `items?`, `store`, `nuance` | Read and write journal items in one call. `from` is a plain integer offset (0 = start). `size` limits returned items — the caller is responsible for choosing a size that fits within their output budget (does not affect additions). `archived` is required — pass the value known from `list_journals` (or `false` for freshly created journals). `items` is an array of `{ content, item_type?, tags?, meta? }`. Use `meta.ref` for file paths, URLs, ticket links, PR links, or cross-journal references (`foray:name`). Returns `from` for the next call (= next offset) and `added_ids` for items added by this call. `store` must be a name from the `hello` response. |
 | `list_journals` | `archived?`, `store`, `nuance` | List journals in the selected store. Pass `archived: true` to list archived journals instead of active ones. Returns all journals in one call. Each entry includes `avg_item_size` and `std_item_size` (serialized JSON byte sizes) — use these to compute a safe `size` for `sync_journal`: `floor(output_budget / (avg_item_size + 2 × std_item_size))`. |
 | `archive_journal` | `name`, `store`, `nuance` | Archive a journal. Archived journals are readable but not writable. |
 | `unarchive_journal` | `name`, `store`, `nuance` | Restore an archived journal, making it writable again. |
@@ -275,14 +275,14 @@ Each MCP tool invocation is traced to **stderr** (stdout carries the JSON-RPC wi
 
 ```
 foray serve                          # Start MCP stdio server
-foray show [name] [--json]  # Full journal with items
+foray show [name] [--json] [--follow] [--archived]  # Full journal with items. --archived shows an archived journal. --follow tails new items.
 foray add <content> [--type TYPE] [--ref REF] [--tags CSV] [--meta KEY=VALUE]...
 foray create <name> --title "..." [--meta KEY=VALUE]...  # Always creates; --title required.
 foray list [--json] [--archived] [--completion]  # List journals. --archived shows archived. --json outputs {"total": N, "journals": [...]}. --completion outputs bare names (for shell scripts).
 foray delete <name> [--archived]        # Permanently delete a journal. --archived deletes from archived location; without it, deletes from active location.
 foray archive <name>                   # Archive a journal
 foray unarchive <name>                 # Unarchive a journal
-foray export <name> [--file PATH]       # Export journal JSON to stdout (or file)
+foray export <name> [--file PATH] [--archived]  # Export journal JSON to stdout (or file). --archived exports from archived location.
 foray import [--file PATH]              # Import journal JSON from stdin (or file)
 foray completions <shell>               # Print shell completion script (bash, zsh, fish, elvish, powershell)
 ```
@@ -327,8 +327,8 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
    - Both `JournalFile`, `JournalItem`, and `JournalSummary` get `#[serde(deny_unknown_fields)]` and `meta: Option<HashMap<String, serde_json::Value>>` for client-specific extensibility
    - `validate_name()` for journal name validation
 2. `store.rs`:
-   - `#[async_trait] trait Store: Send + Sync` with async methods: `load(name, pagination) -> (JournalFile, total)`, `create(name, title, meta)`, `add_items(name, Vec<JournalItem>)`, `list(archived) -> (Vec<JournalSummary>, total)`, `delete(name, archived: bool)`, `exists`, `archive`, `unarchive`
-   - `load` reads both active and archived journals (always readable).
+   - `#[async_trait] trait Store: Send + Sync` with async methods: `load(name, pagination, archived: bool) -> (JournalFile, total)`, `create(name, title, meta)`, `add_items(name, Vec<JournalItem>)`, `list(archived) -> (Vec<JournalSummary>, total)`, `delete(name, archived: bool)`, `archive`, `unarchive`
+   - `load(name, pagination, archived)` uses strict location lookup: `archived: false` reads from the active directory, `archived: true` from the archive directory — returns `NotFound` if not present in the expected location. `StdioStore::load` passes `archived` to the remote server via the `sync_journal` `archived` param (added in protocol 1); protocol 0 servers return an error when `archived: true` is requested.
    - `add_items` errors if the journal is archived.
    - `archive(name) -> Result<()>` marks a journal as archived; `unarchive(name) -> Result<()>` restores it. `unarchive` on an already-active journal is idempotent. `archive` on an already-archived journal returns `StoreError::Archived`.
    - `list(archived: bool)` returns all active journals by default, all archived when `archived = true`.
@@ -434,8 +434,8 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 4. MCP integration:
    - Configure in VS Code → tools appear
    - `create_journal(name: "auth-triage", title: "Auth cache investigation")` → creates journal
-   - `sync_journal(name: "auth-triage", items: [{ content: "..." }])` → adds item
-   - `list_journals` → flat list
+   - `sync_journal(name: "auth-triage", from: 0, size: 10, archived: false, items: [{ content: "..." }])` → adds item and reads page
+   - `list_journals(archived: false)` → flat list of active journals
 5. Companion skill auto-triggers in VS Code
 
 ## Decisions

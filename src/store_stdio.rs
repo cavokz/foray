@@ -597,10 +597,12 @@ impl Store for StdioStore {
         &self,
         name: &str,
         pagination: &Pagination,
+        archived: bool,
     ) -> Result<(JournalFile, usize), StoreError> {
         let from = pagination.from;
         let size = pagination.size;
-        let args = serde_json::json!({ "name": name, "from": from, "size": size });
+        let args =
+            serde_json::json!({ "name": name, "from": from, "size": size, "archived": archived });
 
         let wire: SyncJournalWire = self.call_mcp("sync_journal", args).await?;
 
@@ -679,7 +681,7 @@ impl Store for StdioStore {
             })
             .collect();
 
-        let args = serde_json::json!({ "name": name, "from": 0, "size": 0, "items": items_json });
+        let args = serde_json::json!({ "name": name, "from": 0, "size": 0, "archived": false, "items": items_json });
         let resp: SyncJournalWire = self.call_mcp("sync_journal", args).await?;
         Ok(resp.total)
     }
@@ -924,7 +926,7 @@ mod tests {
 
         // ── load ─────────────────────────────────────────────────────────
         let (loaded, item_total) = store
-            .load("remote-test", &Pagination::all())
+            .load("remote-test", &Pagination::all(), false)
             .await
             .expect("load should succeed");
 
@@ -937,7 +939,7 @@ mod tests {
         // ── exists (via load) ─────────────────────────────────────────────
         assert!(
             store
-                .load("remote-test", &Pagination { from: 0, size: 0 })
+                .load("remote-test", &Pagination { from: 0, size: 0 }, false)
                 .await
                 .is_ok(),
             "remote-test should exist"
@@ -945,7 +947,7 @@ mod tests {
         assert!(
             matches!(
                 store
-                    .load("no-such-journal", &Pagination { from: 0, size: 0 })
+                    .load("no-such-journal", &Pagination { from: 0, size: 0 }, false)
                     .await,
                 Err(StoreError::NotFound(_))
             ),
@@ -954,7 +956,7 @@ mod tests {
 
         // ── load not found ───────────────────────────────────────────────
         let not_found = store
-            .load("no-such-journal", &Pagination { from: 0, size: 0 })
+            .load("no-such-journal", &Pagination { from: 0, size: 0 }, false)
             .await;
         assert!(
             matches!(not_found, Err(StoreError::NotFound(_))),

@@ -74,17 +74,21 @@ sequenceDiagram
     participant M as migrate
     participant FS as Filesystem
 
-    C->>S: call_tool("sync_journal",\n  {name, from, size, items?, store, nuance})
+    C->>S: call_tool("sync_journal",\n  {name, from, size, archived, items?, store, nuance})
     S->>S: preflight(nuance) · validate_name(name)
 
-    opt items provided
+    opt items provided (archived must be false)
         S->>J: add_items(name, items)
         J->>FS: lock <name>.lock · read · append · write · unlock
         FS-->>J: ok
     end
 
-    S->>J: load(name, {from, size})
-    J->>FS: read <name>.json
+    S->>J: load(name, {from, size}, archived)
+    alt archived == false
+        J->>FS: read journals/<name>.json
+    else archived == true
+        J->>FS: read journals/archive/<name>.json
+    end
     FS-->>J: raw JSON bytes
     J->>M: migrate(raw)
 
@@ -202,8 +206,8 @@ sequenceDiagram
     participant M as migrate
 
     SS->>A: adapt_tool(0, "sync_journal") → "sync_journal" (unchanged)
-    SS->>A: adapt_send(0, "sync_journal",\n  {name, from:5, size:10, store:"local"})
-    note over A: strip store · rename from→cursor · size→limit
+    SS->>A: adapt_send(0, "sync_journal",\n  {name, from:5, size:10, archived:false, store:"local"})
+    note over A: strip store · strip archived:false · rename from→cursor · size→limit
     A-->>SS: {name, cursor:5, limit:10}
 
     SS->>R: call_tool("sync_journal", {name, cursor:5, limit:10})

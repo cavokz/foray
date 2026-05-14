@@ -54,6 +54,8 @@ When connected to a protocol 0 server, `adapt_send` and `adapt_receive` wrap eve
 | Any call with `store: "work"` (non-default store) | Send | Cannot adapt — v0.2.0 has no multi-store | Error: *"store 'work' not found: protocol 0 server exposes a single implicit store 'local'"* — also caught eagerly at connect time |
 | `list_journals` with `archived: false` | Send | Strips `archived` param | Transparent |
 | `list_journals` with `archived: true` | Send | Cannot adapt — archive feature did not exist in v0.2.0 | Error: *"archived journals not supported by protocol 0 server; upgrade the remote foray"* |
+| `sync_journal` with `archived: false` | Send | Strips `archived` param | Transparent |
+| `sync_journal` with `archived: true` | Send | Cannot adapt — archive feature did not exist in v0.2.0 | Error: *"archived journals not supported by protocol 0 server; upgrade the remote foray"* |
 | `archive_journal` / `unarchive_journal` | Send | Tool did not exist in v0.2.0 | Error: *"'archive_journal' is not supported by protocol 0 server; upgrade the remote foray"* |
 | `hello` response missing `protocol`, `stores` | Receive | `adapt_receive` injects `protocol: 0`, synthesises `stores: [{name:"local", …}]` | Transparent |
 | `create_journal` | Send | Rewrites tool name to `open_journal` (via `adapt_tool`) | Transparent |

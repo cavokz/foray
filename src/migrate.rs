@@ -184,7 +184,7 @@ pub(crate) fn adapt_send(
     // `deny_unknown_fields`:
     //   all tools:          `store` (protocol 0 servers have a single implicit store)
     //   list_journals:      `archived` (archive feature did not exist)
-    //   sync_journal:       `from` renamed from `cursor`, `size` renamed from `limit`
+    //   sync_journal:       `from` renamed from `cursor`, `size` renamed from `limit`; `archived` added
     //   archive_journal:    entire tool did not exist
     //   unarchive_journal:  entire tool did not exist
     //   create_journal:     renamed from `open_journal` (tool name rewrite in adapt_tool)
@@ -229,6 +229,7 @@ pub(crate) fn adapt_send(
             if tool == "sync_journal" {
                 // `from`/`size` were introduced in protocol 1; translate back to
                 // `cursor`/`limit` for protocol 0 servers.
+                // `archived` was also introduced in protocol 1; strip false, error on true.
                 if let Some(from) = obj.remove("from") {
                     // Only send `cursor` if non-zero; protocol 0 servers default to 0.
                     if from.as_u64() != Some(0) {
@@ -237,6 +238,16 @@ pub(crate) fn adapt_send(
                 }
                 if let Some(size) = obj.remove("size") {
                     obj.insert("limit".to_string(), size);
+                }
+                match obj.get("archived").and_then(Value::as_bool) {
+                    Some(true) => {
+                        return Err("archived journals not supported by protocol 0 server; \
+                             upgrade the remote foray"
+                            .to_string());
+                    }
+                    _ => {
+                        obj.remove("archived");
+                    }
                 }
             }
         }
@@ -593,6 +604,26 @@ mod tests {
         let args = json!({ "store": "remote", "name": "j" });
         let err = adapt_send(0, "create_journal", args).unwrap_err();
         assert!(err.contains("store 'remote' not found"), "got: {err}");
+    }
+
+    #[test]
+    fn adapt_send_sync_journal_strips_archived_false_for_protocol_0() {
+        let args = json!({ "store": PROTOCOL_0_IMPLICIT_STORE, "name": "j", "from": 0, "size": 10, "archived": false });
+        let result = adapt_send(0, "sync_journal", args).unwrap();
+        assert!(
+            result.get("archived").is_none(),
+            "archived false should be stripped"
+        );
+    }
+
+    #[test]
+    fn adapt_send_sync_journal_errors_on_archived_true_for_protocol_0() {
+        let args = json!({ "store": PROTOCOL_0_IMPLICIT_STORE, "name": "j", "from": 0, "size": 10, "archived": true });
+        let err = adapt_send(0, "sync_journal", args).unwrap_err();
+        assert!(
+            err.contains("archived journals not supported"),
+            "got: {err}"
+        );
     }
 
     #[test]

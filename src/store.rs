@@ -43,6 +43,7 @@ pub(crate) trait Store: Send + Sync {
         &self,
         name: &str,
         pagination: &Pagination,
+        archived: bool,
     ) -> Result<(JournalFile, usize), StoreError>;
     async fn create(
         &self,

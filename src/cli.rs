@@ -48,6 +48,9 @@ pub(crate) enum Commands {
         /// Follow: watch for new items in real time
         #[arg(short, long)]
         follow: bool,
+        /// Show an archived journal
+        #[arg(long)]
+        archived: bool,
     },
     /// Add an item to the current journal
     Add {
@@ -122,6 +125,9 @@ pub(crate) enum Commands {
         /// Output file (default: stdout)
         #[arg(long)]
         file: Option<PathBuf>,
+        /// Export from archived location
+        #[arg(long)]
+        archived: bool,
     },
     /// Import journal JSON from stdin or file
     Import {
@@ -453,15 +459,26 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
         Commands::Completions { .. } => {
             unreachable!("completions is handled in main")
         }
-        Commands::Show { name, json, follow } => {
+        Commands::Show {
+            name,
+            json,
+            follow,
+            archived,
+        } => {
             let journal_name = resolve_journal(cli.journal.as_deref(), name.as_deref())?;
-            let (journal, total) = store.load(&journal_name, &Pagination::all()).await?;
+            let (journal, total) = store
+                .load(&journal_name, &Pagination::all(), *archived)
+                .await?;
             if *json {
                 for item in &journal.items {
                     println!("{}", serde_json::to_string(item)?);
                 }
             } else {
-                println!("Journal: {}", journal.name);
+                if *archived {
+                    println!("Journal: {} (archived)", journal.name);
+                } else {
+                    println!("Journal: {}", journal.name);
+                }
                 println!("Title:   {}", journal.title);
                 println!("Items:   {} / {total}", journal.items.len());
                 println!();
@@ -477,7 +494,7 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                         from: seen,
                         size: usize::MAX,
                     };
-                    let (journal, new_total) = store.load(&journal_name, &all).await?;
+                    let (journal, new_total) = store.load(&journal_name, &all, *archived).await?;
                     if new_total > seen {
                         for item in &journal.items {
                             if *json {
@@ -578,8 +595,12 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             store.unarchive(name).await?;
             println!("Unarchived: {name}");
         }
-        Commands::Export { name, file } => {
-            let (journal, _) = store.load(name, &Pagination::all()).await?;
+        Commands::Export {
+            name,
+            file,
+            archived,
+        } => {
+            let (journal, _) = store.load(name, &Pagination::all(), *archived).await?;
             let data = serde_json::to_string_pretty(&journal)?;
             match file {
                 Some(path) => std::fs::write(path, format!("{data}\n"))?,
@@ -899,5 +920,63 @@ mod tests {
             err.to_string().to_lowercase().contains("already exists"),
             "expected 'already exists' in error, got: {err}"
         );
+    }
+
+    #[tokio::test]
+    async fn show_archived_loads_archived_location() {
+        let _guard = SERIAL_LOCK.lock().await;
+        let dir = tempfile::TempDir::new().unwrap();
+        let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
+        let _cwd = CwdGuard::set(dir.path());
+
+        // Create and archive a journal.
+        run(
+            &make_cli(Commands::Create {
+                name: "arch-show".to_string(),
+                title: "Archived Journal".to_string(),
+                meta: vec![],
+            }),
+            &store,
+        )
+        .await
+        .unwrap();
+        run(
+            &make_cli(Commands::Archive {
+                name: "arch-show".to_string(),
+            }),
+            &store,
+        )
+        .await
+        .unwrap();
+
+        // show without --archived should fail (strict active-only lookup).
+        let err = run(
+            &make_cli(Commands::Show {
+                name: Some("arch-show".to_string()),
+                json: false,
+                follow: false,
+                archived: false,
+            }),
+            &store,
+        )
+        .await
+        .unwrap_err();
+        assert!(
+            err.to_string().to_lowercase().contains("not found"),
+            "expected not-found without --archived, got: {err}"
+        );
+
+        // show with --archived should succeed.
+        run(
+            &make_cli(Commands::Show {
+                name: Some("arch-show".to_string()),
+                json: false,
+                follow: false,
+                archived: true,
+            }),
+            &store,
+        )
+        .await
+        .expect("show --archived should succeed for archived journal");
     }
 }

@@ -112,6 +112,9 @@ struct SyncJournalParams {
     from: usize,
     /// Maximum number of items to return (does not affect additions — all items are always added).
     size: usize,
+    /// Whether the journal is archived. The model must always pass the correct value — it is known from the prior `list_journals` call (or `false` when creating/opening a new journal).
+    #[schemars(required)]
+    archived: bool,
     /// Items to add to the journal
     #[serde(default)]
     items: Option<Vec<SyncItemInput>>,
@@ -453,9 +456,15 @@ impl ForayServer {
         validate_name(&args.name).map_err(|e| ErrorData::invalid_params(e, None))?;
         let store = self.resolve_store(args.store.as_deref())?;
 
-        // Add items if provided
+        // Add items if provided. Items can only be added to active (non-archived) journals.
         let mut added_ids = Vec::new();
         if let Some(inputs) = args.items {
+            if args.archived {
+                return Err(ErrorData::invalid_params(
+                    "cannot add items to an archived journal",
+                    None,
+                ));
+            }
             let mut items_to_add = Vec::new();
             for input in inputs {
                 if input.content.len() > MAX_CONTENT {
@@ -498,7 +507,7 @@ impl ForayServer {
             size: args.size,
         };
         let (journal, total) = store
-            .load(&args.name, &pagination)
+            .load(&args.name, &pagination, args.archived)
             .await
             .map_err(Self::store_err)?;
 
@@ -603,7 +612,7 @@ impl ForayServer {
 
     #[tool(
         name = "sync_journal",
-        description = "Read and write journal items in one call. Returns items since your last `from` position. Pass items to add them. Pass `from` from the previous response to get only new items — use `from: 0` to read from the beginning. Response includes `from` for the next call and `added_ids` for items you added. Use `size` to limit the number of items returned — the caller is responsible for choosing a size that fits within their output budget. Compute a safe `size` using `avg_item_size` and `std_item_size` from `list_journals`: `size = floor(output_budget / (avg_item_size + 2 * std_item_size))`. The `from` field is a plain integer offset — `list_journals` already returns `item_count` (= total), so all page offsets (`0`, `size`, `2×size`, …) are known before any sync_journal call and all pages can be requested in parallel."
+        description = "Read and write journal items in one call. Returns items since your last `from` position. Pass items to add them. Pass `from` from the previous response to get only new items — use `from: 0` to read from the beginning. `archived` is required — pass `false` for active journals, `true` for archived ones; derive this from which `list_journals(archived: ...)` call returned the journal, or use `false` for freshly created journals. Items can only be added to active journals (`archived: false`). Response includes `from` for the next call and `added_ids` for items you added. Use `size` to limit the number of items returned — the caller is responsible for choosing a size that fits within their output budget. Compute a safe `size` using `avg_item_size` and `std_item_size` from `list_journals`: `size = floor(output_budget / (avg_item_size + 2 * std_item_size))`. The `from` field is a plain integer offset — `list_journals` already returns `item_count` (= total), so all page offsets (`0`, `size`, `2×size`, …) are known before any sync_journal call and all pages can be requested in parallel."
     )]
     async fn sync_journal(
         &self,
@@ -1241,7 +1250,7 @@ mod tests {
     #[test]
     fn sync_journal_params_store_field() {
         let p: SyncJournalParams = serde_json::from_str(
-            r#"{"name":"j","from":0,"size":10,"store":"local","nuance":"abc"}"#,
+            r#"{"name":"j","from":0,"size":10,"archived":false,"store":"local","nuance":"abc"}"#,
         )
         .unwrap();
         assert_eq!(p.store.as_deref(), Some("local"));

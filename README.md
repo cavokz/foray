@@ -76,6 +76,16 @@ Items:   1 / 1
   ref: src/auth/session.go:142
 ```
 
+View an archived journal:
+
+```
+$ foray show --archived old-investigation
+Journal: old-investigation (archived)
+Title:   Old investigation
+Items:   3 / 3
+...
+```
+
 Work against a remote foray instance configured in `~/.foray/config.toml`:
 
 ```

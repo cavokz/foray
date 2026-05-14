@@ -31,7 +31,7 @@ Use foray when the conversation involves **substantive, evolving work** — not 
 | `hello` | Establish handshake and get `nuance` + available `stores` — call this first, every session |
 | `list_journals` | Check existing journals before creating. Returns `avg_item_size` + `std_item_size` — use to compute a safe `size` for `sync_journal` |
 | `create_journal` | Create a new journal. Returns `AlreadyExists` if the journal already exists |
-| `sync_journal` | Read items and/or add new ones (the workhorse). Paginated via `from`/`size` |
+| `sync_journal` | Read items and/or add new ones (the workhorse). Paginated via `from`/`size`. **`archived` is required** — see below |
 | `archive_journal` | Archive a journal (readable but not writable) |
 | `unarchive_journal` | Restore an archived journal |
 
@@ -62,6 +62,16 @@ parallel:
 
 Stick to one store per journal within a session — a journal's store must be specified consistently.
 
+## `archived` in `sync_journal`
+
+`sync_journal` requires `archived: bool` on every call. Derive it from which `list_journals` call returned the journal — `list_journals` takes an `archived: bool` param, so all journals it returns share that flag:
+
+- **Returned by `list_journals(archived: false)`** → use `archived: false`
+- **Returned by `list_journals(archived: true)`** → use `archived: true`
+- **Freshly created journal** → `archived: false`
+
+Never guess.
+
 ## Recording Findings
 
 Add items as you discover things. Use the right type:
@@ -80,6 +90,7 @@ Always set `ref` when the finding relates to a specific file, URL, or ticket:
 ```
 sync_journal(
   name: "auth-cache-race",
+  archived: false,
   nuance: "...",
   items: [{
     content: "Race condition: two goroutines access session cache without lock",
@@ -97,6 +108,7 @@ When working in a version-controlled checkout, set VCS metadata on items so `ref
 ```
 sync_journal(
   name: "auth-cache-race",
+  archived: false,
   nuance: "...",
   items: [{
     content: "Lock added around cache access",
@@ -134,12 +146,12 @@ size = floor(output_budget / (avg_item_size + 2 × std_item_size))
 # If avg_item_size is absent (old server / empty journal) or std_item_size is absent (old server / <2 items): use size = 5
 
 parallel:
-  sync_journal(name: "auth-cache-race", from: 0,   size: 22, nuance: "...")
-  sync_journal(name: "auth-cache-race", from: 22,  size: 22, nuance: "...")
-  sync_journal(name: "auth-cache-race", from: 44,  size: 22, nuance: "...")
-  sync_journal(name: "auth-cache-race", from: 66,  size: 22, nuance: "...")
-  sync_journal(name: "auth-cache-race", from: 88,  size: 22, nuance: "...")
-  sync_journal(name: "auth-cache-race", from: 110, size: 22, nuance: "...")
+  sync_journal(name: "auth-cache-race", archived: false, from: 0,   size: 22, nuance: "...")
+  sync_journal(name: "auth-cache-race", archived: false, from: 22,  size: 22, nuance: "...")
+  sync_journal(name: "auth-cache-race", archived: false, from: 44,  size: 22, nuance: "...")
+  sync_journal(name: "auth-cache-race", archived: false, from: 66,  size: 22, nuance: "...")
+  sync_journal(name: "auth-cache-race", archived: false, from: 88,  size: 22, nuance: "...")
+  sync_journal(name: "auth-cache-race", archived: false, from: 110, size: 22, nuance: "...")
 ```
 
 **Never use a round-number heuristic (`size: 50`, `size: 100`, etc.) when `avg_item_size` and `std_item_size` are available.** Always compute from the formula above.
@@ -152,11 +164,11 @@ Use during an active session to pick up only new items added since the last read
 
 ```
 # Pick up new items since from: 42
-sync_journal(name: "auth-cache-race", from: 42, size: 30, nuance: "...")
+sync_journal(name: "auth-cache-race", archived: false, from: 42, size: 30, nuance: "...")
 → { total: 45, from: 45, items: [...3 new items...] }
 
 # Next call — nothing new
-sync_journal(name: "auth-cache-race", from: 45, size: 30, nuance: "...")
+sync_journal(name: "auth-cache-race", archived: false, from: 45, size: 30, nuance: "...")
 → { total: 45, from: 45, items: [] }
 ```
 
@@ -168,13 +180,13 @@ If a tool response exceeds your output budget, split the oversized page into two
 
 ```
 # Original call that returned too much
-sync_journal(name: "auth-cache-race", from: 44, size: 50, nuance: "...")
+sync_journal(name: "auth-cache-race", archived: false, from: 44, size: 50, nuance: "...")
 # → response too large
 
 # Split: re-request the same range as two half-sized calls
 parallel:
-  sync_journal(name: "auth-cache-race", from: 44, size: 25, nuance: "...")
-  sync_journal(name: "auth-cache-race", from: 69, size: 25, nuance: "...")
+  sync_journal(name: "auth-cache-race", archived: false, from: 44, size: 25, nuance: "...")
+  sync_journal(name: "auth-cache-race", archived: false, from: 69, size: 25, nuance: "...")
 ```
 
 Halve `size` until the responses fit. The item content is fixed — smaller `size` just means fewer items per call.
@@ -206,6 +218,7 @@ To reference another journal's finding, use the `ref` field with foray's cross-r
 ```
 sync_journal(
   name: "db-pooling-theory",
+  archived: false,
   nuance: "...",
   items: [{
     content: "This contradicts the earlier finding about cache timing",
@@ -227,6 +240,7 @@ Always tell the user when routing an item to a different journal, so they are no
 # Bug found during a design session — route to the bugs journal, not the current one
 sync_journal(
   name: "bugs",
+  archived: false,
   nuance: "...",
   items: [{ content: "...", item_type: "finding" }]
 )
@@ -240,6 +254,7 @@ Journals are **append-only**. Never ask to delete or edit items. If a finding wa
 ```
 sync_journal(
   name: "auth-cache-race",
+  archived: false,
   nuance: "...",
   items: [{
     content: "CORRECTION: session.go:142 is thread-safe — the race is in cache.go:89 instead",
@@ -258,6 +273,7 @@ sync_journal(
 - Set `ref` for file paths, URLs, ticket links, PR links
 - Don't use foray for simple one-shot Q&A with no follow-up work
 - Track `from` per journal: save the value returned by each `sync_journal` call; use incremental sync (pass last `from`) to pick up only new items, or complete sync (start from `from: 0`) to reload everything
+- **Always pass `archived`** on every `sync_journal` call — derive it from which `list_journals(archived: ...)` call returned the journal; use `false` for freshly created journals. Never omit or guess.
 - Route tangential items to the most appropriate journal, not always the current one
 - **Sync proactively** — don't wait to be asked. Sync at natural completion points: after a task is done, when a round of review comments is addressed, when the user signals approval ("good", "done", "looks good"). Batch items when it makes sense, but don't defer indefinitely.
 - **Never guess a page size.** When `avg_item_size` and `std_item_size` are available, always compute `size` from the formula. When they are absent, use `size: 5`. Round numbers like 30, 50, or 100 are never acceptable when stats are available.
