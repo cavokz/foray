@@ -74,7 +74,7 @@ sequenceDiagram
     participant M as migrate
     participant FS as Filesystem
 
-    C->>S: call_tool("sync_journal",\n  {name, from, size, items?, store, nuance})
+    C->>S: call_tool("sync_journal",\n  {name, from, size, archived, items?, store, nuance})
     S->>S: preflight(nuance) · validate_name(name)
 
     opt items provided
@@ -83,7 +83,7 @@ sequenceDiagram
         FS-->>J: ok
     end
 
-    S->>J: load(name, {from, size})
+    S->>J: load(name, {from, size}, archived)
     J->>FS: read <name>.json
     FS-->>J: raw JSON bytes
     J->>M: migrate(raw)
@@ -202,8 +202,8 @@ sequenceDiagram
     participant M as migrate
 
     SS->>A: adapt_tool(0, "sync_journal") → "sync_journal" (unchanged)
-    SS->>A: adapt_send(0, "sync_journal",\n  {name, from:5, size:10, store:"local"})
-    note over A: strip store · rename from→cursor · size→limit
+    SS->>A: adapt_send(0, "sync_journal",\n  {name, from:5, size:10, archived:false, store:"local"})
+    note over A: strip archived · strip store · rename from→cursor · size→limit
     A-->>SS: {name, cursor:5, limit:10}
 
     SS->>R: call_tool("sync_journal", {name, cursor:5, limit:10})
@@ -218,4 +218,41 @@ sequenceDiagram
     M-->>SS: Migrated({schema:1, name, title, items})
 
     SS-->>SS: deserialize JournalFile · return to caller
+```
+
+---
+
+## 7. `list_journals` via StdioStore — Protocol 0 vs Protocol 1
+
+`list_journals` is the only tool whose wire behaviour differs across protocol
+versions. Protocol 1 servers return all journals (active + archived) in a single
+call, each entry carrying `archived: bool`. Protocol 0 servers only had active
+journals and used `deny_unknown_fields`, so `adapt_send` strips `archived` from
+the request; `adapt_receive` tags every returned entry with `archived: false`
+from the original `request_args`.
+
+```mermaid
+sequenceDiagram
+    participant L as foray (local server)
+    participant SS as StdioStore
+    participant A as adapt layer
+    participant R as remote foray
+
+    alt protocol 1 (current)
+        L->>SS: store.list()
+        SS->>R: call_tool("list_journals", {})
+        R-->>SS: {journals:[{name, title, ..., archived:bool}, ...], total}
+        SS->>A: adapt_receive(1, "list_journals", ...) → noop
+        SS-->>L: Vec<JournalSummary> (active + archived, archived flag per entry)
+    else protocol 0 (foray v0.2.0)
+        L->>SS: store.list()
+        SS->>A: adapt_send(0, "list_journals", {archived:false, ...})
+        note over A: strip store · strip archived (v0 deny_unknown_fields)
+        SS->>R: call_tool("list_journals", {})
+        R-->>SS: {journals:[{name, title, ...}], total}
+        SS->>A: adapt_receive(0, "list_journals", {archived:false}, response)
+        note over A: tag each entry with archived:false from orig_args
+        A-->>SS: [{name, title, ..., archived:false}, ...]
+        SS-->>L: Vec<JournalSummary> (active only — v0 has no archived journals)
+    end
 ```

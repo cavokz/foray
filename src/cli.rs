@@ -530,7 +530,7 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 added_at: Utc::now(),
                 meta: parsed_meta,
             };
-            let count = store.add_items(&journal_name, vec![item]).await?;
+            let count = store.add_items(&journal_name, vec![item], false).await?;
             println!("Added to {journal_name} ({count} items)");
         }
         Commands::Create { name, title, meta } => {
@@ -545,7 +545,12 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             archived,
             completion,
         } => {
-            let (summaries, total) = store.list(*archived).await?;
+            let (all_summaries, _) = store.list().await?;
+            let summaries: Vec<_> = all_summaries
+                .into_iter()
+                .filter(|s| s.archived == *archived)
+                .collect();
+            let total = summaries.len();
 
             if *completion {
                 for s in &summaries {
@@ -623,7 +628,7 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             let items = journal.items;
             store.create(&name, journal.title, journal.meta).await?;
             if !items.is_empty() {
-                store.add_items(&name, items).await?;
+                store.add_items(&name, items, false).await?;
             }
             println!("Imported successfully");
         }

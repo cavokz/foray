@@ -66,6 +66,7 @@ pub(crate) struct JournalSummary {
     pub(crate) name: String,
     pub(crate) title: String,
     pub(crate) item_count: usize,
+    pub(crate) archived: bool,
     /// Average serialized byte size of items in this journal.
     /// `None` if the journal is empty or the server does not report it.
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -125,6 +126,7 @@ impl From<&JournalFile> for JournalSummary {
             name: j.name.clone(),
             title: j.title.clone(),
             item_count: n,
+            archived: false, // populated by the store after reading location
             avg_item_size,
             std_item_size,
             schema: Some(j.schema),

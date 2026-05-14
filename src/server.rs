@@ -112,6 +112,8 @@ struct SyncJournalParams {
     from: usize,
     /// Maximum number of items to return (does not affect additions — all items are always added).
     size: usize,
+    /// Whether the journal is archived. The model must always pass the correct value — it is known from the prior `list_journals` call (or `false` when creating/opening a new journal).
+    archived: bool,
     /// Items to add to the journal
     #[serde(default)]
     items: Option<Vec<SyncItemInput>>,
@@ -128,9 +130,6 @@ struct SyncJournalParams {
 #[derive(Debug, Deserialize, JsonSchema)]
 #[serde(deny_unknown_fields)]
 struct ListJournalsParams {
-    /// List archived journals instead of active ones
-    #[serde(default)]
-    archived: bool,
     /// Store name from `hello` stores list — required
     #[serde(default)]
     #[schemars(required)]
@@ -307,13 +306,12 @@ impl ForayServer {
                     "hint": "Use a different name or load the existing journal.",
                 })),
             ),
-            StoreError::Archived(name) => ErrorData::invalid_params(
-                format!("journal is archived: {name}"),
+            StoreError::ReadOnly(name) => ErrorData::invalid_params(
+                format!("journal is read-only: {name}"),
                 Some(serde_json::json!({
-                    "type": "journal_archived",
+                    "type": "journal_read_only",
                     "name": name,
-                    "remedy": "call_unarchive_journal",
-                    "hint": "Call 'unarchive_journal' to restore it.",
+                    "hint": "Journal is archived. Call 'unarchive_journal' to make it writable again.",
                 })),
             ),
             StoreError::SchemaTooNew { found, max, origin } => {
@@ -487,7 +485,7 @@ impl ForayServer {
                 added_ids.push(id);
             }
             store
-                .add_items(&args.name, items_to_add)
+                .add_items(&args.name, items_to_add, args.archived)
                 .await
                 .map_err(Self::store_err)?;
         }
@@ -498,7 +496,7 @@ impl ForayServer {
             size: args.size,
         };
         let (journal, total) = store
-            .load(&args.name, &pagination, false)
+            .load(&args.name, &pagination, args.archived)
             .await
             .map_err(Self::store_err)?;
 
@@ -530,7 +528,7 @@ impl ForayServer {
     ) -> Result<CallToolResult, ErrorData> {
         self.preflight(args.nuance.as_deref())?;
         let store = self.resolve_store(args.store.as_deref())?;
-        let (summaries, total) = store.list(args.archived).await.map_err(Self::store_err)?;
+        let (summaries, total) = store.list().await.map_err(Self::store_err)?;
 
         let journals: Vec<serde_json::Value> = summaries
             .iter()
@@ -629,16 +627,15 @@ impl ForayServer {
 
     #[tool(
         name = "list_journals",
-        description = "List journals. Pass `archived: true` to list archived journals instead of active ones. Returns all journals in one call. Each entry includes `avg_item_size` (average serialized JSON byte size of all items) and `std_item_size` (standard deviation) — use these to compute a safe sync_journal size: floor(output_budget / (avg_item_size + 2 * std_item_size)). `avg_item_size` is absent for empty journals or old servers; `std_item_size` is also absent for single-item journals. When absent, use size: 5 as a safe default."
+        description = "List journals. Returns all journals in one call — both active and archived. Each entry includes `archived` (bool), `avg_item_size` (average serialized JSON byte size of all items) and `std_item_size` (standard deviation) — use these to compute a safe sync_journal size: floor(output_budget / (avg_item_size + 2 * std_item_size)). `avg_item_size` is absent for empty journals or old servers; `std_item_size` is also absent for single-item journals. When absent, use size: 5 as a safe default."
     )]
     async fn list_journals(
         &self,
         Parameters(args): Parameters<ListJournalsParams>,
     ) -> Result<CallToolResult, ErrorData> {
         eprintln!(
-            "list_journals ({}){}",
-            Self::sanitize(args.store.as_deref().unwrap_or("?")),
-            if args.archived { " archived" } else { "" }
+            "list_journals ({})",
+            Self::sanitize(args.store.as_deref().unwrap_or("?"))
         );
         self.do_list_journals(args)
             .await
@@ -934,20 +931,20 @@ mod tests {
     }
 
     #[test]
-    fn store_err_archived_is_invalid_params() {
-        let err = ForayServer::store_err(StoreError::Archived("my-journal".into()));
+    fn store_err_read_only_is_invalid_params() {
+        let err = ForayServer::store_err(StoreError::ReadOnly("my-journal".into()));
         assert!(
-            err.message.contains("archived"),
-            "expected 'archived' in message, got: {}",
+            err.message.contains("read-only"),
+            "expected 'read-only' in message, got: {}",
             err.message
         );
         assert_eq!(
             err.data.as_ref().and_then(|d| d["type"].as_str()),
-            Some("journal_archived")
+            Some("journal_read_only")
         );
         assert_eq!(
-            err.data.as_ref().and_then(|d| d["remedy"].as_str()),
-            Some("call_unarchive_journal")
+            err.data.as_ref().and_then(|d| d["name"].as_str()),
+            Some("my-journal")
         );
         assert!(err.data.as_ref().and_then(|d| d["hint"].as_str()).is_some());
     }
@@ -1025,12 +1022,12 @@ mod tests {
         assert!(json.get("id").is_none());
 
         // Verify active list no longer contains it.
-        let (active, _) = store.list(false).await.unwrap();
-        assert!(!active.iter().any(|s| s.name == "arc-test"));
+        let (all, _) = store.list().await.unwrap();
+        assert!(!all.iter().any(|s| !s.archived && s.name == "arc-test"));
 
         // Verify archived list contains it.
-        let (archived, _) = store.list(true).await.unwrap();
-        assert!(archived.iter().any(|s| s.name == "arc-test"));
+        let (all, _) = store.list().await.unwrap();
+        assert!(all.iter().any(|s| s.archived && s.name == "arc-test"));
 
         // Unarchive it.
         let unarchive_args = Parameters(UnarchiveJournalParams {
@@ -1049,8 +1046,8 @@ mod tests {
         assert_eq!(json["unarchived"], "arc-test");
 
         // Verify it is active again.
-        let (active, _) = store.list(false).await.unwrap();
-        assert!(active.iter().any(|s| s.name == "arc-test"));
+        let (all, _) = store.list().await.unwrap();
+        assert!(all.iter().any(|s| !s.archived && s.name == "arc-test"));
     }
 
     #[tokio::test]
@@ -1241,7 +1238,7 @@ mod tests {
     #[test]
     fn sync_journal_params_store_field() {
         let p: SyncJournalParams = serde_json::from_str(
-            r#"{"name":"j","from":0,"size":10,"store":"local","nuance":"abc"}"#,
+            r#"{"name":"j","from":0,"size":10,"archived":false,"store":"local","nuance":"abc"}"#,
         )
         .unwrap();
         assert_eq!(p.store.as_deref(), Some("local"));

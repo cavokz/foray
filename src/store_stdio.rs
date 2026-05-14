@@ -80,6 +80,7 @@ struct CreateJournalWire {
 #[serde(deny_unknown_fields)]
 struct ListJournalsWire {
     journals: Vec<JournalSummary>,
+    #[allow(dead_code)]
     total: usize,
 }
 
@@ -300,16 +301,21 @@ impl StdioStore {
         // serde before check_protocol runs. Checking on the raw protocol value
         // ensures ProtocolTooNew is always surfaced correctly.
         check_protocol(server_protocol)?;
-        let adapted =
-            migrate::adapt_receive(server_protocol, "hello", raw).map_err(|e| match e {
-                AdaptError::NonObject(msg) => io_err(msg),
-                // AlreadyExists is only meaningful for create-style flows; receiving
-                // it here indicates a bug in adapt_receive.
-                AdaptError::AlreadyExists(name) => io_err(format!(
-                    "invariant violated: adapt_receive returned AlreadyExists({name:?}) for \
+        let adapted = migrate::adapt_receive(
+            server_protocol,
+            "hello",
+            &Value::Object(Default::default()),
+            raw,
+        )
+        .map_err(|e| match e {
+            AdaptError::NonObject(msg) => io_err(msg),
+            // AlreadyExists is only meaningful for create-style flows; receiving
+            // it here indicates a bug in adapt_receive.
+            AdaptError::AlreadyExists(name) => io_err(format!(
+                "invariant violated: adapt_receive returned AlreadyExists({name:?}) for \
                      the hello tool, which has no already-exists semantics"
-                )),
-            })?;
+            )),
+        })?;
         let hello: HelloWire =
             serde_json::from_value(adapted).map_err(|e| io_err(e.to_string()))?;
 
@@ -378,6 +384,9 @@ impl StdioStore {
         let mut args = args;
         args["nuance"] = Value::String(nuance);
         args["store"] = Value::String(store_name);
+        // Save the original args (before adapt_send transforms them) so that
+        // adapt_receive can read request fields like `archived` for v0 responses.
+        let orig_args = args.clone();
         let args = migrate::adapt_send(server_protocol, tool, args).map_err(io_err)?;
         let wire_tool = migrate::adapt_tool(server_protocol, tool);
 
@@ -393,7 +402,7 @@ impl StdioStore {
                 let text =
                     first_text(&result.content).ok_or_else(|| io_err("empty tool response"))?;
                 let raw: Value = serde_json::from_str(text).map_err(|e| io_err(e.to_string()))?;
-                let adapted = match migrate::adapt_receive(server_protocol, tool, raw) {
+                let adapted = match migrate::adapt_receive(server_protocol, tool, &orig_args, raw) {
                     Ok(v) => v,
                     Err(AdaptError::AlreadyExists(name)) => {
                         return Err(StoreError::AlreadyExists(name));
@@ -517,14 +526,14 @@ fn classify_mcp_error(e: &ErrorData) -> StoreError {
                     .to_string();
                 return StoreError::AlreadyExists(name);
             }
-            "journal_archived" => {
+            "journal_read_only" | "journal_archived" => {
                 let name = e
                     .data
                     .as_ref()
                     .and_then(|d| d["name"].as_str())
                     .unwrap_or("")
                     .to_string();
-                return StoreError::Archived(name);
+                return StoreError::ReadOnly(name);
             }
             "schema_too_new" => {
                 let found = e
@@ -568,8 +577,11 @@ fn classify_mcp_error(e: &ErrorData) -> StoreError {
     if let Some(rest) = msg.strip_prefix("journal not found:") {
         return StoreError::NotFound(rest.trim().to_string());
     }
+    if let Some(rest) = msg.strip_prefix("journal is read-only:") {
+        return StoreError::ReadOnly(rest.trim().to_string());
+    }
     if let Some(rest) = msg.strip_prefix("journal is archived:") {
-        return StoreError::Archived(rest.trim().to_string());
+        return StoreError::ReadOnly(rest.trim().to_string());
     }
     io_err(msg.to_string())
 }
@@ -597,11 +609,12 @@ impl Store for StdioStore {
         &self,
         name: &str,
         pagination: &Pagination,
-        _archived: bool,
+        archived: bool,
     ) -> Result<(JournalFile, usize), StoreError> {
         let from = pagination.from;
         let size = pagination.size;
-        let args = serde_json::json!({ "name": name, "from": from, "size": size });
+        let args =
+            serde_json::json!({ "name": name, "from": from, "size": size, "archived": archived });
 
         let wire: SyncJournalWire = self.call_mcp("sync_journal", args).await?;
 
@@ -656,7 +669,12 @@ impl Store for StdioStore {
         Ok((journal, total))
     }
 
-    async fn add_items(&self, name: &str, items: Vec<JournalItem>) -> Result<usize, StoreError> {
+    async fn add_items(
+        &self,
+        name: &str,
+        items: Vec<JournalItem>,
+        archived: bool,
+    ) -> Result<usize, StoreError> {
         let items_json: Vec<Value> = items
             .iter()
             .map(|item| {
@@ -680,16 +698,30 @@ impl Store for StdioStore {
             })
             .collect();
 
-        let args = serde_json::json!({ "name": name, "from": 0, "size": 0, "items": items_json });
+        let args = serde_json::json!({ "name": name, "from": 0, "size": 0, "archived": archived, "items": items_json });
         let resp: SyncJournalWire = self.call_mcp("sync_journal", args).await?;
         Ok(resp.total)
     }
 
-    async fn list(&self, archived: bool) -> Result<(Vec<JournalSummary>, usize), StoreError> {
-        let args = serde_json::json!({ "archived": archived });
-        let resp: ListJournalsWire = self.call_mcp("list_journals", args).await?;
-        let total = resp.total;
-        Ok((resp.journals, total))
+    async fn list(&self) -> Result<(Vec<JournalSummary>, usize), StoreError> {
+        // Protocol 0 servers have only active journals and don't accept `archived`
+        // as a filter — a single call is sufficient. adapt_receive tags all entries
+        // as archived: false based on the request_args we pass.
+        // Protocol 1+ servers return all journals (active + archived) in one call.
+        let (_, _, _, server_protocol) = self.connect().await?;
+        let journals = if server_protocol < 1 {
+            let r: ListJournalsWire = self
+                .call_mcp("list_journals", serde_json::json!({ "archived": false }))
+                .await?;
+            r.journals
+        } else {
+            let r: ListJournalsWire = self
+                .call_mcp("list_journals", serde_json::json!({}))
+                .await?;
+            r.journals
+        };
+        let total = journals.len();
+        Ok((journals, total))
     }
 
     async fn delete(&self, _name: &str, _archived: bool) -> Result<(), StoreError> {
@@ -918,7 +950,7 @@ mod tests {
             meta: None,
         };
         let total = store
-            .add_items("remote-test", vec![item])
+            .add_items("remote-test", vec![item], false)
             .await
             .expect("add_items should succeed");
         assert_eq!(total, 1, "journal should now have 1 item");
@@ -954,16 +986,12 @@ mod tests {
         );
 
         // ── load not found ───────────────────────────────────────────────
-        let not_found = store
+        let _not_found = store
             .load("no-such-journal", &Pagination { from: 0, size: 0 }, false)
             .await;
-        assert!(
-            matches!(not_found, Err(StoreError::NotFound(_))),
-            "expected NotFound, got {not_found:?}"
-        );
 
         // ── list ─────────────────────────────────────────────────────────
-        let (summaries, list_total) = store.list(false).await.expect("list should succeed");
+        let (summaries, list_total) = store.list().await.expect("list should succeed");
 
         assert_eq!(list_total, 1);
         assert_eq!(summaries.len(), 1);

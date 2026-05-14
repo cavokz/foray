@@ -9,8 +9,8 @@ pub(crate) enum StoreError {
     NotFound(String),
     #[error("journal already exists: {0}")]
     AlreadyExists(String),
-    #[error("journal is archived: {0}")]
-    Archived(String),
+    #[error("journal is read-only: {0}")]
+    ReadOnly(String),
     #[error("journal schema {found} is too new (max supported: {max})")]
     SchemaTooNew {
         found: u32,
@@ -39,6 +39,13 @@ pub(crate) enum SchemaOrigin {
 /// Backend-agnostic journal storage.
 #[async_trait]
 pub(crate) trait Store: Send + Sync {
+    /// Load a journal page.
+    ///
+    /// `archived` determines which storage location to look in. Returns
+    /// [`StoreError::NotFound`] if the journal does not exist there.
+    ///
+    /// [`list`] returns all journals from both locations; callers filter by
+    /// [`JournalSummary::archived`] as needed.
     async fn load(
         &self,
         name: &str,
@@ -51,8 +58,13 @@ pub(crate) trait Store: Send + Sync {
         title: String,
         meta: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<(), StoreError>;
-    async fn add_items(&self, name: &str, items: Vec<JournalItem>) -> Result<usize, StoreError>;
-    async fn list(&self, archived: bool) -> Result<(Vec<JournalSummary>, usize), StoreError>;
+    async fn add_items(
+        &self,
+        name: &str,
+        items: Vec<JournalItem>,
+        archived: bool,
+    ) -> Result<usize, StoreError>;
+    async fn list(&self) -> Result<(Vec<JournalSummary>, usize), StoreError>;
     async fn delete(&self, name: &str, archived: bool) -> Result<(), StoreError>;
     async fn archive(&self, name: &str) -> Result<(), StoreError>;
     async fn unarchive(&self, name: &str) -> Result<(), StoreError>;
