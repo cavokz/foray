@@ -54,18 +54,6 @@ impl JsonFileStore {
         Ok(lock_file)
     }
 
-    fn find(&self, name: &str) -> Option<(PathBuf, bool)> {
-        let active = self.journal_path(name);
-        if active.exists() {
-            return Some((active, false));
-        }
-        let archived = self.archive_path(name);
-        if archived.exists() {
-            return Some((archived, true));
-        }
-        None
-    }
-
     pub(crate) fn read_journal(&self, path: &Path) -> Result<JournalFile, StoreError> {
         let data = fs::read_to_string(path)?;
         let raw: serde_json::Value = serde_json::from_str(&data)?;
@@ -154,6 +142,7 @@ impl JsonFileStore {
                             name,
                             title: String::new(),
                             item_count: 0,
+                            archived: false,
                             avg_item_size: None,
                             std_item_size: None,
                             schema: None,
@@ -189,6 +178,7 @@ impl JsonFileStore {
                             name,
                             title: String::new(),
                             item_count: 0,
+                            archived: false,
                             avg_item_size: None,
                             std_item_size: None,
                             schema,
@@ -210,10 +200,16 @@ impl Store for JsonFileStore {
         &self,
         name: &str,
         pagination: &Pagination,
+        archived: bool,
     ) -> Result<(JournalFile, usize), StoreError> {
-        let (path, _) = self
-            .find(name)
-            .ok_or_else(|| StoreError::NotFound(name.into()))?;
+        let path = if archived {
+            self.archive_path(name)
+        } else {
+            self.journal_path(name)
+        };
+        if !path.exists() {
+            return Err(StoreError::NotFound(name.into()));
+        }
         let mut journal = self.read_journal(&path)?;
         // The file stem is the authoritative name; override whatever the JSON says.
         journal.name = name.to_string();
@@ -237,12 +233,22 @@ impl Store for JsonFileStore {
         self.write_journal(&path, &journal)
     }
 
-    async fn add_items(&self, name: &str, items: Vec<JournalItem>) -> Result<usize, StoreError> {
-        let (path, is_archived) = self
-            .find(name)
-            .ok_or_else(|| StoreError::NotFound(name.into()))?;
-        if is_archived {
-            return Err(StoreError::Archived(name.into()));
+    async fn add_items(
+        &self,
+        name: &str,
+        items: Vec<JournalItem>,
+        archived: bool,
+    ) -> Result<usize, StoreError> {
+        if archived {
+            return Err(if self.archive_path(name).exists() {
+                StoreError::ReadOnly(name.into())
+            } else {
+                StoreError::NotFound(name.into())
+            });
+        }
+        let path = self.journal_path(name);
+        if !path.exists() {
+            return Err(StoreError::NotFound(name.into()));
         }
         let _lock = self.with_lock(name)?;
         let mut journal = self.read_journal(&path)?;
@@ -254,13 +260,70 @@ impl Store for JsonFileStore {
         Ok(count)
     }
 
-    async fn list(&self, archived: bool) -> Result<(Vec<JournalSummary>, usize), StoreError> {
-        let dir = if archived {
-            self.base_dir.join("archive")
+    async fn import(
+        &self,
+        name: &str,
+        journal: JournalFile,
+        merge: bool,
+        archived: bool,
+    ) -> Result<(usize, usize), StoreError> {
+        if merge {
+            let path = self.journal_path(name);
+            if !path.exists() {
+                return Err(StoreError::NotFound(name.into()));
+            }
+            let _lock = self.with_lock(name)?;
+            let mut dest = self.read_journal(&path)?;
+            dest.name = name.to_string();
+            let existing_ids: std::collections::HashSet<&str> =
+                dest.items.iter().map(|i| i.id.as_str()).collect();
+            let mut skipped = 0usize;
+            let to_add: Vec<JournalItem> = journal
+                .items
+                .into_iter()
+                .filter(|i| {
+                    if existing_ids.contains(i.id.as_str()) {
+                        skipped += 1;
+                        false
+                    } else {
+                        true
+                    }
+                })
+                .collect();
+            let added = to_add.len();
+            dest.items.extend(to_add);
+            self.write_journal(&path, &dest)?;
+            Ok((added, skipped))
         } else {
-            self.base_dir.clone()
-        };
-        let summaries = self.list_dir(&dir)?;
+            let path = self.journal_path(name);
+            if path.exists() || self.archive_path(name).exists() {
+                return Err(StoreError::AlreadyExists(name.to_string()));
+            }
+            let mut new_journal = JournalFile::new(name, journal.title, journal.meta);
+            let added = journal.items.len();
+            new_journal.items = journal.items;
+            let dest_path = if archived {
+                let archive_dir = self.base_dir.join("archive");
+                fs::create_dir_all(&archive_dir)?;
+                archive_dir.join(format!("{name}.json"))
+            } else {
+                path
+            };
+            self.write_journal(&dest_path, &new_journal)?;
+            Ok((added, 0))
+        }
+    }
+
+    async fn list(&self) -> Result<(Vec<JournalSummary>, usize), StoreError> {
+        let mut summaries = self.list_dir(&self.base_dir)?;
+        for s in &mut summaries {
+            s.archived = false;
+        }
+        let mut archived = self.list_dir(&self.base_dir.join("archive"))?;
+        for s in &mut archived {
+            s.archived = true;
+        }
+        summaries.extend(archived);
         let total = summaries.len();
         Ok((summaries, total))
     }
@@ -281,9 +344,6 @@ impl Store for JsonFileStore {
     async fn archive(&self, name: &str) -> Result<(), StoreError> {
         let active = self.journal_path(name);
         if !active.exists() {
-            if self.archive_path(name).exists() {
-                return Err(StoreError::Archived(name.into()));
-            }
             return Err(StoreError::NotFound(name.into()));
         }
         let dest = self.archive_path(name);
@@ -297,9 +357,6 @@ impl Store for JsonFileStore {
     async fn unarchive(&self, name: &str) -> Result<(), StoreError> {
         let archived = self.archive_path(name);
         if !archived.exists() {
-            if self.journal_path(name).exists() {
-                return Ok(());
-            }
             return Err(StoreError::NotFound(name.into()));
         }
         let dest = self.journal_path(name);
@@ -339,7 +396,10 @@ mod tests {
             .create(&journal.name, journal.title.clone(), journal.meta.clone())
             .await
             .unwrap();
-        let (loaded, total) = store.load("my-ctx", &Pagination::all()).await.unwrap();
+        let (loaded, total) = store
+            .load("my-ctx", &Pagination::all(), false)
+            .await
+            .unwrap();
         assert_eq!(loaded.name, "my-ctx");
         assert_eq!(total, 0);
     }
@@ -355,7 +415,7 @@ mod tests {
     #[tokio::test]
     async fn load_not_found() {
         let (store, _dir) = make_store();
-        let result = store.load("nonexistent", &Pagination::all()).await;
+        let result = store.load("nonexistent", &Pagination::all(), false).await;
         assert!(matches!(result, Err(StoreError::NotFound(_))));
     }
 
@@ -364,8 +424,11 @@ mod tests {
         let (store, _dir) = make_store();
         store.create("my-ctx", "T".into(), None).await.unwrap();
         let item = make_item("found a bug");
-        store.add_items("my-ctx", vec![item]).await.unwrap();
-        let (loaded, total) = store.load("my-ctx", &Pagination::all()).await.unwrap();
+        store.add_items("my-ctx", vec![item], false).await.unwrap();
+        let (loaded, total) = store
+            .load("my-ctx", &Pagination::all(), false)
+            .await
+            .unwrap();
         assert_eq!(total, 1);
         assert_eq!(loaded.items[0].content, "found a bug");
     }
@@ -373,7 +436,7 @@ mod tests {
     #[tokio::test]
     async fn add_item_not_found() {
         let (store, _dir) = make_store();
-        let result = store.add_items("nope", vec![make_item("x")]).await;
+        let result = store.add_items("nope", vec![make_item("x")], false).await;
         assert!(matches!(result, Err(StoreError::NotFound(_))));
     }
 
@@ -382,7 +445,7 @@ mod tests {
         let (store, _dir) = make_store();
         store.create("alpha", "A".into(), None).await.unwrap();
         store.create("beta", "B".into(), None).await.unwrap();
-        let (summaries, total) = store.list(false).await.unwrap();
+        let (summaries, total) = store.list().await.unwrap();
         assert_eq!(total, 2);
         assert_eq!(summaries[0].name, "alpha");
         assert_eq!(summaries[1].name, "beta");
@@ -394,7 +457,7 @@ mod tests {
         for name in ["a", "b", "c", "d"] {
             store.create(name, name.into(), None).await.unwrap();
         }
-        let (page, total) = store.list(false).await.unwrap();
+        let (page, total) = store.list().await.unwrap();
         assert_eq!(total, 4);
         assert_eq!(page.len(), 4);
     }
@@ -405,7 +468,7 @@ mod tests {
         store.create("to-delete", "D".into(), None).await.unwrap();
         store.delete("to-delete", false).await.unwrap();
         assert!(matches!(
-            store.load("to-delete", &Pagination::all()).await,
+            store.load("to-delete", &Pagination::all(), false).await,
             Err(StoreError::NotFound(_))
         ));
     }
@@ -415,13 +478,15 @@ mod tests {
         let (store, _dir) = make_store();
         store.create("to-delete", "D".into(), None).await.unwrap();
         store.archive("to-delete").await.unwrap();
+        // deleting active when archived → NotFound (not at active location)
         assert!(matches!(
             store.delete("to-delete", false).await,
             Err(StoreError::NotFound(_))
         ));
+        // deleting archived → ok
         store.delete("to-delete", true).await.unwrap();
         assert!(matches!(
-            store.load("to-delete", &Pagination::all()).await,
+            store.load("to-delete", &Pagination::all(), true).await,
             Err(StoreError::NotFound(_))
         ));
     }
@@ -443,19 +508,27 @@ mod tests {
 
         store.archive("arch-test").await.unwrap();
 
-        let (loaded, _) = store.load("arch-test", &Pagination::all()).await.unwrap();
+        let (loaded, _) = store
+            .load("arch-test", &Pagination::all(), true)
+            .await
+            .unwrap();
         assert_eq!(loaded.name, "arch-test");
         assert!(matches!(
-            store.add_items("arch-test", vec![make_item("x")]).await,
-            Err(StoreError::Archived(_))
+            store
+                .add_items("arch-test", vec![make_item("x")], true)
+                .await,
+            Err(StoreError::ReadOnly(_))
         ));
-        let (archived_list, _) = store.list(true).await.unwrap();
+        let (archived_list, _) = store.list().await.unwrap();
+        let archived_list: Vec<_> = archived_list.into_iter().filter(|s| s.archived).collect();
         assert_eq!(archived_list.len(), 1);
-        let (active, _) = store.list(false).await.unwrap();
+        let (all, _) = store.list().await.unwrap();
+        let active: Vec<_> = all.into_iter().filter(|s| !s.archived).collect();
         assert_eq!(active.len(), 0);
 
         store.unarchive("arch-test").await.unwrap();
-        let (active, _) = store.list(false).await.unwrap();
+        let (all, _) = store.list().await.unwrap();
+        let active: Vec<_> = all.into_iter().filter(|s| !s.archived).collect();
         assert_eq!(active.len(), 1);
     }
 
@@ -466,27 +539,18 @@ mod tests {
         store.archive("to-archive").await.unwrap();
         assert!(matches!(
             store.archive("to-archive").await,
-            Err(StoreError::Archived(_))
-        ));
-    }
-
-    #[tokio::test]
-    async fn archive_not_found_errors() {
-        let (store, _dir) = make_store();
-        assert!(matches!(
-            store.archive("missing").await,
             Err(StoreError::NotFound(_))
         ));
     }
 
     #[tokio::test]
-    async fn unarchive_already_active_is_noop() {
+    async fn unarchive_already_active_errors() {
         let (store, _dir) = make_store();
         store.create("active", "A".into(), None).await.unwrap();
-        store.unarchive("active").await.unwrap();
-        // still active
-        let (active, _) = store.list(false).await.unwrap();
-        assert_eq!(active.len(), 1);
+        assert!(matches!(
+            store.unarchive("active").await,
+            Err(StoreError::NotFound(_))
+        ));
     }
 
     #[tokio::test]
@@ -605,7 +669,7 @@ mod tests {
         });
         std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
 
-        let (summaries, total) = store.list(false).await.unwrap();
+        let (summaries, total) = store.list().await.unwrap();
         assert_eq!(total, 2, "both valid and error journals should appear");
         let valid = summaries.iter().find(|s| s.name == "valid").unwrap();
         assert!(valid.error.is_none(), "valid journal should have no error");
@@ -634,7 +698,7 @@ mod tests {
         });
         std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
 
-        let (summaries, total) = store.list(false).await.unwrap();
+        let (summaries, total) = store.list().await.unwrap();
         assert_eq!(total, 2, "both valid and error journals should appear");
         let error_entry = summaries.iter().find(|s| s.name == "empty-title").unwrap();
         assert!(
@@ -706,7 +770,7 @@ mod tests {
 
         // add_items holds the lock and rewrites the file — this is the heal path.
         store
-            .add_items("legacy", vec![make_item("new item")])
+            .add_items("legacy", vec![make_item("new item")], false)
             .await
             .unwrap();
 
@@ -770,7 +834,7 @@ mod tests {
         });
         std::fs::write(&path, serde_json::to_string_pretty(&raw).unwrap()).unwrap();
 
-        let (summaries, total) = store.list(false).await.unwrap();
+        let (summaries, total) = store.list().await.unwrap();
         assert_eq!(total, 2, "both journals should appear");
         let error_entry = summaries.iter().find(|s| s.name == "future").unwrap();
         assert!(
@@ -791,7 +855,7 @@ mod tests {
         let path = dir.path().join("corrupt.json");
         std::fs::write(&path, b"this is not valid json {{{").unwrap();
 
-        let (summaries, total) = store.list(false).await.unwrap();
+        let (summaries, total) = store.list().await.unwrap();
         assert_eq!(total, 2, "both journals should appear");
         let error_entry = summaries.iter().find(|s| s.name == "corrupt").unwrap();
         assert!(
@@ -812,7 +876,7 @@ mod tests {
         let path = dir.path().join("array.json");
         std::fs::write(&path, b"[1, 2, 3]").unwrap();
 
-        let (summaries, total) = store.list(false).await.unwrap();
+        let (summaries, total) = store.list().await.unwrap();
         assert_eq!(total, 2, "both journals should appear");
         let error_entry = summaries.iter().find(|s| s.name == "array").unwrap();
         assert!(
@@ -831,12 +895,12 @@ mod tests {
         store.create("pag", "P".into(), None).await.unwrap();
         for i in 0..5 {
             store
-                .add_items("pag", vec![make_item(&format!("item-{i}"))])
+                .add_items("pag", vec![make_item(&format!("item-{i}"))], false)
                 .await
                 .unwrap();
         }
         let p = Pagination { from: 1, size: 2 };
-        let (journal, total) = store.load("pag", &p).await.unwrap();
+        let (journal, total) = store.load("pag", &p, false).await.unwrap();
         assert_eq!(total, 5);
         assert_eq!(journal.items.len(), 2);
         assert_eq!(journal.items[0].content, "item-1");

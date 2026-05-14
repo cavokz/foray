@@ -180,10 +180,12 @@ pub(crate) fn adapt_send(
     tool: &str,
     mut args: Value,
 ) -> Result<Value, String> {
-    // Protocol 0 → 1: several params were added that old servers reject via
-    // `deny_unknown_fields`:
+    // Protocol 0 → 1: several params were added or removed that old servers
+    // reject via `deny_unknown_fields`:
     //   all tools:          `store` (protocol 0 servers have a single implicit store)
-    //   list_journals:      `archived` (archive feature did not exist)
+    //   list_journals:      `archived` stripped — protocol 0 servers only accepted
+    //                       `limit`/`offset`/`nuance` and returned all journals in one call;
+    //                       protocol 1 returns all journals too but with per-entry archived flag
     //   sync_journal:       `from` renamed from `cursor`, `size` renamed from `limit`
     //   archive_journal:    entire tool did not exist
     //   unarchive_journal:  entire tool did not exist
@@ -214,7 +216,16 @@ pub(crate) fn adapt_send(
                     // absent or non-string — pass through
                 }
             }
+            // list_journals: strip `archived` — protocol 0 servers only accepted
+            // `limit`/`offset`/`nuance` and reject unknown fields. They return all
+            // journals in one call. adapt_receive uses orig_args["archived"] to tag
+            // entries; stripping here does not affect response tagging.
             if tool == "list_journals" {
+                obj.remove("archived");
+            }
+            if tool == "sync_journal" {
+                // `archived` was introduced in protocol 1; protocol 0 servers had
+                // only active journals.
                 match obj.get("archived").and_then(Value::as_bool) {
                     Some(true) => {
                         return Err("archived journals not supported by protocol 0 server; \
@@ -225,8 +236,6 @@ pub(crate) fn adapt_send(
                         obj.remove("archived");
                     }
                 }
-            }
-            if tool == "sync_journal" {
                 // `from`/`size` were introduced in protocol 1; translate back to
                 // `cursor`/`limit` for protocol 0 servers.
                 if let Some(from) = obj.remove("from") {
@@ -264,6 +273,7 @@ pub(crate) fn adapt_send(
 pub(crate) fn adapt_receive(
     server_protocol: u32,
     tool: &str,
+    request_args: &Value,
     mut response: Value,
 ) -> Result<Value, AdaptError> {
     // Protocol 0 → 1: the following fields were added or renamed in this transition:
@@ -334,6 +344,19 @@ pub(crate) fn adapt_receive(
                 // can deserialize without error.
                 obj.remove("limit");
                 obj.remove("offset");
+                // Protocol 0 filtered by `archived`; tag every entry with the
+                // value that was requested so the new unified format is satisfied.
+                let req_archived = request_args
+                    .get("archived")
+                    .and_then(Value::as_bool)
+                    .unwrap_or(false);
+                if let Some(Value::Array(journals)) = obj.get_mut("journals") {
+                    for entry in journals.iter_mut() {
+                        if let Value::Object(e) = entry {
+                            e.insert("archived".to_string(), Value::Bool(req_archived));
+                        }
+                    }
+                }
             }
             _ => {}
         }
@@ -568,23 +591,22 @@ mod tests {
     // ── adapt_send ────────────────────────────────────────────────────
 
     #[test]
-    fn adapt_send_strips_store_and_archived_false_for_protocol_0() {
-        let args = json!({ "store": PROTOCOL_0_IMPLICIT_STORE, "archived": false });
-        let result = adapt_send(0, "list_journals", args).unwrap();
+    fn adapt_send_list_journals_strips_archived_for_protocol_0() {
+        // v0 servers only accept `limit`/`offset`/`nuance` — strip `archived`.
+        let args_false = json!({ "store": PROTOCOL_0_IMPLICIT_STORE, "archived": false });
+        let result = adapt_send(0, "list_journals", args_false).unwrap();
         assert!(result.get("store").is_none(), "store should be stripped");
         assert!(
             result.get("archived").is_none(),
-            "archived false should be stripped"
+            "archived should be stripped"
         );
-    }
 
-    #[test]
-    fn adapt_send_errors_on_archived_true_for_protocol_0() {
-        let args = json!({ "store": PROTOCOL_0_IMPLICIT_STORE, "archived": true });
-        let err = adapt_send(0, "list_journals", args).unwrap_err();
+        let args_true = json!({ "store": PROTOCOL_0_IMPLICIT_STORE, "archived": true });
+        let result = adapt_send(0, "list_journals", args_true).unwrap();
+        assert!(result.get("store").is_none(), "store should be stripped");
         assert!(
-            err.contains("archived journals not supported"),
-            "got: {err}"
+            result.get("archived").is_none(),
+            "archived should be stripped"
         );
     }
 
@@ -609,13 +631,6 @@ mod tests {
         let err = adapt_send(0, "unarchive_journal", args).unwrap_err();
         assert!(err.contains("unarchive_journal"), "got: {err}");
         assert!(err.contains("not supported"), "got: {err}");
-    }
-
-    #[test]
-    fn adapt_send_keeps_archived_for_protocol_1() {
-        let args = json!({ "archived": true });
-        let result = adapt_send(1, "list_journals", args).unwrap();
-        assert_eq!(result["archived"], json!(true));
     }
 
     #[test]
@@ -649,7 +664,7 @@ mod tests {
     #[test]
     fn adapt_receive_hello_inserts_synthetic_store_for_protocol_0() {
         let raw = json!({ "version": "0.2.0", "nuance": "abc" });
-        let result = adapt_receive(0, "hello", raw).unwrap();
+        let result = adapt_receive(0, "hello", &json!({}), raw).unwrap();
         assert_eq!(result["protocol"], json!(0));
         assert_eq!(
             result["stores"][0]["name"],
@@ -664,7 +679,7 @@ mod tests {
     fn adapt_receive_hello_preserves_existing_stores_for_protocol_0() {
         // If server somehow sends stores already, do not overwrite them.
         let raw = json!({ "nuance": "abc", "stores": [{"name": "x", "description": "y"}] });
-        let result = adapt_receive(0, "hello", raw).unwrap();
+        let result = adapt_receive(0, "hello", &json!({}), raw).unwrap();
         assert_eq!(result["stores"][0]["name"], json!("x"));
     }
 
@@ -676,7 +691,7 @@ mod tests {
             "protocol": 1,
             "stores": [{"name": "local", "description": "Local store"}]
         });
-        let result = adapt_receive(1, "hello", raw.clone()).unwrap();
+        let result = adapt_receive(1, "hello", &json!({}), raw.clone()).unwrap();
         assert_eq!(result, raw);
     }
 
@@ -687,7 +702,7 @@ mod tests {
             "name": "j", "title": "My Journal",
             "items": [], "added_ids": [], "cursor": 0, "total": 0
         });
-        let result = adapt_receive(0, "sync_journal", raw).unwrap();
+        let result = adapt_receive(0, "sync_journal", &json!({}), raw).unwrap();
         assert_eq!(result["schema"], json!(0));
         // cursor → from rename also applied in the protocol 0 → 1 transition.
         assert!(result.get("cursor").is_none());
@@ -695,30 +710,61 @@ mod tests {
     }
 
     #[test]
-    fn adapt_receive_list_journals_strips_limit_offset_for_protocol_0() {
-        let raw = json!({ "journals": [], "total": 0, "limit": 500, "offset": 0 });
-        let result = adapt_receive(0, "list_journals", raw).unwrap();
-        assert_eq!(result, json!({ "journals": [], "total": 0 }));
+    fn adapt_receive_list_journals_strips_limit_offset_and_tags_archived_for_protocol_0() {
+        let raw = json!({
+            "journals": [{"name": "j", "title": "T", "item_count": 0}],
+            "total": 1, "limit": 500, "offset": 0
+        });
+        let result = adapt_receive(0, "list_journals", &json!({ "archived": false }), raw).unwrap();
+        assert!(result.get("limit").is_none());
+        assert!(result.get("offset").is_none());
+        assert_eq!(result["journals"][0]["archived"], json!(false));
     }
 
     #[test]
-    fn adapt_receive_list_journals_no_limit_offset_is_noop_for_protocol_0() {
+    fn adapt_receive_list_journals_tags_archived_false_on_entries_for_protocol_0() {
+        let raw = json!({
+            "journals": [{"name": "j", "title": "T", "item_count": 2}],
+            "total": 1
+        });
+        let result = adapt_receive(0, "list_journals", &json!({ "archived": false }), raw).unwrap();
+        assert_eq!(result["journals"][0]["archived"], json!(false));
+    }
+
+    #[test]
+    fn adapt_receive_list_journals_tags_archived_true_on_entries_for_protocol_0() {
+        let raw = json!({
+            "journals": [{"name": "j", "title": "T", "item_count": 2}],
+            "total": 1
+        });
+        let result = adapt_receive(0, "list_journals", &json!({ "archived": true }), raw).unwrap();
+        assert_eq!(result["journals"][0]["archived"], json!(true));
+    }
+
+    #[test]
+    fn adapt_receive_list_journals_empty_journals_for_protocol_0() {
         let raw = json!({ "journals": [], "total": 0 });
-        let result = adapt_receive(0, "list_journals", raw.clone()).unwrap();
-        assert_eq!(result, raw);
+        let result = adapt_receive(
+            0,
+            "list_journals",
+            &json!({ "archived": false }),
+            raw.clone(),
+        )
+        .unwrap();
+        assert_eq!(result["journals"], json!([]));
     }
 
     #[test]
     fn adapt_receive_unknown_tool_is_noop() {
         let raw = json!({ "foo": "bar" });
-        let result = adapt_receive(0, "some_future_tool", raw.clone()).unwrap();
+        let result = adapt_receive(0, "some_future_tool", &json!({}), raw.clone()).unwrap();
         assert_eq!(result, raw);
     }
 
     #[test]
     fn adapt_receive_non_object_returns_err() {
         let raw = json!([1, 2, 3]);
-        assert!(adapt_receive(0, "hello", raw).is_err());
+        assert!(adapt_receive(0, "hello", &json!({}), raw).is_err());
     }
 
     #[test]
@@ -763,7 +809,7 @@ mod tests {
             "schema": 1, "name": "j", "title": "T",
             "items": [], "added_ids": [], "cursor": 22, "total": 100
         });
-        let result = adapt_receive(0, "sync_journal", raw).unwrap();
+        let result = adapt_receive(0, "sync_journal", &json!({}), raw).unwrap();
         assert!(result.get("cursor").is_none());
         assert_eq!(result["from"], json!(22));
     }
@@ -774,14 +820,14 @@ mod tests {
             "schema": 1, "name": "j", "title": "T",
             "items": [], "added_ids": [], "from": 22, "total": 100
         });
-        let result = adapt_receive(1, "sync_journal", raw.clone()).unwrap();
+        let result = adapt_receive(1, "sync_journal", &json!({}), raw.clone()).unwrap();
         assert_eq!(result, raw);
     }
 
     #[test]
     fn adapt_receive_create_journal_strips_item_count_and_created_for_protocol_0() {
         let raw = json!({ "name": "j", "title": "T", "item_count": 0, "created": true });
-        let result = adapt_receive(0, "create_journal", raw).unwrap();
+        let result = adapt_receive(0, "create_journal", &json!({}), raw).unwrap();
         assert!(
             result.get("item_count").is_none(),
             "item_count should be stripped"
@@ -797,7 +843,7 @@ mod tests {
     #[test]
     fn adapt_receive_create_journal_errors_on_created_false_for_protocol_0() {
         let raw = json!({ "name": "j", "title": "T", "item_count": 1, "created": false });
-        let err = adapt_receive(0, "create_journal", raw).unwrap_err();
+        let err = adapt_receive(0, "create_journal", &json!({}), raw).unwrap_err();
         assert!(
             matches!(err, AdaptError::AlreadyExists(ref n) if n == "j"),
             "expected AlreadyExists(\"j\")"
@@ -805,9 +851,29 @@ mod tests {
     }
 
     #[test]
+    fn adapt_send_sync_journal_strips_archived_false_for_protocol_0() {
+        let args = json!({ "name": "j", "from": 0, "size": 5, "archived": false });
+        let result = adapt_send(0, "sync_journal", args).unwrap();
+        assert!(
+            result.get("archived").is_none(),
+            "archived: false should be stripped for protocol 0"
+        );
+    }
+
+    #[test]
     fn adapt_receive_create_journal_passthrough_for_protocol_1() {
         let raw = json!({ "name": "j", "title": "T" });
-        let result = adapt_receive(1, "create_journal", raw.clone()).unwrap();
+        let result = adapt_receive(1, "create_journal", &json!({}), raw.clone()).unwrap();
         assert_eq!(result, raw);
+    }
+
+    #[test]
+    fn adapt_send_sync_journal_errors_on_archived_true_for_protocol_0() {
+        let args = json!({ "name": "j", "from": 0, "size": 5, "archived": true });
+        let err = adapt_send(0, "sync_journal", args).unwrap_err();
+        assert!(
+            err.contains("archived journals not supported"),
+            "got: {err}"
+        );
     }
 }

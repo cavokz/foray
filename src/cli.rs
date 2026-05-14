@@ -48,6 +48,9 @@ pub(crate) enum Commands {
         /// Follow: watch for new items in real time
         #[arg(short, long)]
         follow: bool,
+        /// Show an archived journal
+        #[arg(long)]
+        archived: bool,
     },
     /// Add an item to the current journal
     Add {
@@ -122,12 +125,23 @@ pub(crate) enum Commands {
         /// Output file (default: stdout)
         #[arg(long)]
         file: Option<PathBuf>,
+        /// Export an archived journal
+        #[arg(long)]
+        archived: bool,
     },
     /// Import journal JSON from stdin or file
     Import {
+        /// Destination journal name
+        name: String,
         /// Input file (default: stdin)
         #[arg(long)]
         file: Option<PathBuf>,
+        /// Merge items into an existing journal (skips items whose ID already exists)
+        #[arg(long)]
+        merge: bool,
+        /// Create the imported journal as archived
+        #[arg(long, conflicts_with = "merge")]
+        archived: bool,
     },
     /// Generate shell completion script
     #[cfg_attr(
@@ -453,9 +467,16 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
         Commands::Completions { .. } => {
             unreachable!("completions is handled in main")
         }
-        Commands::Show { name, json, follow } => {
+        Commands::Show {
+            name,
+            json,
+            follow,
+            archived,
+        } => {
             let journal_name = resolve_journal(cli.journal.as_deref(), name.as_deref())?;
-            let (journal, total) = store.load(&journal_name, &Pagination::all()).await?;
+            let (journal, total) = store
+                .load(&journal_name, &Pagination::all(), *archived)
+                .await?;
             if *json {
                 for item in &journal.items {
                     println!("{}", serde_json::to_string(item)?);
@@ -477,7 +498,7 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                         from: seen,
                         size: usize::MAX,
                     };
-                    let (journal, new_total) = store.load(&journal_name, &all).await?;
+                    let (journal, new_total) = store.load(&journal_name, &all, *archived).await?;
                     if new_total > seen {
                         for item in &journal.items {
                             if *json {
@@ -520,7 +541,7 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 added_at: Utc::now(),
                 meta: parsed_meta,
             };
-            let count = store.add_items(&journal_name, vec![item]).await?;
+            let count = store.add_items(&journal_name, vec![item], false).await?;
             println!("Added to {journal_name} ({count} items)");
         }
         Commands::Create { name, title, meta } => {
@@ -535,7 +556,12 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             archived,
             completion,
         } => {
-            let (summaries, total) = store.list(*archived).await?;
+            let (all_summaries, _) = store.list().await?;
+            let summaries: Vec<_> = all_summaries
+                .into_iter()
+                .filter(|s| s.archived == *archived)
+                .collect();
+            let total = summaries.len();
 
             if *completion {
                 for s in &summaries {
@@ -578,15 +604,37 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             store.unarchive(name).await?;
             println!("Unarchived: {name}");
         }
-        Commands::Export { name, file } => {
-            let (journal, _) = store.load(name, &Pagination::all()).await?;
+        Commands::Export {
+            name,
+            file,
+            archived,
+        } => {
+            validate_name(name).map_err(|e| anyhow::anyhow!(e))?;
+            let (journal, _) = store
+                .load(name, &Pagination::all(), *archived)
+                .await
+                .map_err(|e| match e {
+                    crate::store::StoreError::NotFound(_) if *archived => {
+                        anyhow::anyhow!("journal '{name}' not found in archived location; it may be active (omit --archived)")
+                    }
+                    crate::store::StoreError::NotFound(_) => {
+                        anyhow::anyhow!("journal '{name}' not found; it may be archived (use --archived)")
+                    }
+                    e => e.into(),
+                })?;
             let data = serde_json::to_string_pretty(&journal)?;
             match file {
                 Some(path) => std::fs::write(path, format!("{data}\n"))?,
                 None => println!("{data}"),
             }
         }
-        Commands::Import { file } => {
+        Commands::Import {
+            name,
+            file,
+            merge,
+            archived,
+        } => {
+            validate_name(name).map_err(|e| anyhow::anyhow!(e))?;
             let data = match file {
                 Some(path) => std::fs::read_to_string(path)?,
                 None => {
@@ -608,14 +656,20 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 }
             };
             let journal: JournalFile = serde_json::from_value(value)?;
-            validate_name(&journal.name).map_err(|e| anyhow::anyhow!(e))?;
-            let name = journal.name;
-            let items = journal.items;
-            store.create(&name, journal.title, journal.meta).await?;
-            if !items.is_empty() {
-                store.add_items(&name, items).await?;
+            if !*merge {
+                validate_title(&journal.title).map_err(|e| anyhow::anyhow!(e))?;
             }
-            println!("Imported successfully");
+            let (added, skipped) = store.import(name, journal, *merge, *archived).await?;
+            if skipped > 0 {
+                eprintln!("warning: skipped {skipped} item(s) already present in {name}");
+            }
+            if *merge {
+                println!("Merged {added} item(s) into {name}");
+            } else if *archived {
+                println!("Imported {added} item(s) as archived: {name}");
+            } else {
+                println!("Imported {added} item(s) as {name}");
+            }
         }
     }
     Ok(())
@@ -899,5 +953,322 @@ mod tests {
             err.to_string().to_lowercase().contains("already exists"),
             "expected 'already exists' in error, got: {err}"
         );
+    }
+
+    fn make_export_json(
+        name: &str,
+        title: &str,
+        items: &[(&str, &str)],
+    ) -> tempfile::NamedTempFile {
+        use crate::types::{ItemType, JournalFile, JournalItem};
+        let file_items: Vec<JournalItem> = items
+            .iter()
+            .map(|(id, content)| JournalItem {
+                id: id.to_string(),
+                item_type: ItemType::Note,
+                content: content.to_string(),
+                tags: None,
+                added_at: chrono::DateTime::parse_from_rfc3339("2026-01-01T00:00:00Z")
+                    .unwrap()
+                    .with_timezone(&Utc),
+                meta: None,
+            })
+            .collect();
+        let journal = JournalFile {
+            schema: crate::migrate::CURRENT_SCHEMA,
+            name: name.to_string(),
+            title: title.to_string(),
+            items: file_items,
+            meta: None,
+        };
+        let f = tempfile::NamedTempFile::new().unwrap();
+        serde_json::to_writer_pretty(&f, &journal).unwrap();
+        f
+    }
+
+    #[tokio::test]
+    async fn import_creates_new_journal() {
+        let _guard = SERIAL_LOCK.lock().await;
+        let dir = tempfile::TempDir::new().unwrap();
+        let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
+        let _cwd = CwdGuard::set(dir.path());
+        let f = make_export_json("my-journal", "My Title", &[("aaa-bbb", "item one")]);
+        let cli = make_cli(Commands::Import {
+            name: "my-journal".to_string(),
+            file: Some(f.path().to_path_buf()),
+            merge: false,
+            archived: false,
+        });
+        run(&cli, &store).await.unwrap();
+        let (journal, total) = store
+            .load("my-journal", &Pagination::all(), false)
+            .await
+            .unwrap();
+        assert_eq!(total, 1);
+        assert_eq!(journal.title, "My Title");
+        assert_eq!(journal.items[0].content, "item one");
+    }
+
+    #[tokio::test]
+    async fn import_preserves_added_at() {
+        let _guard = SERIAL_LOCK.lock().await;
+        let dir = tempfile::TempDir::new().unwrap();
+        let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
+        let _cwd = CwdGuard::set(dir.path());
+        let f = make_export_json("ts-journal", "TS Test", &[("ts-id-1", "timestamped")]);
+        let cli = make_cli(Commands::Import {
+            name: "ts-journal".to_string(),
+            file: Some(f.path().to_path_buf()),
+            merge: false,
+            archived: false,
+        });
+        run(&cli, &store).await.unwrap();
+        let (journal, _) = store
+            .load("ts-journal", &Pagination::all(), false)
+            .await
+            .unwrap();
+        assert_eq!(
+            journal.items[0].added_at.to_rfc3339(),
+            "2026-01-01T00:00:00+00:00"
+        );
+    }
+
+    #[tokio::test]
+    async fn import_fails_if_journal_already_exists() {
+        let _guard = SERIAL_LOCK.lock().await;
+        let dir = tempfile::TempDir::new().unwrap();
+        let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
+        let _cwd = CwdGuard::set(dir.path());
+        store
+            .create("my-journal", "Existing".to_string(), None)
+            .await
+            .unwrap();
+        let f = make_export_json("irrelevant", "My Title", &[]);
+        let cli = make_cli(Commands::Import {
+            name: "my-journal".to_string(),
+            file: Some(f.path().to_path_buf()),
+            merge: false,
+            archived: false,
+        });
+        let err = run(&cli, &store).await.unwrap_err();
+        assert!(err.to_string().contains("already exists"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn import_merge_appends_new_items() {
+        let _guard = SERIAL_LOCK.lock().await;
+        let dir = tempfile::TempDir::new().unwrap();
+        let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
+        let _cwd = CwdGuard::set(dir.path());
+        store
+            .create("my-journal", "Existing".to_string(), None)
+            .await
+            .unwrap();
+        store
+            .add_items(
+                "my-journal",
+                vec![JournalItem {
+                    id: "existing-id".to_string(),
+                    item_type: ItemType::Note,
+                    content: "already here".to_string(),
+                    tags: None,
+                    added_at: Utc::now(),
+                    meta: None,
+                }],
+                false,
+            )
+            .await
+            .unwrap();
+        let f = make_export_json("my-journal", "Title", &[("new-id", "new item")]);
+        let cli = make_cli(Commands::Import {
+            name: "my-journal".to_string(),
+            file: Some(f.path().to_path_buf()),
+            merge: true,
+            archived: false,
+        });
+        run(&cli, &store).await.unwrap();
+        let (journal, total) = store
+            .load("my-journal", &Pagination::all(), false)
+            .await
+            .unwrap();
+        assert_eq!(total, 2);
+        assert!(journal.items.iter().any(|i| i.content == "already here"));
+        assert!(journal.items.iter().any(|i| i.content == "new item"));
+    }
+
+    #[tokio::test]
+    async fn import_merge_skips_duplicate_ids() {
+        let _guard = SERIAL_LOCK.lock().await;
+        let dir = tempfile::TempDir::new().unwrap();
+        let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
+        let _cwd = CwdGuard::set(dir.path());
+        store
+            .create("my-journal", "Existing".to_string(), None)
+            .await
+            .unwrap();
+        store
+            .add_items(
+                "my-journal",
+                vec![JournalItem {
+                    id: "dup-id".to_string(),
+                    item_type: ItemType::Note,
+                    content: "original".to_string(),
+                    tags: None,
+                    added_at: Utc::now(),
+                    meta: None,
+                }],
+                false,
+            )
+            .await
+            .unwrap();
+        let f = make_export_json("my-journal", "Title", &[("dup-id", "duplicate")]);
+        let cli = make_cli(Commands::Import {
+            name: "my-journal".to_string(),
+            file: Some(f.path().to_path_buf()),
+            merge: true,
+            archived: false,
+        });
+        run(&cli, &store).await.unwrap();
+        let (journal, total) = store
+            .load("my-journal", &Pagination::all(), false)
+            .await
+            .unwrap();
+        assert_eq!(total, 1);
+        assert_eq!(journal.items[0].content, "original");
+    }
+
+    #[tokio::test]
+    async fn import_merge_fails_if_journal_missing() {
+        let _guard = SERIAL_LOCK.lock().await;
+        let dir = tempfile::TempDir::new().unwrap();
+        let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
+        let _cwd = CwdGuard::set(dir.path());
+        let f = make_export_json("my-journal", "Title", &[("some-id", "item")]);
+        let cli = make_cli(Commands::Import {
+            name: "my-journal".to_string(),
+            file: Some(f.path().to_path_buf()),
+            merge: true,
+            archived: false,
+        });
+        let err = run(&cli, &store).await.unwrap_err();
+        assert!(err.to_string().contains("not found"), "{err}");
+    }
+
+    #[tokio::test]
+    async fn import_archived_creates_archived_journal() {
+        let _guard = SERIAL_LOCK.lock().await;
+        let dir = tempfile::TempDir::new().unwrap();
+        let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
+        let _cwd = CwdGuard::set(dir.path());
+        let f = make_export_json("my-journal", "My Title", &[("id-1", "item one")]);
+        let cli = make_cli(Commands::Import {
+            name: "my-journal".to_string(),
+            file: Some(f.path().to_path_buf()),
+            merge: false,
+            archived: true,
+        });
+        run(&cli, &store).await.unwrap();
+        let (all, _) = store.list().await.unwrap();
+        assert!(!all.iter().any(|s| !s.archived && s.name == "my-journal"));
+        assert!(all.iter().any(|s| s.archived && s.name == "my-journal"));
+    }
+
+    #[tokio::test]
+    async fn export_active_without_flag_works() {
+        let _guard = SERIAL_LOCK.lock().await;
+        let dir = tempfile::TempDir::new().unwrap();
+        let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
+        let _cwd = CwdGuard::set(dir.path());
+        store
+            .create("my-journal", "My Title".to_string(), None)
+            .await
+            .unwrap();
+        let out = tempfile::NamedTempFile::new().unwrap();
+        let cli = make_cli(Commands::Export {
+            name: "my-journal".to_string(),
+            file: Some(out.path().to_path_buf()),
+            archived: false,
+        });
+        run(&cli, &store).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn export_active_with_archived_flag_errors() {
+        let _guard = SERIAL_LOCK.lock().await;
+        let dir = tempfile::TempDir::new().unwrap();
+        let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
+        let _cwd = CwdGuard::set(dir.path());
+        store
+            .create("my-journal", "My Title".to_string(), None)
+            .await
+            .unwrap();
+        let cli = make_cli(Commands::Export {
+            name: "my-journal".to_string(),
+            file: None,
+            archived: true,
+        });
+        let err = run(&cli, &store).await.unwrap_err();
+        assert!(
+            err.to_string().contains("not found") && err.to_string().contains("omit --archived"),
+            "{err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn export_archived_without_flag_errors() {
+        let _guard = SERIAL_LOCK.lock().await;
+        let dir = tempfile::TempDir::new().unwrap();
+        let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
+        let _cwd = CwdGuard::set(dir.path());
+        store
+            .create("my-journal", "My Title".to_string(), None)
+            .await
+            .unwrap();
+        store.archive("my-journal").await.unwrap();
+        let cli = make_cli(Commands::Export {
+            name: "my-journal".to_string(),
+            file: None,
+            archived: false,
+        });
+        let err = run(&cli, &store).await.unwrap_err();
+        assert!(
+            err.to_string().contains("not found") && err.to_string().contains("use --archived"),
+            "{err}"
+        );
+    }
+
+    #[tokio::test]
+    async fn export_archived_with_flag_works() {
+        let _guard = SERIAL_LOCK.lock().await;
+        let dir = tempfile::TempDir::new().unwrap();
+        let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
+        let _cwd = CwdGuard::set(dir.path());
+        store
+            .create("my-journal", "My Title".to_string(), None)
+            .await
+            .unwrap();
+        store.archive("my-journal").await.unwrap();
+        let out = tempfile::NamedTempFile::new().unwrap();
+        let cli = make_cli(Commands::Export {
+            name: "my-journal".to_string(),
+            file: Some(out.path().to_path_buf()),
+            archived: true,
+        });
+        run(&cli, &store).await.unwrap();
+    }
+
+    #[tokio::test]
+    async fn export_nonexistent_errors() {
+        let _guard = SERIAL_LOCK.lock().await;
+        let dir = tempfile::TempDir::new().unwrap();
+        let store = crate::store_json::JsonFileStore::new(dir.path().to_path_buf());
+        let _cwd = CwdGuard::set(dir.path());
+        let cli = make_cli(Commands::Export {
+            name: "no-such-journal".to_string(),
+            file: None,
+            archived: false,
+        });
+        let err = run(&cli, &store).await.unwrap_err();
+        assert!(err.to_string().contains("not found"), "{err}");
     }
 }

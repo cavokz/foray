@@ -9,8 +9,8 @@ pub(crate) enum StoreError {
     NotFound(String),
     #[error("journal already exists: {0}")]
     AlreadyExists(String),
-    #[error("journal is archived: {0}")]
-    Archived(String),
+    #[error("journal is read-only: {0}")]
+    ReadOnly(String),
     #[error("journal schema {found} is too new (max supported: {max})")]
     SchemaTooNew {
         found: u32,
@@ -39,10 +39,18 @@ pub(crate) enum SchemaOrigin {
 /// Backend-agnostic journal storage.
 #[async_trait]
 pub(crate) trait Store: Send + Sync {
+    /// Load a journal page.
+    ///
+    /// `archived` determines which storage location to look in. Returns
+    /// [`StoreError::NotFound`] if the journal does not exist there.
+    ///
+    /// [`list`] returns all journals from both locations; callers filter by
+    /// [`JournalSummary::archived`] as needed.
     async fn load(
         &self,
         name: &str,
         pagination: &Pagination,
+        archived: bool,
     ) -> Result<(JournalFile, usize), StoreError>;
     async fn create(
         &self,
@@ -50,8 +58,30 @@ pub(crate) trait Store: Send + Sync {
         title: String,
         meta: Option<HashMap<String, serde_json::Value>>,
     ) -> Result<(), StoreError>;
-    async fn add_items(&self, name: &str, items: Vec<JournalItem>) -> Result<usize, StoreError>;
-    async fn list(&self, archived: bool) -> Result<(Vec<JournalSummary>, usize), StoreError>;
+    async fn add_items(
+        &self,
+        name: &str,
+        items: Vec<JournalItem>,
+        archived: bool,
+    ) -> Result<usize, StoreError>;
+    /// Import a journal from an external [`JournalFile`].
+    ///
+    /// - `merge: false` — create a new journal (fails if it already exists).
+    ///   Source `title` and `meta` are used. `archived` controls whether the
+    ///   new journal is created in archived state.
+    /// - `merge: true` — append items to an existing active journal, skipping
+    ///   any whose `id` already exists in the destination. Source `title`,
+    ///   `meta`, and `archived` are ignored.
+    ///
+    /// Returns `(added, skipped)`.
+    async fn import(
+        &self,
+        name: &str,
+        journal: JournalFile,
+        merge: bool,
+        archived: bool,
+    ) -> Result<(usize, usize), StoreError>;
+    async fn list(&self) -> Result<(Vec<JournalSummary>, usize), StoreError>;
     async fn delete(&self, name: &str, archived: bool) -> Result<(), StoreError>;
     async fn archive(&self, name: &str) -> Result<(), StoreError>;
     async fn unarchive(&self, name: &str) -> Result<(), StoreError>;

@@ -52,13 +52,15 @@ When connected to a protocol 0 server, `adapt_send` and `adapt_receive` wrap eve
 |---|---|---|---|
 | Any call with `store: "local"` | Send | Strips `store` (implicit on v0.2.0) | Transparent |
 | Any call with `store: "work"` (non-default store) | Send | Cannot adapt — v0.2.0 has no multi-store | Error: *"store 'work' not found: protocol 0 server exposes a single implicit store 'local'"* — also caught eagerly at connect time |
-| `list_journals` with `archived: false` | Send | Strips `archived` param | Transparent |
-| `list_journals` with `archived: true` | Send | Cannot adapt — archive feature did not exist in v0.2.0 | Error: *"archived journals not supported by protocol 0 server; upgrade the remote foray"* |
+| `list_journals` | Send | Strips `archived` — protocol 0 servers only accepted `limit`/`offset`/`nuance`; `adapt_receive` tags entries using the original request args | Transparent |
+| `list_journals` response entries | Receive | `adapt_receive` tags each entry with `archived` matching the request | Transparent |
 | `archive_journal` / `unarchive_journal` | Send | Tool did not exist in v0.2.0 | Error: *"'archive_journal' is not supported by protocol 0 server; upgrade the remote foray"* |
 | `hello` response missing `protocol`, `stores` | Receive | `adapt_receive` injects `protocol: 0`, synthesises `stores: [{name:"local", …}]` | Transparent |
 | `create_journal` | Send | Rewrites tool name to `open_journal` (via `adapt_tool`) | Transparent |
 | `create_journal` response `item_count`, `created` | Receive | `adapt_receive` strips `item_count`; maps `created: false` → `AdaptError::AlreadyExists` → `StoreError::AlreadyExists`; strips `created` on success | Transparent on success; error on conflict |
-| `list_journals` response missing `limit`, `offset` | Receive | `adapt_receive` injects `null` for both | Transparent |
+| `sync_journal` (`archived: false`) | Send | `adapt_send` strips `archived` — protocol 0 servers only had active journals | Transparent |
+| `sync_journal` (`archived: true`) | Send | Error — archived journals not supported by protocol 0 server | Error: *"archived journals not supported by protocol 0 server; upgrade the remote foray"* |
+| `list_journals` response missing `avg_item_size`, `std_item_size` | Receive | Fields are absent (optional) — callers fall back to `size: 5` default | Transparent |
 
 ---
 
