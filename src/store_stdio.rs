@@ -597,6 +597,7 @@ impl Store for StdioStore {
         &self,
         name: &str,
         pagination: &Pagination,
+        _archived: bool,
     ) -> Result<(JournalFile, usize), StoreError> {
         let from = pagination.from;
         let size = pagination.size;
@@ -924,7 +925,7 @@ mod tests {
 
         // ── load ─────────────────────────────────────────────────────────
         let (loaded, item_total) = store
-            .load("remote-test", &Pagination::all())
+            .load("remote-test", &Pagination::all(), false)
             .await
             .expect("load should succeed");
 
@@ -937,7 +938,7 @@ mod tests {
         // ── exists (via load) ─────────────────────────────────────────────
         assert!(
             store
-                .load("remote-test", &Pagination { from: 0, size: 0 })
+                .load("remote-test", &Pagination { from: 0, size: 0 }, false)
                 .await
                 .is_ok(),
             "remote-test should exist"
@@ -945,7 +946,7 @@ mod tests {
         assert!(
             matches!(
                 store
-                    .load("no-such-journal", &Pagination { from: 0, size: 0 })
+                    .load("no-such-journal", &Pagination { from: 0, size: 0 }, false)
                     .await,
                 Err(StoreError::NotFound(_))
             ),
@@ -954,7 +955,7 @@ mod tests {
 
         // ── load not found ───────────────────────────────────────────────
         let not_found = store
-            .load("no-such-journal", &Pagination { from: 0, size: 0 })
+            .load("no-such-journal", &Pagination { from: 0, size: 0 }, false)
             .await;
         assert!(
             matches!(not_found, Err(StoreError::NotFound(_))),

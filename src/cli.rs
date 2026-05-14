@@ -48,6 +48,9 @@ pub(crate) enum Commands {
         /// Follow: watch for new items in real time
         #[arg(short, long)]
         follow: bool,
+        /// Show an archived journal
+        #[arg(long)]
+        archived: bool,
     },
     /// Add an item to the current journal
     Add {
@@ -453,9 +456,16 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
         Commands::Completions { .. } => {
             unreachable!("completions is handled in main")
         }
-        Commands::Show { name, json, follow } => {
+        Commands::Show {
+            name,
+            json,
+            follow,
+            archived,
+        } => {
             let journal_name = resolve_journal(cli.journal.as_deref(), name.as_deref())?;
-            let (journal, total) = store.load(&journal_name, &Pagination::all()).await?;
+            let (journal, total) = store
+                .load(&journal_name, &Pagination::all(), *archived)
+                .await?;
             if *json {
                 for item in &journal.items {
                     println!("{}", serde_json::to_string(item)?);
@@ -477,7 +487,7 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                         from: seen,
                         size: usize::MAX,
                     };
-                    let (journal, new_total) = store.load(&journal_name, &all).await?;
+                    let (journal, new_total) = store.load(&journal_name, &all, *archived).await?;
                     if new_total > seen {
                         for item in &journal.items {
                             if *json {
@@ -579,7 +589,7 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
             println!("Unarchived: {name}");
         }
         Commands::Export { name, file } => {
-            let (journal, _) = store.load(name, &Pagination::all()).await?;
+            let (journal, _) = store.load(name, &Pagination::all(), false).await?;
             let data = serde_json::to_string_pretty(&journal)?;
             match file {
                 Some(path) => std::fs::write(path, format!("{data}\n"))?,

@@ -498,7 +498,7 @@ impl ForayServer {
             size: args.size,
         };
         let (journal, total) = store
-            .load(&args.name, &pagination)
+            .load(&args.name, &pagination, false)
             .await
             .map_err(Self::store_err)?;
 

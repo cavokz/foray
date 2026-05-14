@@ -275,7 +275,7 @@ Each MCP tool invocation is traced to **stderr** (stdout carries the JSON-RPC wi
 
 ```
 foray serve                          # Start MCP stdio server
-foray show [name] [--json]  # Full journal with items
+foray show [name] [--json] [--archived]  # Full journal with items. --archived shows an archived journal.
 foray add <content> [--type TYPE] [--ref REF] [--tags CSV] [--meta KEY=VALUE]...
 foray create <name> --title "..." [--meta KEY=VALUE]...  # Always creates; --title required.
 foray list [--json] [--archived] [--completion]  # List journals. --archived shows archived. --json outputs {"total": N, "journals": [...]}. --completion outputs bare names (for shell scripts).

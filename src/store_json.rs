@@ -210,10 +210,16 @@ impl Store for JsonFileStore {
         &self,
         name: &str,
         pagination: &Pagination,
+        archived: bool,
     ) -> Result<(JournalFile, usize), StoreError> {
-        let (path, _) = self
-            .find(name)
-            .ok_or_else(|| StoreError::NotFound(name.into()))?;
+        let path = if archived {
+            self.archive_path(name)
+        } else {
+            self.journal_path(name)
+        };
+        if !path.exists() {
+            return Err(StoreError::NotFound(name.into()));
+        }
         let mut journal = self.read_journal(&path)?;
         // The file stem is the authoritative name; override whatever the JSON says.
         journal.name = name.to_string();
@@ -339,7 +345,10 @@ mod tests {
             .create(&journal.name, journal.title.clone(), journal.meta.clone())
             .await
             .unwrap();
-        let (loaded, total) = store.load("my-ctx", &Pagination::all()).await.unwrap();
+        let (loaded, total) = store
+            .load("my-ctx", &Pagination::all(), false)
+            .await
+            .unwrap();
         assert_eq!(loaded.name, "my-ctx");
         assert_eq!(total, 0);
     }
@@ -355,7 +364,7 @@ mod tests {
     #[tokio::test]
     async fn load_not_found() {
         let (store, _dir) = make_store();
-        let result = store.load("nonexistent", &Pagination::all()).await;
+        let result = store.load("nonexistent", &Pagination::all(), false).await;
         assert!(matches!(result, Err(StoreError::NotFound(_))));
     }
 
@@ -365,7 +374,10 @@ mod tests {
         store.create("my-ctx", "T".into(), None).await.unwrap();
         let item = make_item("found a bug");
         store.add_items("my-ctx", vec![item]).await.unwrap();
-        let (loaded, total) = store.load("my-ctx", &Pagination::all()).await.unwrap();
+        let (loaded, total) = store
+            .load("my-ctx", &Pagination::all(), false)
+            .await
+            .unwrap();
         assert_eq!(total, 1);
         assert_eq!(loaded.items[0].content, "found a bug");
     }
@@ -405,7 +417,7 @@ mod tests {
         store.create("to-delete", "D".into(), None).await.unwrap();
         store.delete("to-delete", false).await.unwrap();
         assert!(matches!(
-            store.load("to-delete", &Pagination::all()).await,
+            store.load("to-delete", &Pagination::all(), false).await,
             Err(StoreError::NotFound(_))
         ));
     }
@@ -421,7 +433,7 @@ mod tests {
         ));
         store.delete("to-delete", true).await.unwrap();
         assert!(matches!(
-            store.load("to-delete", &Pagination::all()).await,
+            store.load("to-delete", &Pagination::all(), false).await,
             Err(StoreError::NotFound(_))
         ));
     }
@@ -443,7 +455,10 @@ mod tests {
 
         store.archive("arch-test").await.unwrap();
 
-        let (loaded, _) = store.load("arch-test", &Pagination::all()).await.unwrap();
+        let (loaded, _) = store
+            .load("arch-test", &Pagination::all(), false)
+            .await
+            .unwrap();
         assert_eq!(loaded.name, "arch-test");
         assert!(matches!(
             store.add_items("arch-test", vec![make_item("x")]).await,
@@ -836,7 +851,7 @@ mod tests {
                 .unwrap();
         }
         let p = Pagination { from: 1, size: 2 };
-        let (journal, total) = store.load("pag", &p).await.unwrap();
+        let (journal, total) = store.load("pag", &p, false).await.unwrap();
         assert_eq!(total, 5);
         assert_eq!(journal.items.len(), 2);
         assert_eq!(journal.items[0].content, "item-1");
