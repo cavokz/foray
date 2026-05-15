@@ -3,6 +3,7 @@ mod config;
 mod migrate;
 mod server;
 mod store;
+mod store_elasticsearch;
 mod store_json;
 mod store_stdio;
 mod types;
