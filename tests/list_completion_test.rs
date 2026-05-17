@@ -11,13 +11,11 @@ fn run_foray(home: &std::path::Path, args: &[&str]) -> std::process::Output {
     let mut cmd = Command::new(foray_bin());
     cmd.args(args)
         .current_dir(home)
-        .env("HOME", home_str)
+        .env("FORAY_HOME", home_str)
+        .env_remove("HOME")
         .env_remove("FORAY_JOURNAL")
         .env_remove("FORAY_STORE")
         .env_remove("COMPLETE");
-    // On Windows, home::home_dir() checks USERPROFILE, not HOME.
-    #[cfg(windows)]
-    cmd.env("USERPROFILE", home_str);
     cmd.output().expect("failed to run foray")
 }
 

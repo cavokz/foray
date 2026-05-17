@@ -1,7 +1,7 @@
 # Blueprint: foray — Persistent Journals via MCP
 
 ## TL;DR
-A **Rust MCP server + CLI** that gives any AI assistant persistent investigation journals. Fully stateless server — every tool takes an explicit journal name. Pluggable journal store (ships with `JsonFileStore` at `~/.foray/journals/*.json`). CLI resolves journal via `--journal` flag > `FORAY_JOURNAL` env > `.forayrc` walk-up; store via `--store` flag > `FORAY_STORE` env > `.forayrc current-store` > registry default.
+A **Rust MCP server + CLI** that gives any AI assistant persistent investigation journals. Fully stateless server — every tool takes an explicit journal name. Pluggable journal store (ships with `JsonFileStore` at `~/.foray/journals/*.json`; override base dir with `FORAY_HOME`). CLI resolves journal via `--journal` flag > `FORAY_JOURNAL` env > `.forayrc` walk-up; store via `--store` flag > `FORAY_STORE` env > `.forayrc current-store` > registry default.
 
 **Tagline:** *"Start with a foray. Keep the trail."*
 
@@ -88,7 +88,7 @@ root = true
 The default store implementation uses flat JSON files:
 
 ```
-~/.foray/journals/
+~/.foray/journals/            ← default; override with FORAY_HOME
   ├── auth-investigation.json
   ├── perf-deep-dive.json
   ├── main-cleanup.json
@@ -97,6 +97,8 @@ The default store implementation uses flat JSON files:
 ```
 
 No `.active` file. No project subdirectories. One JSON file per journal. Archived journals are moved to `archive/` subdirectory.
+
+**`FORAY_HOME`**: when set to a non-empty string, overrides `~/.foray/` as the foray base directory. `JsonFileStore::default_dir()` resolves to `$FORAY_HOME/journals/`; `config_path()` resolves to `$FORAY_HOME/config.toml`. Takes precedence over `home::home_dir()`. Useful for testing (point at a fixture tree), CI isolation, and non-standard home setups. Does not affect `.forayrc` walk-up, which is always cwd-relative.
 
 ### Journal file format
 ```json
@@ -339,8 +341,9 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
    - File locking via `fs2::lock_exclusive` on `{name}.lock` sidecar file for concurrent access safety
    - Custom `StoreError` enum: `NotFound`, `AlreadyExists`, `Archived`, `SchemaTooNew`, `ProtocolTooNew`, `Unsupported` (for operations not available on remote stores, e.g. `delete`), `Io`, `Json`
 3. `config.rs` — `StoreRegistry` and config parsing:
-   - Parses `~/.foray/config.toml` with `[stores.<name>]` sections; two backends: `type = "json_file"` (`path`, `description`) and `type = "foray_stdio"` (`command`, `args`, `description`, `store?`). `StdioStore` always appends `serve` to the configured command, so `args` contains only transport arguments — e.g. for SSH: `command = "ssh"`, `args = ["user@host", "--", "foray"]` → spawns `ssh user@host -- foray serve`
-   - Falls back to implicit `local` `JsonFileStore` at `~/.foray/journals/` when config is absent or has no stores; returns `InvalidData` error if the default journal path is not valid UTF-8 (incompatible with TOML-based config regardless)
+   - `config_path()` checks `FORAY_HOME` (non-empty) before `home::home_dir()` — returns `$FORAY_HOME/config.toml` when set
+   - Parses `~/.foray/config.toml` (or `$FORAY_HOME/config.toml`) with `[stores.<name>]` sections; two backends: `type = "json_file"` (`path`, `description`) and `type = "foray_stdio"` (`command`, `args`, `description`, `store?`). `StdioStore` always appends `serve` to the configured command, so `args` contains only transport arguments — e.g. for SSH: `command = "ssh"`, `args = ["user@host", "--", "foray"]` → spawns `ssh user@host -- foray serve`
+   - Falls back to implicit `local` `JsonFileStore` at `$FORAY_HOME/journals/` (or `~/.foray/journals/`) when config is absent or has no stores; returns `InvalidData` error if the default journal path is not valid UTF-8 (incompatible with TOML-based config regardless)
    - `StoreRegistry` holds a `Vec<StoreEntry>` (name, description, `Arc<dyn Store>`) and a `nuance: String`
    - `nuance` is a FNV-1a hash of the full parsed config serialized to JSON (capturing all fields of all stores automatically) plus `"schema=N"` and `"protocol=N"` — deterministic, stable across restarts, changes when any config field, schema, or protocol version changes. The implicit local store is represented as a synthetic single-entry `RawConfig` through the same code path. `RawConfig` and `RawStoreConfig` derive both `Deserialize` and `Serialize`.
    - `StoreRegistry::get(name)` — look up by name; `default_store()` — first entry; `names_hint()` — comma-joined names for error messages
