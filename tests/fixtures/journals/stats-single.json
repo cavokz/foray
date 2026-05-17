@@ -1,0 +1,20 @@
+{
+  "schema": 1,
+  "name": "stats-single",
+  "title": "Stats single \u2014 one item",
+  "items": [
+    {
+      "id": "rbhg-tsxc-lbgn-bgrp",
+      "type": "finding",
+      "content": "Auth session cookie not invalidated on logout \u2014 attacker can reuse stolen cookie indefinitely until natural expiry.",
+      "tags": [
+        "auth",
+        "security"
+      ],
+      "added_at": "2026-01-01T10:00:00Z",
+      "meta": {
+        "ref": "src/auth/session.go:142"
+      }
+    }
+  ]
+}

@@ -481,3 +481,33 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 - **CLI output**: plain text by default, `--json` flag on read commands.
 - **MCP responses**: JSON-serialized structs. LLM formats for the user.
 - **`rmcp` pattern**: `#[derive(Clone)]` server, `StoreRegistry` (not a bare `Arc<dyn Store>`), `Parameters<T>` for tool args, `CallToolResult::success(Content::text(...))` for returns. `serve_server()` returns a `RunningService` — must call `.waiting()` to keep the process alive. `use rmcp::schemars;` is required at module level for `#[derive(JsonSchema)]` to resolve.
+
+## Test Fixtures
+
+Static journal files under `tests/fixtures/journals/` for use in integration and model eval tests. Never mutated in-place — tests that need a writable copy set `FORAY_HOME` to a temporary directory containing a copy of the tree.
+
+```
+tests/fixtures/journals/
+  ├── stats-empty.json                     — 0 items; list_journals must omit avg/std
+  ├── stats-single.json                    — 1 item; avg_item_size present, std_item_size absent
+  ├── stats-uniform.json                   — 100 identical items; std ≈ 0
+  ├── stats-high-variance.json             — 100 items alternating ~50 B / ~2 KB; large std
+  ├── stats-realistic.json                 — 200 items; 5-template × 8-service real-world mix
+  ├── schema-v0.json                       — 5 items; no 'schema' field; top-level 'ref' on items (pre-v1)
+  ├── correction-trail.json                — 10 items; memory leak investigation with correction
+  ├── cross-reference.json                 — 10 items; foray: cross-journal refs in meta.ref
+  └── archive/
+      └── stats-high-variance-archived.json — same content as stats-high-variance; archived location
+```
+
+| File | Purpose |
+|------|---------|
+| `stats-empty.json` | Validates `n==0` branch: both `avg_item_size` and `std_item_size` absent from `list_journals` response |
+| `stats-single.json` | Validates `n==1` branch: `avg_item_size` present, `std_item_size` absent |
+| `stats-uniform.json` | Zero variance — page size ≈ `floor(budget/avg)` without std inflation |
+| `stats-high-variance.json` | Large std — model must use conservative page size (≤ 4 at 10 KB budget) |
+| `stats-realistic.json` | Real-world distribution across 8 services; full multi-page pagination |
+| `schema-v0.json` | Pre-v1 format; migration moves top-level `ref` → `meta.ref` transparently |
+| `correction-trail.json` | Append-only correction trail; model must not delete or edit existing items |
+| `cross-reference.json` | `foray:` refs in `meta.ref`; model must open and read referenced journals |
+| `archive/stats-high-variance-archived.json` | Archived journal; `sync_journal` calls must pass `archived: true` |
