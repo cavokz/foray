@@ -1,4 +1,5 @@
 use crate::migrate;
+use crate::paths::{expand_tilde, resolve_foray_home};
 use crate::store::{Store, StoreError};
 use crate::store_json::JsonFileStore;
 use crate::store_stdio::StdioStore;
@@ -102,7 +103,7 @@ impl StoreRegistry {
         for (name, entry) in &raw.stores {
             let store: Arc<dyn Store> = match entry {
                 RawStoreConfig::JsonFile { path, .. } => {
-                    let path_buf = PathBuf::from(path);
+                    let path_buf = expand_tilde(path)?;
                     if !path_buf.is_absolute() {
                         return Err(StoreError::Io(std::io::Error::new(
                             std::io::ErrorKind::InvalidData,
@@ -306,18 +307,7 @@ impl StoreRegistry {
 // ── Helpers ─────────────────────────────────────────────────────────
 
 fn config_path() -> Result<PathBuf, StoreError> {
-    if let Some(foray_home) = std::env::var("FORAY_HOME").ok().filter(|v| !v.is_empty()) {
-        return Ok(PathBuf::from(foray_home).join("config.toml"));
-    }
-    Ok(home::home_dir()
-        .ok_or_else(|| {
-            StoreError::Io(std::io::Error::new(
-                std::io::ErrorKind::NotFound,
-                "cannot determine home directory",
-            ))
-        })?
-        .join(".foray")
-        .join("config.toml"))
+    Ok(resolve_foray_home()?.join("config.toml"))
 }
 
 fn compute_nuance(fingerprints: &[String]) -> String {
@@ -423,6 +413,45 @@ mod tests {
         .unwrap();
         let err = StoreRegistry::load_from(&config_path).err().unwrap();
         assert!(err.to_string().contains("description"), "error was: {err}");
+    }
+
+    #[tokio::test]
+    async fn load_from_expands_tilde_in_store_path() {
+        let fake_home = tempfile::tempdir().unwrap();
+        let journals_dir = fake_home.path().join("journals");
+        std::fs::create_dir_all(&journals_dir).unwrap();
+        let _home = crate::paths::TestHomeGuard::set(fake_home.path());
+
+        assert_eq!(expand_tilde("~/journals").unwrap(), journals_dir.as_path());
+
+        let probe = serde_json::json!({
+            "schema": crate::migrate::CURRENT_SCHEMA,
+            "name": "probe",
+            "title": "Probe",
+            "items": []
+        });
+        std::fs::write(
+            journals_dir.join("probe.json"),
+            serde_json::to_string(&probe).unwrap(),
+        )
+        .unwrap();
+
+        let dir = tempfile::tempdir().unwrap();
+        let config_path = dir.path().join("config.toml");
+        std::fs::write(
+            &config_path,
+            "[stores.work]\ntype = \"json_file\"\npath = '~/journals'\ndescription = \"Work journals\"\n",
+        )
+        .unwrap();
+
+        let registry = StoreRegistry::load_from(&config_path).unwrap();
+        assert_eq!(registry.entries().len(), 1);
+        assert_eq!(registry.entries()[0].name, "work");
+
+        let store = registry.get("work").expect("work store");
+        let (summaries, total) = store.list().await.expect("list journals");
+        assert_eq!(total, 1, "store must read from expanded ~/journals path");
+        assert_eq!(summaries[0].name, "probe");
     }
 
     #[test]

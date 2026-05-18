@@ -1,4 +1,5 @@
 use crate::migrate::{self, MigrateResult};
+use crate::paths::resolve_foray_home;
 use crate::store::{Store, StoreError};
 use crate::types::{JournalFile, JournalItem, JournalSummary, Pagination};
 use async_trait::async_trait;
@@ -18,18 +19,7 @@ impl JsonFileStore {
     }
 
     pub(crate) fn default_dir() -> Result<PathBuf, StoreError> {
-        if let Some(foray_home) = std::env::var("FORAY_HOME").ok().filter(|v| !v.is_empty()) {
-            return Ok(PathBuf::from(foray_home).join("journals"));
-        }
-        Ok(home::home_dir()
-            .ok_or_else(|| {
-                StoreError::Io(std::io::Error::new(
-                    std::io::ErrorKind::NotFound,
-                    "cannot determine home directory",
-                ))
-            })?
-            .join(".foray")
-            .join("journals"))
+        Ok(resolve_foray_home()?.join("journals"))
     }
 
     fn journal_path(&self, name: &str) -> PathBuf {
@@ -908,5 +898,15 @@ mod tests {
         assert_eq!(journal.items.len(), 2);
         assert_eq!(journal.items[0].content, "item-1");
         assert_eq!(journal.items[1].content, "item-2");
+    }
+
+    #[test]
+    fn default_dir_expands_tilde_in_foray_home() {
+        let fake_home = tempfile::tempdir().unwrap();
+        let foray_home = fake_home.path().join("foray-root");
+        std::fs::create_dir_all(foray_home.join("journals")).unwrap();
+        let _env = crate::paths::TestForayHomeEnv::with(fake_home.path(), "~/foray-root");
+        let resolved = JsonFileStore::default_dir().unwrap();
+        assert_eq!(resolved, foray_home.join("journals"));
     }
 }
