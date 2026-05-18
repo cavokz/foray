@@ -369,7 +369,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 3. `resolve_store<'a>(registry, cli_flag) -> Result<&'a dyn Store>` — `--store` > `FORAY_STORE` > `.forayrc current-store` > registry default (single-store) or error.
 4. `find_forayrc(start_dir) -> Option<String>` — walk up from cwd looking for `.forayrc`, parse TOML, return `current-journal` value. Stop at `root = true` or filesystem root.
 5. `find_store_in_forayrc(start_dir) -> Option<String>` — same walk, returns `current-store` value.
-6. `main.rs` — parse CLI, load `StoreRegistry`, call `resolve_store()`, route subcommands. `serve` → MCP server. Everything else → resolve journal + store via chains, call store, format output.
+6. `main.rs` — parse CLI, load `StoreRegistry`, call `resolve_store()`, route subcommands. `serve` → MCP server (prints startup banner to stderr: `foray <version> (<git-describe>)[ FORAY_HOME=<path>]`; git describe is baked in at compile time via `build.rs`). Everything else → resolve journal + store via chains, call store, format output.
 7. `create` handler: create journal, return success.
 
 ### Phase 5: Setup Guide + Companion Skill + README + Config
