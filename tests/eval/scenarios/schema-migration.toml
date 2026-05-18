@@ -1,0 +1,15 @@
+journal  = "schema-v0"
+archived = false
+prompt   = "Read the schema-v0 journal and list all findings."
+
+[[expected_behaviors]]
+description = "Reads the journal without error despite the missing 'schema' field at the journal root."
+
+[[expected_behaviors]]
+description = "Returns the correct item count (5 items)."
+
+[[expected_behaviors]]
+description = "Item meta.ref values are accessible — migration moved the old top-level 'ref' field into meta.ref transparently."
+
+[[expected_behaviors]]
+description = "Lists the two finding items: the initial race condition finding and the residual latency spike finding."

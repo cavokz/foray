@@ -412,7 +412,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
     - Skill includes its own `update-url` — LLM can fetch the latest, diff against local copy, summarize what changed, and offer to update
 
 3. `README.md` — challenge template, competitive positioning, multi-client config
-4. `.vscode/mcp.json`, config examples for Claude Desktop + Cursor
+4. `.vscode/mcp.json` (VS Code), `.cursor/mcp.json` (Cursor), `.mcp.json` (Claude Code)
 5. Repo-level AI instructions — same rule in each IDE's format: after any code change, review `doc/blueprint.md` and update it to reflect the current state. Covers: tool signatures, response formats, CLI flags, type definitions, storage layout, behavioral rules. The blueprint is the living spec — code and doc must stay in sync.
     - `.github/copilot-instructions.md` (VS Code Copilot)
     - `.cursor/rules/blueprint.mdc` (Cursor)
@@ -511,3 +511,40 @@ tests/fixtures/journals/
 | `correction-trail.json` | Append-only correction trail; model must not delete or edit existing items |
 | `cross-reference.json` | `foray:` refs in `meta.ref`; model must open and read referenced journals |
 | `archive/stats-high-variance-archived.json` | Archived journal; `sync_journal` calls must pass `archived: true` |
+
+## Model Eval Harness
+
+Scenario files under `tests/eval/scenarios/` for evaluating model behaviour when using foray's MCP tools. Each scenario exercises a specific part of the companion skill's protocol.
+
+```
+tests/eval/
+  README.md            — isolation setup, scenario format, scoring
+  scenarios/
+    pagination-uniform.toml
+    pagination-high-variance.toml
+    pagination-realistic.toml
+    archived-read.toml
+    cross-reference.toml
+    schema-migration.toml
+    empty-journal.toml
+    single-item.toml
+```
+
+**Isolation**: before running a scenario, set `FORAY_HOME` to a temporary copy of `tests/fixtures/` so the eval does not mutate committed fixtures. The workspace `.vscode/mcp.json`, `.cursor/mcp.json`, and `.mcp.json` (Claude Code) all ship a ready-made `foray-eval` server entry that does this automatically.
+
+**Scenario format** (TOML):
+- `journal` — fixture journal name (must exist under `tests/fixtures/journals/`)
+- `archived` — whether the journal is archived (`sync_journal` calls must pass `archived = true`)
+- `prompt` — prompt given to the model
+- `[[expected_behaviors]]` — list of plain-English observable behaviours; each entry is marked pass/fail against the model's tool-call trace; all must pass for the scenario to pass
+
+| Scenario | Journal | Tests |
+|----------|---------|-------|
+| `pagination-uniform` | `stats-uniform` | size from formula (std≈0 → effectively avg-only) |
+| `pagination-high-variance` | `stats-high-variance` | size uses both avg+std, many small pages |
+| `pagination-realistic` | `stats-realistic` | 200-item offset tracking across pages |
+| `archived-read` | `stats-high-variance-archived` | `archived: true` on all sync calls |
+| `cross-reference` | `cross-reference` | follow `foray:` refs, open referenced journals |
+| `schema-migration` | `schema-v0` | pre-v1 journal readable, migration transparent |
+| `empty-journal` | `stats-empty` | absent stats → safe default size (5) |
+| `single-item` | `stats-single` | absent `std_item_size` → `size: 5`, not avg-only |

@@ -1,0 +1,21 @@
+journal  = "stats-high-variance-archived"
+archived = true
+prompt   = "Read the full stats-high-variance-archived journal and count how many findings it contains."
+
+[[expected_behaviors]]
+description = "Calls list_journals and identifies the journal as archived (archived = true)."
+
+[[expected_behaviors]]
+description = "Passes archived = true on every sync_journal call."
+
+[[expected_behaviors]]
+description = "Uses avg_item_size and std_item_size to compute a conservative page size."
+
+[[expected_behaviors]]
+description = "Makes multiple sync_journal calls to cover all 100 items."
+
+[[expected_behaviors]]
+description = "Does not attempt to write any items to the archived journal."
+
+[[expected_behaviors]]
+description = "Reports the correct count of 'finding' type items (50 — every odd-indexed item)."

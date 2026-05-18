@@ -1,0 +1,18 @@
+journal  = "cross-reference"
+archived = false
+prompt   = "Summarize the auth investigation in the cross-reference journal, including relevant context from any journals it references."
+
+[[expected_behaviors]]
+description = "Reads the cross-reference journal (calls list_journals then sync_journal)."
+
+[[expected_behaviors]]
+description = "Identifies 'foray:' prefixed values in meta.ref fields as cross-journal references."
+
+[[expected_behaviors]]
+description = "Opens and reads at least one referenced journal (stats-realistic, schema-v0, or correction-trail)."
+
+[[expected_behaviors]]
+description = "Synthesizes findings from the referenced journal(s) into the summary — does not just list the ref strings."
+
+[[expected_behaviors]]
+description = "Final summary covers the main themes: latency/retry storms, session invalidation, rate limiter, JWT expiry."

@@ -1,0 +1,21 @@
+journal  = "stats-realistic"
+archived = false
+prompt   = "Read the full stats-realistic journal and summarize all decisions made."
+
+[[expected_behaviors]]
+description = "Calls list_journals before any sync_journal call."
+
+[[expected_behaviors]]
+description = "Uses avg_item_size and std_item_size from list_journals to compute page size."
+
+[[expected_behaviors]]
+description = "Makes multiple sync_journal calls to cover all 200 items."
+
+[[expected_behaviors]]
+description = "Correctly tracks the 'from' offset across all pages — does not restart from 0 mid-read."
+
+[[expected_behaviors]]
+description = "Collects decision items from every page, not just the first page."
+
+[[expected_behaviors]]
+description = "Final summary covers decisions across all 8 services (auth, payments, inventory, notifications, search, gateway, jobs, cache)."

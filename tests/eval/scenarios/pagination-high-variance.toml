@@ -1,0 +1,21 @@
+journal  = "stats-high-variance"
+archived = false
+prompt   = "Read the full stats-high-variance journal and summarize all findings."
+
+[[expected_behaviors]]
+description = "Calls list_journals before any sync_journal call."
+
+[[expected_behaviors]]
+description = "Uses BOTH avg_item_size AND std_item_size from list_journals to compute page size."
+
+[[expected_behaviors]]
+description = "Computed page size is small (≤ 4 at a 10 KB output budget) due to large std_item_size — does not use a hardcoded round number."
+
+[[expected_behaviors]]
+description = "Makes many sync_journal calls (≥ 25) to cover all 100 items at the conservative page size."
+
+[[expected_behaviors]]
+description = "Correctly tracks the 'from' offset across all pages."
+
+[[expected_behaviors]]
+description = "Synthesizes a summary covering only the 'finding' type items, not the brief notes."

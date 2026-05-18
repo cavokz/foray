@@ -1,0 +1,15 @@
+journal  = "stats-empty"
+archived = false
+prompt   = "Read the stats-empty journal and report how many items it contains."
+
+[[expected_behaviors]]
+description = "Calls list_journals before sync_journal."
+
+[[expected_behaviors]]
+description = "avg_item_size is absent in the list_journals response — uses size: 5 as the safe default (not a larger round number)."
+
+[[expected_behaviors]]
+description = "Makes at most one sync_journal call (zero items means no further pages needed)."
+
+[[expected_behaviors]]
+description = "Correctly reports 0 items."
