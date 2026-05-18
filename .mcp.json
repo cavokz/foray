@@ -1,0 +1,25 @@
+{
+	"mcpServers": {
+		"foray-dev": {
+			"type": "stdio",
+			"command": "cargo",
+			"args": [
+				"run",
+				"--",
+				"serve"
+			]
+		},
+		"foray-eval": {
+			"type": "stdio",
+			"command": "cargo",
+			"args": [
+				"run",
+				"--",
+				"serve"
+			],
+			"env": {
+				"FORAY_HOME": "${CLAUDE_PROJECT_DIR:-.}/tests/fixtures"
+			}
+		}
+	}
+}
