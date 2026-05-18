@@ -306,6 +306,9 @@ impl StoreRegistry {
 // ── Helpers ─────────────────────────────────────────────────────────
 
 fn config_path() -> Result<PathBuf, StoreError> {
+    if let Some(foray_home) = std::env::var("FORAY_HOME").ok().filter(|v| !v.is_empty()) {
+        return Ok(PathBuf::from(foray_home).join("config.toml"));
+    }
     Ok(home::home_dir()
         .ok_or_else(|| {
             StoreError::Io(std::io::Error::new(

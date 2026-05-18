@@ -18,6 +18,9 @@ impl JsonFileStore {
     }
 
     pub(crate) fn default_dir() -> Result<PathBuf, StoreError> {
+        if let Some(foray_home) = std::env::var("FORAY_HOME").ok().filter(|v| !v.is_empty()) {
+            return Ok(PathBuf::from(foray_home).join("journals"));
+        }
         Ok(home::home_dir()
             .ok_or_else(|| {
                 StoreError::Io(std::io::Error::new(

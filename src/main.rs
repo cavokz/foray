@@ -35,6 +35,15 @@ async fn main() -> anyhow::Result<()> {
     let registry = StoreRegistry::load()?;
 
     if matches!(cli.command, Commands::Serve) {
+        let version = env!("CARGO_PKG_VERSION");
+        let git = env!("FORAY_GIT_DESCRIBE");
+        let home = std::env::var("FORAY_HOME")
+            .ok()
+            .filter(|v| !v.is_empty())
+            .map(|v| format!(" FORAY_HOME={v}"))
+            .unwrap_or_default();
+        eprintln!("foray {version} ({git}){home}");
+
         let server = ForayServer::new(registry);
         let transport = rmcp::transport::io::stdio();
         let service = rmcp::serve_server(server, transport).await?;

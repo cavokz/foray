@@ -1,0 +1,1257 @@
+{
+  "schema": 1,
+  "name": "stats-high-variance-archived",
+  "title": "Stats high variance (archived) \u2014 100 alternating small/large items",
+  "items": [
+    {
+      "id": "nrjz-nvsj-ccmn-gqjt",
+      "type": "note",
+      "content": "Note 0: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-01T08:00:00Z"
+    },
+    {
+      "id": "txzd-kpjm-hhdj-lqhx",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-01T09:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "fjqj-vnnn-jbyn-zgkc",
+      "type": "note",
+      "content": "Note 2: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-01T10:00:00Z"
+    },
+    {
+      "id": "nxrm-pwmx-tvkl-pgpc",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-01T11:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "nvhz-sdzl-vkyt-gnnb",
+      "type": "note",
+      "content": "Note 4: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-01T12:00:00Z"
+    },
+    {
+      "id": "djmm-qnjq-fztj-kwps",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-01T13:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "jwks-zqvt-sbmz-vvqt",
+      "type": "note",
+      "content": "Note 6: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-01T14:00:00Z"
+    },
+    {
+      "id": "qfrr-wfsb-ydbj-fslv",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-01T15:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "yxtc-dgjr-pjfy-kkvt",
+      "type": "note",
+      "content": "Note 8: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-01T16:00:00Z"
+    },
+    {
+      "id": "rsqg-hpgz-jjgs-jkyv",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-01T17:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "hdsk-zwzv-jjsk-mhng",
+      "type": "note",
+      "content": "Note 10: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-01T08:00:00Z"
+    },
+    {
+      "id": "pysd-qqhs-prcl-tdvb",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-01T09:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "pyly-xngz-jryc-qpty",
+      "type": "note",
+      "content": "Note 12: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-01T10:00:00Z"
+    },
+    {
+      "id": "yfxf-yzln-yzyx-bpdz",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-01T11:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "hzpn-ywmg-dfmh-ftvp",
+      "type": "note",
+      "content": "Note 14: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-01T12:00:00Z"
+    },
+    {
+      "id": "tfwx-wncs-fdjh-hgtz",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-01T13:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "jtbr-scdj-lnxs-jdyj",
+      "type": "note",
+      "content": "Note 16: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-01T14:00:00Z"
+    },
+    {
+      "id": "qgdf-tqlp-mprg-htxc",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-01T15:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "mscp-cpnq-fjnd-gqcn",
+      "type": "note",
+      "content": "Note 18: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-01T16:00:00Z"
+    },
+    {
+      "id": "vmnm-cmvt-lwtq-bkcz",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-01T17:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "ycyb-lvvz-rlzl-xyks",
+      "type": "note",
+      "content": "Note 20: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-02T08:00:00Z"
+    },
+    {
+      "id": "rprk-fppt-gbbj-sppw",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-02T09:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "hkhy-tdvl-vxbg-dbqs",
+      "type": "note",
+      "content": "Note 22: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-02T10:00:00Z"
+    },
+    {
+      "id": "ctlg-gxcn-jwtj-qsjj",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-02T11:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "frgj-cyxy-rlnz-ysvj",
+      "type": "note",
+      "content": "Note 24: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-02T12:00:00Z"
+    },
+    {
+      "id": "lfkt-mwjs-vypz-pdhg",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-02T13:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "rywc-tghs-qxft-tpnx",
+      "type": "note",
+      "content": "Note 26: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-02T14:00:00Z"
+    },
+    {
+      "id": "jzby-zdzn-hqgy-pvkp",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-02T15:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "khnn-dzmw-yklp-gfhy",
+      "type": "note",
+      "content": "Note 28: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-02T16:00:00Z"
+    },
+    {
+      "id": "qlfj-kwnr-shwz-rnfv",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-02T17:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "ftny-prcb-wysv-lwgs",
+      "type": "note",
+      "content": "Note 30: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-02T08:00:00Z"
+    },
+    {
+      "id": "bnkq-sqnn-bpbp-hzbw",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-02T09:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "svyd-dfgp-whlk-lpzg",
+      "type": "note",
+      "content": "Note 32: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-02T10:00:00Z"
+    },
+    {
+      "id": "swrx-tckp-cbfn-mvpx",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-02T11:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "dpbg-xxmb-cyxp-byjz",
+      "type": "note",
+      "content": "Note 34: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-02T12:00:00Z"
+    },
+    {
+      "id": "qtsl-cfhw-lxjt-dztn",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-02T13:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "zcmw-kvzl-vbhz-nkym",
+      "type": "note",
+      "content": "Note 36: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-02T14:00:00Z"
+    },
+    {
+      "id": "srcq-vscf-srtj-dbjk",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-02T15:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "hdfm-plbk-cqjl-jlcx",
+      "type": "note",
+      "content": "Note 38: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-02T16:00:00Z"
+    },
+    {
+      "id": "yzqf-kdjn-cmln-chhr",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-02T17:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "qgdj-yjrv-jkwx-zdjy",
+      "type": "note",
+      "content": "Note 40: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-03T08:00:00Z"
+    },
+    {
+      "id": "gjzz-jsnq-hkwl-dpqp",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-03T09:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "spzm-smjs-wvln-rhrt",
+      "type": "note",
+      "content": "Note 42: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-03T10:00:00Z"
+    },
+    {
+      "id": "vczn-lnys-pvkx-prcv",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-03T11:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "rkrb-zslt-zmbh-nnqq",
+      "type": "note",
+      "content": "Note 44: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-03T12:00:00Z"
+    },
+    {
+      "id": "mlvq-nkbd-lzdy-djmg",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-03T13:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "nmms-jjwd-wrsf-zhff",
+      "type": "note",
+      "content": "Note 46: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-03T14:00:00Z"
+    },
+    {
+      "id": "pzgl-frmb-qgql-sgtv",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-03T15:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "cdxf-jmhx-prqq-qkwq",
+      "type": "note",
+      "content": "Note 48: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-03T16:00:00Z"
+    },
+    {
+      "id": "wsjq-cddj-fsnl-dlfr",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-03T17:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "srzp-ndjm-ckbd-wznn",
+      "type": "note",
+      "content": "Note 50: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-03T08:00:00Z"
+    },
+    {
+      "id": "slwn-cbtj-hpfm-tvpd",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-03T09:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "dvwk-wbtp-zdwt-jzmk",
+      "type": "note",
+      "content": "Note 52: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-03T10:00:00Z"
+    },
+    {
+      "id": "wmzv-gwqk-srfd-ggck",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-03T11:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "hpjs-jhxz-sczv-yzxd",
+      "type": "note",
+      "content": "Note 54: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-03T12:00:00Z"
+    },
+    {
+      "id": "xhsw-tsnq-hlmr-xcnh",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-03T13:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "ykyj-bvtt-mrkc-pgmg",
+      "type": "note",
+      "content": "Note 56: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-03T14:00:00Z"
+    },
+    {
+      "id": "hwkq-pnks-cdvm-dxmb",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-03T15:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "zgsd-rfyh-rhkx-fljs",
+      "type": "note",
+      "content": "Note 58: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-03T16:00:00Z"
+    },
+    {
+      "id": "grsb-ndgs-bswz-ldcl",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-03T17:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "tdjx-dvtd-zdpb-rmtr",
+      "type": "note",
+      "content": "Note 60: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-04T08:00:00Z"
+    },
+    {
+      "id": "flsx-cdtq-lzjd-hcpq",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-04T09:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "qvsw-rjnn-tjcx-zndn",
+      "type": "note",
+      "content": "Note 62: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-04T10:00:00Z"
+    },
+    {
+      "id": "qpzz-ydxp-ksvz-vbch",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-04T11:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "bcvn-rnls-cpqh-jngv",
+      "type": "note",
+      "content": "Note 64: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-04T12:00:00Z"
+    },
+    {
+      "id": "plrw-scst-wccm-mqjt",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-04T13:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "tdss-fznv-tfdv-hxvb",
+      "type": "note",
+      "content": "Note 66: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-04T14:00:00Z"
+    },
+    {
+      "id": "vhcs-qcmk-npkh-dqtg",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-04T15:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "nbxh-mlfy-xpyt-ljlt",
+      "type": "note",
+      "content": "Note 68: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-04T16:00:00Z"
+    },
+    {
+      "id": "hckn-xfvz-zcmh-wjpb",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-04T17:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "gpjr-mqnv-gxth-blgk",
+      "type": "note",
+      "content": "Note 70: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-04T08:00:00Z"
+    },
+    {
+      "id": "wxyb-rwtd-phnc-zscy",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-04T09:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "xnsk-zcdd-wcpm-zghj",
+      "type": "note",
+      "content": "Note 72: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-04T10:00:00Z"
+    },
+    {
+      "id": "vstj-hcgv-qffm-lpzg",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-04T11:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "jhdf-swsb-wjch-knsh",
+      "type": "note",
+      "content": "Note 74: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-04T12:00:00Z"
+    },
+    {
+      "id": "zblm-thmv-dbwz-dwkr",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-04T13:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "rqhw-bcxm-dywj-bmfq",
+      "type": "note",
+      "content": "Note 76: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-04T14:00:00Z"
+    },
+    {
+      "id": "wlbs-fgfh-xbrh-jlpc",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-04T15:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "hdgx-prvv-zvkp-nynl",
+      "type": "note",
+      "content": "Note 78: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-04T16:00:00Z"
+    },
+    {
+      "id": "fjgx-vczp-vzzd-rhwy",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-04T17:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "czgw-vkww-fqvs-ybsy",
+      "type": "note",
+      "content": "Note 80: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-05T08:00:00Z"
+    },
+    {
+      "id": "ppfz-xnjn-cggp-bygd",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-05T09:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "tywj-bqyv-wxzk-yldj",
+      "type": "note",
+      "content": "Note 82: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-05T10:00:00Z"
+    },
+    {
+      "id": "dfyv-zrfz-syvg-qfjs",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-05T11:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "dtyy-lzzb-qyzg-pydt",
+      "type": "note",
+      "content": "Note 84: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-05T12:00:00Z"
+    },
+    {
+      "id": "gzfx-csrx-mhhc-hdbl",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-05T13:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "tzxn-kpdn-xrsf-cwjj",
+      "type": "note",
+      "content": "Note 86: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-05T14:00:00Z"
+    },
+    {
+      "id": "ycfk-tpxc-qqnb-yfxf",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-05T15:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "dgfs-tthh-gcqw-fklj",
+      "type": "note",
+      "content": "Note 88: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-05T16:00:00Z"
+    },
+    {
+      "id": "rqgb-fjcw-jlnr-cpfx",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-05T17:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "kmhm-ghct-sckp-zqpw",
+      "type": "note",
+      "content": "Note 90: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-05T08:00:00Z"
+    },
+    {
+      "id": "wlpx-mxnc-xtnx-vsrd",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-05T09:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "tfzz-vdlz-mzrw-hyyc",
+      "type": "note",
+      "content": "Note 92: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-05T10:00:00Z"
+    },
+    {
+      "id": "lljh-mxvr-nllf-qtyy",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-05T11:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "pdjp-klln-qbhf-qsbx",
+      "type": "note",
+      "content": "Note 94: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-05T12:00:00Z"
+    },
+    {
+      "id": "jgty-xbwj-hnsd-xdzm",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-05T13:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "whlr-fgwt-txwn-fjnd",
+      "type": "note",
+      "content": "Note 96: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-05T14:00:00Z"
+    },
+    {
+      "id": "wxbg-wwhm-yshw-nrdb",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-05T15:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    },
+    {
+      "id": "kqfx-qkfx-tshl-fqzw",
+      "type": "note",
+      "content": "Note 98: cache miss.",
+      "tags": [
+        "cache",
+        "perf"
+      ],
+      "added_at": "2026-01-05T16:00:00Z"
+    },
+    {
+      "id": "rshl-bvvb-yrqb-hvjz",
+      "type": "finding",
+      "content": "TLS handshake failure investigation \u2014 root cause analysis:\nClient presented cert chain with intermediate CA signed by expired root (CN=GlobalSign Root CA, expired 2021-01-28). Server's trust store was not updated after CA rotation. Affected services: payments-gateway, auth-proxy, notification-sender.\nTimeline:\n  - 09:12 UTC: first 503 errors on payments-gateway (rate: 0.3%)\n  - 09:18 UTC: auth-proxy errors spike to 12%\n  - 09:23 UTC: PagerDuty alert fired (P2)\n  - 09:31 UTC: root cause identified via `openssl s_client` trace\n  - 09:47 UTC: trust store updated and deployed to all nodes\n  - 09:52 UTC: error rate back to baseline\nReferences: incident-2026-01-15, runbook/tls-cert-rotation.md, ops ticket OPS-4421.\nFollow-up: automate trust store rotation via cert-manager CRD; add expiry monitoring alert 30d before CA expiry.",
+      "tags": [
+        "tls",
+        "incident",
+        "infra"
+      ],
+      "added_at": "2026-01-05T17:00:00Z",
+      "meta": {
+        "ref": "runbook/tls-cert-rotation.md",
+        "vcs-repo": "https://github.com/cavokz/foray"
+      }
+    }
+  ]
+}

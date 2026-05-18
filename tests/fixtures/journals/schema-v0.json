@@ -1,0 +1,63 @@
+{
+  "name": "schema-v0",
+  "title": "Auth cache race condition \u2014 schema v0 fixture",
+  "items": [
+    {
+      "id": "wdxx-lylz-hcwg-gxyr",
+      "type": "finding",
+      "content": "Race condition detected in auth cache: two goroutines access the write path concurrently without synchronization.",
+      "tags": [
+        "race",
+        "auth",
+        "cache"
+      ],
+      "added_at": "2026-01-05T09:00:00Z",
+      "ref": "src/auth/cache.go:77"
+    },
+    {
+      "id": "xvlb-xwym-lwtx-wwsn",
+      "type": "note",
+      "content": "Added sync.Mutex around write path in cache.go. Read path is already safe (map read under lock).",
+      "tags": [
+        "auth",
+        "cache",
+        "fix"
+      ],
+      "added_at": "2026-01-05T10:00:00Z",
+      "ref": "src/auth/cache.go:80"
+    },
+    {
+      "id": "kqwt-mbcr-rvdl-rjcf",
+      "type": "note",
+      "content": "Verified fix with Go race detector (`go test -race ./auth/...`). No race conditions reported after 10 consecutive runs.",
+      "tags": [
+        "testing",
+        "race-detector"
+      ],
+      "added_at": "2026-01-05T11:00:00Z"
+    },
+    {
+      "id": "nzwv-wsvj-nths-wvgl",
+      "type": "finding",
+      "content": "Residual latency spike (p99 ~800ms) observed under load \u2014 likely mutex contention on the write path at high concurrency.",
+      "tags": [
+        "perf",
+        "auth",
+        "cache"
+      ],
+      "added_at": "2026-01-05T14:00:00Z",
+      "ref": "src/auth/cache.go:80"
+    },
+    {
+      "id": "fxyx-gyyr-ryzg-sflm",
+      "type": "decision",
+      "content": "Replace sync.Mutex with sync.Map for the auth cache \u2014 eliminates writer contention at the cost of slightly more complex iteration.",
+      "tags": [
+        "auth",
+        "cache",
+        "decision"
+      ],
+      "added_at": "2026-01-05T15:00:00Z"
+    }
+  ]
+}

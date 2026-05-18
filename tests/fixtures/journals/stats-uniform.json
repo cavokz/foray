@@ -1,0 +1,1307 @@
+{
+  "schema": 1,
+  "name": "stats-uniform",
+  "title": "Stats uniform \u2014 100 identical-size items",
+  "items": [
+    {
+      "id": "gqvb-vskf-zkcd-wqvt",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-01T08:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "pzkp-wqxq-sbgj-cgdh",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-01T09:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "rkkg-hyrq-ftfk-zrps",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-01T10:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "wvgb-jhgy-xjrl-ymhh",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-01T11:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "phqx-lgzn-cbdr-vlcl",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-01T12:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "zpzx-btsp-hrdm-mzxh",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-01T13:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "nfyx-jrqf-vpvp-bjby",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-01T14:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "xwjc-xycn-ctvd-mphx",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-01T15:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "lgpt-gjzr-mndg-kqgg",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-01T16:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "crgy-xcgs-gdyp-mvvf",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-01T17:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "dmlm-tszd-lkxh-fmlh",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-02T08:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "hymx-pczw-zywf-nglc",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-02T09:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "kzhv-mlzz-ptfj-zqpt",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-02T10:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "cqnw-fzcf-qsgd-xhqr",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-02T11:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "lqny-gthl-sjjt-cmzz",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-02T12:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "cghy-xxkf-wsqz-rbwj",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-02T13:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "rydd-dphq-tgrh-nywc",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-02T14:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "lhbv-rhtp-lbcx-xpwq",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-02T15:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "fdjx-vxxg-hdvx-lrfy",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-02T16:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "xzwx-btjy-vxwh-vdxx",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-02T17:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "gwmj-vgbg-jxzh-rlzp",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-03T08:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "ydzf-zhdm-tjqn-lqhs",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-03T09:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "bypt-tskc-rjjw-tjjl",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-03T10:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "ljdl-ysxq-jpbj-mqrm",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-03T11:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "mgmx-vfcn-rkwt-sggb",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-03T12:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "hmwc-lrgs-nhrb-tvdl",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-03T13:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "fznc-hwmv-szqy-xqtn",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-03T14:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "wpxt-mhhr-vnrh-cjhj",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-03T15:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "pdgs-sclp-lgly-qswv",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-03T16:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "kbkt-wzlt-pqgg-mbks",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-03T17:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "lfmd-rblp-brdm-ckgj",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-04T08:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "tktw-hcbp-zkrv-rtyg",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-04T09:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "bfds-pgsv-fqtd-wzdb",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-04T10:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "jszl-tcsr-dvwq-dzvk",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-04T11:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "lknk-wwdz-rwsm-tzhv",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-04T12:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "pnmt-hwwc-xhmq-kbwf",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-04T13:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "gvkx-shby-ctnt-srnv",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-04T14:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "cgsj-qmpl-tjsh-hdgd",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-04T15:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "pvfg-ntzp-hdgg-fbph",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-04T16:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "zpsd-xnxq-mmfc-ynwl",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-04T17:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "crcf-pjzd-vqvg-nmmx",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-05T08:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "zjrq-tygg-rffc-bmqj",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-05T09:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "gssm-syvr-rylp-rywc",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-05T10:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "fjtp-jdss-ynnc-bmjh",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-05T11:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "czwq-yzsh-btmr-yfqr",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-05T12:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "nckj-sxjs-jywp-mjjz",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-05T13:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "lnzr-plfk-trtg-pyms",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-05T14:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "dzqh-fppc-zymd-wntn",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-05T15:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "hwzh-plyn-xxhv-lynw",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-05T16:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "hjqz-nfpk-ppmj-fsqg",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-05T17:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "vbts-wlrw-znbn-qxxm",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-06T08:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "pmtl-rfmz-ksrw-wxkj",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-06T09:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "ttxb-cryz-tmdr-xmsx",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-06T10:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "bvjk-fppv-fcxr-hyfm",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-06T11:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "hhbv-xsfm-kqrl-hwgl",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-06T12:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "ngqq-zjzr-hpst-cqnx",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-06T13:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "jvqk-rrst-rwrx-rjmq",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-06T14:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "tcjt-fdpz-pywh-wnvt",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-06T15:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "kdzd-zxtz-zvkv-bpms",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-06T16:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "sqwy-dgbx-pygc-wyjl",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-06T17:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "dyjn-dxdm-styl-tfld",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-07T08:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "nlyb-kmyw-dspz-klfd",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-07T09:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "wmrr-qbvh-dpcv-ggxj",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-07T10:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "fxbx-fdhf-rbbv-gjfc",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-07T11:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "tptn-vndn-ybvx-nmzc",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-07T12:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "nlsn-yccq-chrp-jzpm",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-07T13:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "qdsw-rvtg-mgkm-lclr",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-07T14:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "kfyc-wcdt-wpqp-jdkr",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-07T15:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "txtz-qkqg-rgdw-kvqv",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-07T16:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "wzwq-rbyw-hfsj-kbxp",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-07T17:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "ldrb-tglk-ktvp-ccfq",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-08T08:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "shrn-mhtd-mhsn-sblq",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-08T09:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "bjgd-hjbt-fksn-wvcx",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-08T10:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "bbyx-qqsl-dbjv-qwyc",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-08T11:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "whqp-ljkj-fndn-yktw",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-08T12:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "wgfg-qtrf-vntt-mypr",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-08T13:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "rxrf-cmjh-cnjm-cwcx",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-08T14:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "wqnm-pvxm-wrjm-fcdx",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-08T15:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "ktnf-hmmn-fkhl-kqvr",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-08T16:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "ccsh-tryx-kqdk-zslq",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-08T17:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "yjkv-wswt-sprl-kkfg",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-09T08:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "yngd-cwdv-wxbk-vdkf",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-09T09:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "wvvf-mlsg-mhtm-pjvm",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-09T10:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "wkyz-mhlp-zwvd-hrxp",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-09T11:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "dwwh-vhyf-mygm-kbcn",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-09T12:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "gzkb-ywrv-djws-dsmb",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-09T13:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "chwp-tpdj-jclv-mdyq",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-09T14:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "bnhf-mqhl-rczc-pnzp",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-09T15:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "lmrz-hbvk-trvt-jbpw",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-09T16:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "fvms-rwcv-mjbg-bynz",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-09T17:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "phtg-kvxj-dkxt-xlzn",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-10T08:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "nynv-tcqw-pjcr-jqls",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-10T09:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "kbxk-zhzy-crkv-szdq",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-10T10:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "vbcv-klpq-sykv-qplr",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-10T11:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "hdtn-lphh-mzhy-ndwm",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-10T12:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "xmcs-wjkc-pxws-yrvn",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-10T13:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "dgdv-bpkv-pqcj-ztpv",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-10T14:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "wczr-mskx-vrfz-mycd",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-10T15:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "ffjs-kyxw-hrpd-jpnf",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-10T16:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    },
+    {
+      "id": "yfrt-qwpw-bbrq-rvlr",
+      "type": "finding",
+      "content": "Database connection pool exhausted under load \u2014 max_connections=25 reached during peak traffic at 14:00 UTC. Pool wait timeout set to 30s.",
+      "tags": [
+        "db",
+        "perf"
+      ],
+      "added_at": "2026-01-10T17:00:00Z",
+      "meta": {
+        "ref": "src/db/pool.go:88"
+      }
+    }
+  ]
+}

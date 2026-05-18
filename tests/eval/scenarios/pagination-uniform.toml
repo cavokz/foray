@@ -1,0 +1,21 @@
+journal  = "stats-uniform"
+archived = false
+prompt   = "Read the full stats-uniform journal and list all unique tags found across all items."
+
+[[expected_behaviors]]
+description = "Calls list_journals before any sync_journal call."
+
+[[expected_behaviors]]
+description = "Uses avg_item_size from list_journals to compute the page size — does not use a hardcoded round number."
+
+[[expected_behaviors]]
+description = "Computes size using the formula floor(budget / (avg_item_size + 2 * std_item_size)); std_item_size is present and approximately zero for this fixture so the result is effectively floor(budget / avg_item_size)."
+
+[[expected_behaviors]]
+description = "Makes multiple sync_journal calls to cover all 100 items."
+
+[[expected_behaviors]]
+description = "Correctly tracks the 'from' offset across pages."
+
+[[expected_behaviors]]
+description = "Reports all unique tags present in the journal (e.g. 'db', 'perf')."

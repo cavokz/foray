@@ -1,0 +1,140 @@
+{
+  "schema": 1,
+  "name": "cross-reference",
+  "title": "Auth investigation \u2014 cross-journal references",
+  "items": [
+    {
+      "id": "wfvh-trdn-mvjs-drwn",
+      "type": "finding",
+      "content": "Auth service latency spike correlates exactly with DB pool exhaustion events documented in stats-realistic. Same root cause: retry storms without backoff.",
+      "tags": [
+        "auth",
+        "latency",
+        "db"
+      ],
+      "added_at": "2026-01-15T09:00:00Z",
+      "meta": {
+        "ref": "foray:stats-realistic"
+      }
+    },
+    {
+      "id": "nxnp-ltwq-mlbk-mgsf",
+      "type": "finding",
+      "content": "Session token not invalidated on logout \u2014 same root cause as cache race condition documented in schema-v0 journal.",
+      "tags": [
+        "auth",
+        "session",
+        "security"
+      ],
+      "added_at": "2026-01-15T10:00:00Z",
+      "meta": {
+        "ref": "foray:schema-v0"
+      }
+    },
+    {
+      "id": "nrpj-mynf-dxwn-jccb",
+      "type": "decision",
+      "content": "Consolidate all auth findings into a dedicated auth-deep-dive journal. Cross-reference items will remain here for traceability.",
+      "tags": [
+        "auth",
+        "routing",
+        "decision"
+      ],
+      "added_at": "2026-01-15T11:00:00Z"
+    },
+    {
+      "id": "dlcr-phhc-ndrf-flcx",
+      "type": "finding",
+      "content": "OAuth token refresh endpoint bypasses rate limiter \u2014 refresh storms possible when many clients lose tokens simultaneously.",
+      "tags": [
+        "auth",
+        "oauth",
+        "ratelimit"
+      ],
+      "added_at": "2026-01-15T13:00:00Z",
+      "meta": {
+        "ref": "src/auth/oauth.go:201"
+      }
+    },
+    {
+      "id": "jqms-rhzx-fftq-xdpb",
+      "type": "note",
+      "content": "Rate limiter config is loaded at process startup only \u2014 live changes require restart. Hot-reload needed.",
+      "tags": [
+        "ratelimit",
+        "config"
+      ],
+      "added_at": "2026-01-15T14:00:00Z",
+      "meta": {
+        "ref": "src/ratelimit/config.go:14"
+      }
+    },
+    {
+      "id": "dfns-xzqn-qzks-sljd",
+      "type": "decision",
+      "content": "Add config hot-reload via SIGHUP for rate limiter. Atomic swap of config pointer to avoid races during reload.",
+      "tags": [
+        "ratelimit",
+        "config",
+        "decision"
+      ],
+      "added_at": "2026-01-15T15:00:00Z",
+      "meta": {
+        "ref": "src/ratelimit/config.go:14"
+      }
+    },
+    {
+      "id": "bdbz-xgrr-mrvg-jmmb",
+      "type": "note",
+      "content": "HTTP client timeout context pattern documented in correction-trail journal is directly applicable to OAuth refresh client.",
+      "tags": [
+        "http",
+        "oauth",
+        "cross-ref"
+      ],
+      "added_at": "2026-01-16T09:00:00Z",
+      "meta": {
+        "ref": "foray:correction-trail"
+      }
+    },
+    {
+      "id": "ffsz-mxqg-pwcb-rszw",
+      "type": "finding",
+      "content": "JWT expiry set to 5 minutes \u2014 too short, causes refresh storms when many sessions expire simultaneously at peak.",
+      "tags": [
+        "auth",
+        "jwt",
+        "perf"
+      ],
+      "added_at": "2026-01-16T10:00:00Z",
+      "meta": {
+        "ref": "src/auth/jwt.go:55"
+      }
+    },
+    {
+      "id": "tqpj-nnqq-swnt-pljc",
+      "type": "decision",
+      "content": "Extend JWT expiry to 15 minutes. Combine with sliding window refresh to avoid hard expiry cliffs.",
+      "tags": [
+        "auth",
+        "jwt",
+        "decision"
+      ],
+      "added_at": "2026-01-16T11:00:00Z",
+      "meta": {
+        "ref": "src/auth/jwt.go:55"
+      }
+    },
+    {
+      "id": "xlmn-yksb-jgkg-gykq",
+      "type": "note",
+      "content": "All auth findings summarised. Key remediations: retry backoff, session invalidation, rate limiter hot-reload, JWT expiry extension. Handoff to auth-deep-dive journal.",
+      "tags": [
+        "auth",
+        "summary",
+        "handoff"
+      ],
+      "added_at": "2026-01-16T15:00:00Z"
+    }
+  ]
+}

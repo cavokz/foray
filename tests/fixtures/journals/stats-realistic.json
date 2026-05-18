@@ -1,0 +1,2567 @@
+{
+  "schema": 1,
+  "name": "stats-realistic",
+  "title": "Stats realistic \u2014 200 items, real-world mix",
+  "items": [
+    {
+      "type": "finding",
+      "content": "auth service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "auth",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/auth/client.go"
+      },
+      "id": "rlkk-hmsw-ldnr-wkrq",
+      "added_at": "2026-01-02T08:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "payments service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "payments",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/payments/client.go"
+      },
+      "id": "jdcz-rxhs-xjfv-xvvq",
+      "added_at": "2026-01-02T09:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "inventory service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "inventory",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/inventory/client.go"
+      },
+      "id": "rstr-zhll-bsqf-tgpv",
+      "added_at": "2026-01-02T10:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "notifications service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "notifications",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/notifications/client.go"
+      },
+      "id": "ysnw-wxfd-dhvv-fskc",
+      "added_at": "2026-01-02T11:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "search service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "search",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/search/client.go"
+      },
+      "id": "ktjv-jhjw-mxqy-cxnx",
+      "added_at": "2026-01-02T12:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "gateway service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "gateway",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/gateway/client.go"
+      },
+      "id": "ljcw-dglp-ymjt-vnrf",
+      "added_at": "2026-01-02T13:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "jobs service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "jobs",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/jobs/client.go"
+      },
+      "id": "rbht-fvnv-cqrl-zlbg",
+      "added_at": "2026-01-02T14:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "cache service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "cache",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/cache/client.go"
+      },
+      "id": "kbjw-gsrh-skdl-qfwj",
+      "added_at": "2026-01-02T15:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap auth retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "auth",
+        "reliability",
+        "decision"
+      ],
+      "id": "jtqk-xzkx-kfyy-lgtd",
+      "added_at": "2026-01-02T16:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap payments retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "payments",
+        "reliability",
+        "decision"
+      ],
+      "id": "tqfk-rbxh-pczr-rbsl",
+      "added_at": "2026-01-02T17:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap inventory retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "inventory",
+        "reliability",
+        "decision"
+      ],
+      "id": "kpmf-srjr-rhqd-wdtd",
+      "added_at": "2026-01-03T08:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap notifications retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "notifications",
+        "reliability",
+        "decision"
+      ],
+      "id": "ddgg-hngs-jbng-yjbs",
+      "added_at": "2026-01-03T09:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap search retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "search",
+        "reliability",
+        "decision"
+      ],
+      "id": "ywsf-cntd-hgzj-mdfb",
+      "added_at": "2026-01-03T10:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap gateway retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "gateway",
+        "reliability",
+        "decision"
+      ],
+      "id": "jvjt-ctbw-rfkm-rxcw",
+      "added_at": "2026-01-03T11:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap jobs retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "jobs",
+        "reliability",
+        "decision"
+      ],
+      "id": "flzh-lwvr-vdsc-yflq",
+      "added_at": "2026-01-03T12:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap cache retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "cache",
+        "reliability",
+        "decision"
+      ],
+      "id": "vsfk-kbsw-zdyd-lbhj",
+      "added_at": "2026-01-03T13:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"auth: max retries exceeded\")\n}",
+      "tags": [
+        "auth",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/auth/retry.go"
+      },
+      "id": "ssvq-pzsk-nsdr-hksl",
+      "added_at": "2026-01-03T14:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"payments: max retries exceeded\")\n}",
+      "tags": [
+        "payments",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/payments/retry.go"
+      },
+      "id": "wpzc-rfww-xcnh-zcgr",
+      "added_at": "2026-01-03T15:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"inventory: max retries exceeded\")\n}",
+      "tags": [
+        "inventory",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/inventory/retry.go"
+      },
+      "id": "lgmv-mwmd-nrdl-pbcq",
+      "added_at": "2026-01-03T16:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"notifications: max retries exceeded\")\n}",
+      "tags": [
+        "notifications",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/notifications/retry.go"
+      },
+      "id": "rjng-sykc-gmpr-mrtd",
+      "added_at": "2026-01-03T17:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"search: max retries exceeded\")\n}",
+      "tags": [
+        "search",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/search/retry.go"
+      },
+      "id": "tgkw-zjns-bfdt-tdqf",
+      "added_at": "2026-01-04T08:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"gateway: max retries exceeded\")\n}",
+      "tags": [
+        "gateway",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/gateway/retry.go"
+      },
+      "id": "ylmv-tdly-wqvm-rzdn",
+      "added_at": "2026-01-04T09:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"jobs: max retries exceeded\")\n}",
+      "tags": [
+        "jobs",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/jobs/retry.go"
+      },
+      "id": "pcyw-nnyf-qtdl-qxnl",
+      "added_at": "2026-01-04T10:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"cache: max retries exceeded\")\n}",
+      "tags": [
+        "cache",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/cache/retry.go"
+      },
+      "id": "zyvh-zzmd-lstj-sxsy",
+      "added_at": "2026-01-04T11:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows auth p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "auth",
+        "metrics",
+        "grafana"
+      ],
+      "id": "rgrj-kszr-znsj-dknp",
+      "added_at": "2026-01-04T12:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows payments p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "payments",
+        "metrics",
+        "grafana"
+      ],
+      "id": "sltw-jwvn-bfsg-tfjh",
+      "added_at": "2026-01-04T13:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows inventory p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "inventory",
+        "metrics",
+        "grafana"
+      ],
+      "id": "wsjt-bwdx-txtp-gvvj",
+      "added_at": "2026-01-04T14:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows notifications p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "notifications",
+        "metrics",
+        "grafana"
+      ],
+      "id": "rylz-zjpb-hrvx-wysr",
+      "added_at": "2026-01-04T15:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows search p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "search",
+        "metrics",
+        "grafana"
+      ],
+      "id": "tpqv-zjfs-ffnk-lpdq",
+      "added_at": "2026-01-04T16:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows gateway p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "gateway",
+        "metrics",
+        "grafana"
+      ],
+      "id": "hjsf-fjcy-qrnq-kvjg",
+      "added_at": "2026-01-04T17:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows jobs p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "jobs",
+        "metrics",
+        "grafana"
+      ],
+      "id": "fcnl-pcgg-jkgt-pzwz",
+      "added_at": "2026-01-05T08:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows cache p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "cache",
+        "metrics",
+        "grafana"
+      ],
+      "id": "bsmx-qrzs-jyyl-phyw",
+      "added_at": "2026-01-05T09:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "auth health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "auth",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/auth/health.go"
+      },
+      "id": "kvmb-xgny-fzpb-csvx",
+      "added_at": "2026-01-05T10:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "payments health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "payments",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/payments/health.go"
+      },
+      "id": "ldps-zvry-tfmj-ccvp",
+      "added_at": "2026-01-05T11:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "inventory health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "inventory",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/inventory/health.go"
+      },
+      "id": "qghl-rmbs-prqt-qscy",
+      "added_at": "2026-01-05T12:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "notifications health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "notifications",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/notifications/health.go"
+      },
+      "id": "dvjc-vmlr-mpdl-vpzf",
+      "added_at": "2026-01-05T13:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "search health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "search",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/search/health.go"
+      },
+      "id": "syvt-kypp-dbqp-yjtx",
+      "added_at": "2026-01-05T14:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "gateway health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "gateway",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/gateway/health.go"
+      },
+      "id": "klrn-fgwg-fvww-yzmp",
+      "added_at": "2026-01-05T15:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "jobs health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "jobs",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/jobs/health.go"
+      },
+      "id": "jcdt-njdr-drxj-mqjq",
+      "added_at": "2026-01-05T16:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "cache health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "cache",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/cache/health.go"
+      },
+      "id": "pkjl-bhgt-mwdt-xmkj",
+      "added_at": "2026-01-05T17:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "auth service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "auth",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/auth/client.go"
+      },
+      "id": "pfqw-xdph-xccb-nbql",
+      "added_at": "2026-01-06T08:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "payments service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "payments",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/payments/client.go"
+      },
+      "id": "qypp-zmvk-gvtj-mnln",
+      "added_at": "2026-01-06T09:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "inventory service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "inventory",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/inventory/client.go"
+      },
+      "id": "rwvq-fnmf-yrzt-nkgn",
+      "added_at": "2026-01-06T10:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "notifications service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "notifications",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/notifications/client.go"
+      },
+      "id": "ckbg-ykmm-bzjs-nwwh",
+      "added_at": "2026-01-06T11:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "search service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "search",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/search/client.go"
+      },
+      "id": "pfrk-rwnk-ynkx-nnqn",
+      "added_at": "2026-01-06T12:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "gateway service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "gateway",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/gateway/client.go"
+      },
+      "id": "dfcr-gfkt-dgwt-nngf",
+      "added_at": "2026-01-06T13:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "jobs service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "jobs",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/jobs/client.go"
+      },
+      "id": "wbbq-frbq-chfz-qpbt",
+      "added_at": "2026-01-06T14:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "cache service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "cache",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/cache/client.go"
+      },
+      "id": "rhcm-zxfw-qvwf-rhtk",
+      "added_at": "2026-01-06T15:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap auth retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "auth",
+        "reliability",
+        "decision"
+      ],
+      "id": "mqgl-dgxn-lfdm-qbvn",
+      "added_at": "2026-01-06T16:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap payments retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "payments",
+        "reliability",
+        "decision"
+      ],
+      "id": "dndq-wxvr-nkbp-gvvl",
+      "added_at": "2026-01-06T17:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap inventory retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "inventory",
+        "reliability",
+        "decision"
+      ],
+      "id": "qtts-ddng-xhxl-fsvq",
+      "added_at": "2026-01-07T08:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap notifications retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "notifications",
+        "reliability",
+        "decision"
+      ],
+      "id": "dbrs-jkfr-hwlk-hstl",
+      "added_at": "2026-01-07T09:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap search retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "search",
+        "reliability",
+        "decision"
+      ],
+      "id": "vnkp-hjks-twrt-msfg",
+      "added_at": "2026-01-07T10:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap gateway retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "gateway",
+        "reliability",
+        "decision"
+      ],
+      "id": "lkps-sfzb-cfym-cgcb",
+      "added_at": "2026-01-07T11:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap jobs retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "jobs",
+        "reliability",
+        "decision"
+      ],
+      "id": "lzqn-sqyw-rmgr-vjbq",
+      "added_at": "2026-01-07T12:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap cache retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "cache",
+        "reliability",
+        "decision"
+      ],
+      "id": "ngfb-hbfz-vklq-ntcc",
+      "added_at": "2026-01-07T13:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"auth: max retries exceeded\")\n}",
+      "tags": [
+        "auth",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/auth/retry.go"
+      },
+      "id": "hwyk-zhqg-yqhl-dcjy",
+      "added_at": "2026-01-07T14:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"payments: max retries exceeded\")\n}",
+      "tags": [
+        "payments",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/payments/retry.go"
+      },
+      "id": "vzxw-qszp-vtzm-mqbd",
+      "added_at": "2026-01-07T15:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"inventory: max retries exceeded\")\n}",
+      "tags": [
+        "inventory",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/inventory/retry.go"
+      },
+      "id": "crzs-gjzn-bwhc-swcy",
+      "added_at": "2026-01-07T16:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"notifications: max retries exceeded\")\n}",
+      "tags": [
+        "notifications",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/notifications/retry.go"
+      },
+      "id": "nkxh-ysyn-gtxg-ghqf",
+      "added_at": "2026-01-07T17:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"search: max retries exceeded\")\n}",
+      "tags": [
+        "search",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/search/retry.go"
+      },
+      "id": "dysr-qvpb-nrnz-xxnz",
+      "added_at": "2026-01-08T08:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"gateway: max retries exceeded\")\n}",
+      "tags": [
+        "gateway",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/gateway/retry.go"
+      },
+      "id": "yhgq-cvnp-nlsf-zsms",
+      "added_at": "2026-01-08T09:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"jobs: max retries exceeded\")\n}",
+      "tags": [
+        "jobs",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/jobs/retry.go"
+      },
+      "id": "bgqj-qhpg-mqkn-gskw",
+      "added_at": "2026-01-08T10:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"cache: max retries exceeded\")\n}",
+      "tags": [
+        "cache",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/cache/retry.go"
+      },
+      "id": "hfdq-gdhg-mkfz-fvfn",
+      "added_at": "2026-01-08T11:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows auth p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "auth",
+        "metrics",
+        "grafana"
+      ],
+      "id": "zwnt-vjpp-lscw-nrmk",
+      "added_at": "2026-01-08T12:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows payments p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "payments",
+        "metrics",
+        "grafana"
+      ],
+      "id": "kpyh-bdxz-gqrf-vksn",
+      "added_at": "2026-01-08T13:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows inventory p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "inventory",
+        "metrics",
+        "grafana"
+      ],
+      "id": "txlj-rffv-krqw-cfgj",
+      "added_at": "2026-01-08T14:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows notifications p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "notifications",
+        "metrics",
+        "grafana"
+      ],
+      "id": "jhrh-mxkq-zlfb-trys",
+      "added_at": "2026-01-08T15:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows search p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "search",
+        "metrics",
+        "grafana"
+      ],
+      "id": "cfdc-xpbl-vchf-rxjh",
+      "added_at": "2026-01-08T16:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows gateway p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "gateway",
+        "metrics",
+        "grafana"
+      ],
+      "id": "hrdw-brxj-mzph-mzsf",
+      "added_at": "2026-01-08T17:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows jobs p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "jobs",
+        "metrics",
+        "grafana"
+      ],
+      "id": "qrrp-nrjk-pvmk-hjbw",
+      "added_at": "2026-01-09T08:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows cache p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "cache",
+        "metrics",
+        "grafana"
+      ],
+      "id": "wkmb-yynb-mjgb-klpl",
+      "added_at": "2026-01-09T09:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "auth health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "auth",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/auth/health.go"
+      },
+      "id": "ftlk-hlhv-yvsh-tvlw",
+      "added_at": "2026-01-09T10:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "payments health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "payments",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/payments/health.go"
+      },
+      "id": "fjrq-hrfb-cpfd-httg",
+      "added_at": "2026-01-09T11:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "inventory health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "inventory",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/inventory/health.go"
+      },
+      "id": "fnkj-vzmv-jwyc-vcmg",
+      "added_at": "2026-01-09T12:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "notifications health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "notifications",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/notifications/health.go"
+      },
+      "id": "wwwd-vhvm-tbmv-nzms",
+      "added_at": "2026-01-09T13:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "search health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "search",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/search/health.go"
+      },
+      "id": "jjrb-ynhr-gxxg-drjf",
+      "added_at": "2026-01-09T14:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "gateway health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "gateway",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/gateway/health.go"
+      },
+      "id": "hdvb-bvmq-kcfc-qyzr",
+      "added_at": "2026-01-09T15:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "jobs health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "jobs",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/jobs/health.go"
+      },
+      "id": "crsv-dgzv-tvmg-skdx",
+      "added_at": "2026-01-09T16:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "cache health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "cache",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/cache/health.go"
+      },
+      "id": "nmjs-ffkt-hwyp-cfjh",
+      "added_at": "2026-01-09T17:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "auth service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "auth",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/auth/client.go"
+      },
+      "id": "kbrk-fbwv-htrp-lpnp",
+      "added_at": "2026-01-10T08:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "payments service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "payments",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/payments/client.go"
+      },
+      "id": "qjrd-ncwd-xgnd-pwrp",
+      "added_at": "2026-01-10T09:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "inventory service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "inventory",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/inventory/client.go"
+      },
+      "id": "shkq-cygn-xcvc-pylk",
+      "added_at": "2026-01-10T10:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "notifications service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "notifications",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/notifications/client.go"
+      },
+      "id": "swhb-cjyz-dtpf-phrf",
+      "added_at": "2026-01-10T11:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "search service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "search",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/search/client.go"
+      },
+      "id": "tldr-kmrx-fflk-fzmk",
+      "added_at": "2026-01-10T12:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "gateway service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "gateway",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/gateway/client.go"
+      },
+      "id": "jzjk-vmtq-pgvy-hzml",
+      "added_at": "2026-01-10T13:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "jobs service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "jobs",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/jobs/client.go"
+      },
+      "id": "tzqn-zjjg-wbws-hppy",
+      "added_at": "2026-01-10T14:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "cache service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "cache",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/cache/client.go"
+      },
+      "id": "fbkd-kqgw-clyt-tvfw",
+      "added_at": "2026-01-10T15:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap auth retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "auth",
+        "reliability",
+        "decision"
+      ],
+      "id": "sqyq-jtqc-cvkw-lxxg",
+      "added_at": "2026-01-10T16:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap payments retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "payments",
+        "reliability",
+        "decision"
+      ],
+      "id": "rqbv-ljbp-fngc-tlmq",
+      "added_at": "2026-01-10T17:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap inventory retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "inventory",
+        "reliability",
+        "decision"
+      ],
+      "id": "ngjl-dcqc-lcnv-ddpn",
+      "added_at": "2026-01-11T08:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap notifications retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "notifications",
+        "reliability",
+        "decision"
+      ],
+      "id": "rgqt-hcvj-ycsl-kjqb",
+      "added_at": "2026-01-11T09:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap search retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "search",
+        "reliability",
+        "decision"
+      ],
+      "id": "jzqz-mfbw-gktw-dcyy",
+      "added_at": "2026-01-11T10:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap gateway retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "gateway",
+        "reliability",
+        "decision"
+      ],
+      "id": "xwbs-dmbg-pgnh-ntds",
+      "added_at": "2026-01-11T11:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap jobs retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "jobs",
+        "reliability",
+        "decision"
+      ],
+      "id": "bqrb-fhvq-crbl-hwrx",
+      "added_at": "2026-01-11T12:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap cache retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "cache",
+        "reliability",
+        "decision"
+      ],
+      "id": "bxrg-kzdj-xpfn-mybh",
+      "added_at": "2026-01-11T13:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"auth: max retries exceeded\")\n}",
+      "tags": [
+        "auth",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/auth/retry.go"
+      },
+      "id": "pklf-kkrg-znwr-xxwb",
+      "added_at": "2026-01-11T14:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"payments: max retries exceeded\")\n}",
+      "tags": [
+        "payments",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/payments/retry.go"
+      },
+      "id": "phfx-rclz-qrgh-fzyj",
+      "added_at": "2026-01-11T15:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"inventory: max retries exceeded\")\n}",
+      "tags": [
+        "inventory",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/inventory/retry.go"
+      },
+      "id": "pgdp-vxjs-ndzz-fyyj",
+      "added_at": "2026-01-11T16:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"notifications: max retries exceeded\")\n}",
+      "tags": [
+        "notifications",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/notifications/retry.go"
+      },
+      "id": "pydj-xtvx-llmy-xyhv",
+      "added_at": "2026-01-11T17:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"search: max retries exceeded\")\n}",
+      "tags": [
+        "search",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/search/retry.go"
+      },
+      "id": "dfvq-hpgg-sksn-nqsk",
+      "added_at": "2026-01-12T08:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"gateway: max retries exceeded\")\n}",
+      "tags": [
+        "gateway",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/gateway/retry.go"
+      },
+      "id": "wndg-bvbh-ltzt-cyzx",
+      "added_at": "2026-01-12T09:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"jobs: max retries exceeded\")\n}",
+      "tags": [
+        "jobs",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/jobs/retry.go"
+      },
+      "id": "njmh-lbtk-jqtq-pxvn",
+      "added_at": "2026-01-12T10:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"cache: max retries exceeded\")\n}",
+      "tags": [
+        "cache",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/cache/retry.go"
+      },
+      "id": "mwbz-nltp-nrcj-ljwm",
+      "added_at": "2026-01-12T11:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows auth p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "auth",
+        "metrics",
+        "grafana"
+      ],
+      "id": "lqcn-dwmt-dvys-dlmf",
+      "added_at": "2026-01-12T12:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows payments p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "payments",
+        "metrics",
+        "grafana"
+      ],
+      "id": "qsgm-hsyv-tddm-kplv",
+      "added_at": "2026-01-12T13:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows inventory p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "inventory",
+        "metrics",
+        "grafana"
+      ],
+      "id": "nykk-vypr-fxfs-ljvm",
+      "added_at": "2026-01-12T14:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows notifications p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "notifications",
+        "metrics",
+        "grafana"
+      ],
+      "id": "rddg-rhmw-pbxg-qmlc",
+      "added_at": "2026-01-12T15:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows search p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "search",
+        "metrics",
+        "grafana"
+      ],
+      "id": "qhpr-pwcf-rbws-wjyc",
+      "added_at": "2026-01-12T16:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows gateway p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "gateway",
+        "metrics",
+        "grafana"
+      ],
+      "id": "lfsq-sqvf-mqyc-jkkc",
+      "added_at": "2026-01-12T17:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows jobs p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "jobs",
+        "metrics",
+        "grafana"
+      ],
+      "id": "lpjd-shpp-sqdt-rzns",
+      "added_at": "2026-01-13T08:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows cache p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "cache",
+        "metrics",
+        "grafana"
+      ],
+      "id": "yzjq-jpzk-dpnr-nfqs",
+      "added_at": "2026-01-13T09:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "auth health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "auth",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/auth/health.go"
+      },
+      "id": "zbbr-dwvz-lkpr-bghv",
+      "added_at": "2026-01-13T10:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "payments health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "payments",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/payments/health.go"
+      },
+      "id": "jnjb-sktq-bfjk-syvr",
+      "added_at": "2026-01-13T11:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "inventory health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "inventory",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/inventory/health.go"
+      },
+      "id": "nrxp-kvlt-wjtj-pgsv",
+      "added_at": "2026-01-13T12:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "notifications health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "notifications",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/notifications/health.go"
+      },
+      "id": "xkzh-bzrw-plqx-tsjb",
+      "added_at": "2026-01-13T13:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "search health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "search",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/search/health.go"
+      },
+      "id": "lngm-ygjd-vvym-bnnf",
+      "added_at": "2026-01-13T14:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "gateway health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "gateway",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/gateway/health.go"
+      },
+      "id": "ytnv-fxwy-sdtm-snby",
+      "added_at": "2026-01-13T15:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "jobs health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "jobs",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/jobs/health.go"
+      },
+      "id": "sqcm-bnrj-qjxj-ghjm",
+      "added_at": "2026-01-13T16:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "cache health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "cache",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/cache/health.go"
+      },
+      "id": "dfhb-rngk-jdsh-hcqk",
+      "added_at": "2026-01-13T17:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "auth service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "auth",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/auth/client.go"
+      },
+      "id": "mdms-dclf-qqws-qjws",
+      "added_at": "2026-01-14T08:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "payments service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "payments",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/payments/client.go"
+      },
+      "id": "spzt-mdwy-mmss-mggx",
+      "added_at": "2026-01-14T09:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "inventory service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "inventory",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/inventory/client.go"
+      },
+      "id": "qyls-rvxm-bmkm-fvqd",
+      "added_at": "2026-01-14T10:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "notifications service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "notifications",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/notifications/client.go"
+      },
+      "id": "dwvj-rvpl-lrpz-lkwq",
+      "added_at": "2026-01-14T11:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "search service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "search",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/search/client.go"
+      },
+      "id": "vmvp-grcy-qnqm-pwfz",
+      "added_at": "2026-01-14T12:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "gateway service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "gateway",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/gateway/client.go"
+      },
+      "id": "cdwv-knrc-wxxr-bffp",
+      "added_at": "2026-01-14T13:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "jobs service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "jobs",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/jobs/client.go"
+      },
+      "id": "lqgs-jpyj-ymzk-cbzl",
+      "added_at": "2026-01-14T14:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "cache service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "cache",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/cache/client.go"
+      },
+      "id": "djkp-cswk-xxgs-ljll",
+      "added_at": "2026-01-14T15:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap auth retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "auth",
+        "reliability",
+        "decision"
+      ],
+      "id": "prmf-lywf-zsdc-btnm",
+      "added_at": "2026-01-14T16:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap payments retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "payments",
+        "reliability",
+        "decision"
+      ],
+      "id": "zcrl-mvql-fnpm-kfqq",
+      "added_at": "2026-01-14T17:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap inventory retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "inventory",
+        "reliability",
+        "decision"
+      ],
+      "id": "wgnl-pkzp-sdns-dtzz",
+      "added_at": "2026-01-15T08:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap notifications retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "notifications",
+        "reliability",
+        "decision"
+      ],
+      "id": "vmcx-cmtz-crvj-ckvm",
+      "added_at": "2026-01-15T09:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap search retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "search",
+        "reliability",
+        "decision"
+      ],
+      "id": "nmtl-zvjb-yttp-cmfc",
+      "added_at": "2026-01-15T10:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap gateway retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "gateway",
+        "reliability",
+        "decision"
+      ],
+      "id": "zvrj-cnwh-dhxb-dfqf",
+      "added_at": "2026-01-15T11:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap jobs retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "jobs",
+        "reliability",
+        "decision"
+      ],
+      "id": "mvhs-nvxk-cfyf-nzvg",
+      "added_at": "2026-01-15T12:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap cache retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "cache",
+        "reliability",
+        "decision"
+      ],
+      "id": "mrgt-krtd-fljt-tpks",
+      "added_at": "2026-01-15T13:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"auth: max retries exceeded\")\n}",
+      "tags": [
+        "auth",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/auth/retry.go"
+      },
+      "id": "mfxb-ymsz-sbyr-zmyx",
+      "added_at": "2026-01-15T14:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"payments: max retries exceeded\")\n}",
+      "tags": [
+        "payments",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/payments/retry.go"
+      },
+      "id": "khdr-lvtt-qgks-fpsw",
+      "added_at": "2026-01-15T15:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"inventory: max retries exceeded\")\n}",
+      "tags": [
+        "inventory",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/inventory/retry.go"
+      },
+      "id": "bddm-ghgb-cyrw-yrsd",
+      "added_at": "2026-01-15T16:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"notifications: max retries exceeded\")\n}",
+      "tags": [
+        "notifications",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/notifications/retry.go"
+      },
+      "id": "wdrx-pzxs-hmyr-yhlx",
+      "added_at": "2026-01-15T17:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"search: max retries exceeded\")\n}",
+      "tags": [
+        "search",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/search/retry.go"
+      },
+      "id": "vjfc-vljc-zhmn-yqfn",
+      "added_at": "2026-01-16T08:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"gateway: max retries exceeded\")\n}",
+      "tags": [
+        "gateway",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/gateway/retry.go"
+      },
+      "id": "fvgr-ytdc-phmx-fryr",
+      "added_at": "2026-01-16T09:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"jobs: max retries exceeded\")\n}",
+      "tags": [
+        "jobs",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/jobs/retry.go"
+      },
+      "id": "hsxq-nynm-wvvp-bzwn",
+      "added_at": "2026-01-16T10:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"cache: max retries exceeded\")\n}",
+      "tags": [
+        "cache",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/cache/retry.go"
+      },
+      "id": "pyks-lrzc-pzcm-vrfb",
+      "added_at": "2026-01-16T11:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows auth p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "auth",
+        "metrics",
+        "grafana"
+      ],
+      "id": "lgsx-rkcr-tdgt-qncp",
+      "added_at": "2026-01-16T12:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows payments p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "payments",
+        "metrics",
+        "grafana"
+      ],
+      "id": "jpwm-zbcv-bdvs-msxf",
+      "added_at": "2026-01-16T13:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows inventory p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "inventory",
+        "metrics",
+        "grafana"
+      ],
+      "id": "qybd-rmyb-sdfc-jvmf",
+      "added_at": "2026-01-16T14:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows notifications p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "notifications",
+        "metrics",
+        "grafana"
+      ],
+      "id": "qwdn-vgvl-wzsj-zqdw",
+      "added_at": "2026-01-16T15:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows search p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "search",
+        "metrics",
+        "grafana"
+      ],
+      "id": "vvqk-ddls-pmyb-dwqv",
+      "added_at": "2026-01-16T16:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows gateway p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "gateway",
+        "metrics",
+        "grafana"
+      ],
+      "id": "bnbf-crxl-vvsg-rnly",
+      "added_at": "2026-01-16T17:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows jobs p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "jobs",
+        "metrics",
+        "grafana"
+      ],
+      "id": "qbfn-yrvk-bgdp-dktp",
+      "added_at": "2026-01-17T08:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows cache p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "cache",
+        "metrics",
+        "grafana"
+      ],
+      "id": "gvrh-gvsz-mfsb-rhmk",
+      "added_at": "2026-01-17T09:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "auth health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "auth",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/auth/health.go"
+      },
+      "id": "vtbt-yfvn-dxtq-jgsj",
+      "added_at": "2026-01-17T10:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "payments health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "payments",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/payments/health.go"
+      },
+      "id": "vjdt-xkgm-nxfy-mldt",
+      "added_at": "2026-01-17T11:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "inventory health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "inventory",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/inventory/health.go"
+      },
+      "id": "rzgd-scdw-mfkx-qvrq",
+      "added_at": "2026-01-17T12:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "notifications health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "notifications",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/notifications/health.go"
+      },
+      "id": "fzwc-wnzq-whtt-hjqx",
+      "added_at": "2026-01-17T13:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "search health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "search",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/search/health.go"
+      },
+      "id": "qfqb-zbmv-bpnv-wmhp",
+      "added_at": "2026-01-17T14:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "gateway health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "gateway",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/gateway/health.go"
+      },
+      "id": "btyd-jrcn-jsxt-bmvx",
+      "added_at": "2026-01-17T15:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "jobs health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "jobs",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/jobs/health.go"
+      },
+      "id": "lvkm-rxcx-jblh-ypvv",
+      "added_at": "2026-01-17T16:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "cache health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "cache",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/cache/health.go"
+      },
+      "id": "cxtc-ysxd-krkf-pcsg",
+      "added_at": "2026-01-17T17:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "auth service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "auth",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/auth/client.go"
+      },
+      "id": "zhdn-yqzg-tgkh-shck",
+      "added_at": "2026-01-18T08:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "payments service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "payments",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/payments/client.go"
+      },
+      "id": "npds-spjr-vyvy-cxmc",
+      "added_at": "2026-01-18T09:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "inventory service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "inventory",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/inventory/client.go"
+      },
+      "id": "xjzd-hsnx-nrjz-pdkm",
+      "added_at": "2026-01-18T10:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "notifications service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "notifications",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/notifications/client.go"
+      },
+      "id": "rjcx-gyrl-krjq-swmj",
+      "added_at": "2026-01-18T11:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "search service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "search",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/search/client.go"
+      },
+      "id": "dvfh-nzvb-kmfy-shzw",
+      "added_at": "2026-01-18T12:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "gateway service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "gateway",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/gateway/client.go"
+      },
+      "id": "srfg-bjdh-fpbj-kkpf",
+      "added_at": "2026-01-18T13:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "jobs service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "jobs",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/jobs/client.go"
+      },
+      "id": "jyln-fmjb-tzjs-mjyz",
+      "added_at": "2026-01-18T14:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "cache service retries on 503 without backoff \u2014 downstream flooding observed under partial outage.",
+      "tags": [
+        "cache",
+        "reliability",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/cache/client.go"
+      },
+      "id": "qfpy-mstx-dpjl-wmcc",
+      "added_at": "2026-01-18T15:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap auth retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "auth",
+        "reliability",
+        "decision"
+      ],
+      "id": "rqgy-hbpm-scng-jqyy",
+      "added_at": "2026-01-18T16:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap payments retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "payments",
+        "reliability",
+        "decision"
+      ],
+      "id": "kfwk-khkz-xctm-zvjv",
+      "added_at": "2026-01-18T17:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap inventory retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "inventory",
+        "reliability",
+        "decision"
+      ],
+      "id": "zlxd-qcgm-xzcz-tcly",
+      "added_at": "2026-01-19T08:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap notifications retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "notifications",
+        "reliability",
+        "decision"
+      ],
+      "id": "lpst-dflp-bwwj-pmbb",
+      "added_at": "2026-01-19T09:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap search retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "search",
+        "reliability",
+        "decision"
+      ],
+      "id": "hzwm-rxln-shdh-zctq",
+      "added_at": "2026-01-19T10:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap gateway retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "gateway",
+        "reliability",
+        "decision"
+      ],
+      "id": "pxrm-sdnq-wfcj-xdfh",
+      "added_at": "2026-01-19T11:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap jobs retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "jobs",
+        "reliability",
+        "decision"
+      ],
+      "id": "lykj-pynv-fctp-xwsj",
+      "added_at": "2026-01-19T12:00:00Z"
+    },
+    {
+      "type": "decision",
+      "content": "Cap cache retries at 3 with exponential backoff + jitter (max 2s). Aligns with resilience SLA.",
+      "tags": [
+        "cache",
+        "reliability",
+        "decision"
+      ],
+      "id": "ssdq-wbnk-nkyd-fgfx",
+      "added_at": "2026-01-19T13:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"auth: max retries exceeded\")\n}",
+      "tags": [
+        "auth",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/auth/retry.go"
+      },
+      "id": "qwpp-ptdm-cwyn-jkwx",
+      "added_at": "2026-01-19T14:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"payments: max retries exceeded\")\n}",
+      "tags": [
+        "payments",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/payments/retry.go"
+      },
+      "id": "qvks-bwgw-dgdd-csvc",
+      "added_at": "2026-01-19T15:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"inventory: max retries exceeded\")\n}",
+      "tags": [
+        "inventory",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/inventory/retry.go"
+      },
+      "id": "vtbd-vncd-hcst-vygx",
+      "added_at": "2026-01-19T16:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"notifications: max retries exceeded\")\n}",
+      "tags": [
+        "notifications",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/notifications/retry.go"
+      },
+      "id": "fkcw-yykf-nthp-dqbg",
+      "added_at": "2026-01-19T17:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"search: max retries exceeded\")\n}",
+      "tags": [
+        "search",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/search/retry.go"
+      },
+      "id": "ghxp-zdgn-skqm-zfkk",
+      "added_at": "2026-01-20T08:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"gateway: max retries exceeded\")\n}",
+      "tags": [
+        "gateway",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/gateway/retry.go"
+      },
+      "id": "ggdz-dddv-spbj-dhqj",
+      "added_at": "2026-01-20T09:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"jobs: max retries exceeded\")\n}",
+      "tags": [
+        "jobs",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/jobs/retry.go"
+      },
+      "id": "zmpj-wfcw-msfz-ndmr",
+      "added_at": "2026-01-20T10:00:00Z"
+    },
+    {
+      "type": "snippet",
+      "content": "func retryWithJitter(req *http.Request, maxRetries int) (*http.Response, error) {\n    for attempt := 0; attempt < maxRetries; attempt++ {\n        resp, err := client.Do(req)\n        if err == nil && resp.StatusCode != 503 {\n            return resp, nil\n        }\n        jitter := time.Duration(rand.Intn(200)) * time.Millisecond\n        time.Sleep((1<<attempt)*100*time.Millisecond + jitter)\n    }\n    return nil, fmt.Errorf(\"cache: max retries exceeded\")\n}",
+      "tags": [
+        "cache",
+        "snippet",
+        "retry"
+      ],
+      "meta": {
+        "ref": "src/cache/retry.go"
+      },
+      "id": "cflq-dyzc-zkqz-dwth",
+      "added_at": "2026-01-20T11:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows auth p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "auth",
+        "metrics",
+        "grafana"
+      ],
+      "id": "sqhv-rlmq-lnhv-dhnr",
+      "added_at": "2026-01-20T12:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows payments p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "payments",
+        "metrics",
+        "grafana"
+      ],
+      "id": "ddcc-szls-frdc-tvvg",
+      "added_at": "2026-01-20T13:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows inventory p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "inventory",
+        "metrics",
+        "grafana"
+      ],
+      "id": "rnhk-xpzb-mylj-kmbp",
+      "added_at": "2026-01-20T14:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows notifications p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "notifications",
+        "metrics",
+        "grafana"
+      ],
+      "id": "xjsn-dtnd-srsq-mwnl",
+      "added_at": "2026-01-20T15:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows search p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "search",
+        "metrics",
+        "grafana"
+      ],
+      "id": "nzqk-zjbb-wktb-xkdk",
+      "added_at": "2026-01-20T16:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows gateway p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "gateway",
+        "metrics",
+        "grafana"
+      ],
+      "id": "kkrh-rqyc-jkbj-mxpx",
+      "added_at": "2026-01-20T17:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows jobs p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "jobs",
+        "metrics",
+        "grafana"
+      ],
+      "id": "hsqz-klqv-dskn-vkqk",
+      "added_at": "2026-01-21T08:00:00Z"
+    },
+    {
+      "type": "note",
+      "content": "Grafana dashboard shows cache p99 latency drops from 2.3s to 340ms after retry cap deployed. No downstream flood events in past 48h.",
+      "tags": [
+        "cache",
+        "metrics",
+        "grafana"
+      ],
+      "id": "mnwv-wpjb-zlgt-cwck",
+      "added_at": "2026-01-21T09:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "auth health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "auth",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/auth/health.go"
+      },
+      "id": "cvmg-vrjv-mpgl-rmvf",
+      "added_at": "2026-01-21T10:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "payments health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "payments",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/payments/health.go"
+      },
+      "id": "bsxq-gztm-ypqv-mprn",
+      "added_at": "2026-01-21T11:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "inventory health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "inventory",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/inventory/health.go"
+      },
+      "id": "kffs-jmjw-cglw-rhql",
+      "added_at": "2026-01-21T12:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "notifications health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "notifications",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/notifications/health.go"
+      },
+      "id": "dghw-mpmr-bfdh-vrfw",
+      "added_at": "2026-01-21T13:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "search health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "search",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/search/health.go"
+      },
+      "id": "znbx-cqxx-lkrc-ytdd",
+      "added_at": "2026-01-21T14:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "gateway health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "gateway",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/gateway/health.go"
+      },
+      "id": "tynw-yyhx-gdvj-qltg",
+      "added_at": "2026-01-21T15:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "jobs health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "jobs",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/jobs/health.go"
+      },
+      "id": "lffz-mhqn-kyjl-szxy",
+      "added_at": "2026-01-21T16:00:00Z"
+    },
+    {
+      "type": "finding",
+      "content": "cache health check returns HTTP 200 even when connection pool is exhausted \u2014 misleads load balancer.",
+      "tags": [
+        "cache",
+        "health",
+        "reliability"
+      ],
+      "meta": {
+        "ref": "src/cache/health.go"
+      },
+      "id": "ktwb-zqwr-ysvh-pjzk",
+      "added_at": "2026-01-21T17:00:00Z"
+    }
+  ]
+}

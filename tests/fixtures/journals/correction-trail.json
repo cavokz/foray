@@ -1,0 +1,132 @@
+{
+  "schema": 1,
+  "name": "correction-trail",
+  "title": "Memory leak investigation with correction trail",
+  "items": [
+    {
+      "id": "hcky-dtmy-msds-gxvj",
+      "type": "finding",
+      "content": "Memory leak in worker pool goroutines \u2014 heap grows ~50MB/hour under sustained load. Suspected goroutine leak in pool shutdown path.",
+      "tags": [
+        "memleak",
+        "goroutine",
+        "worker"
+      ],
+      "added_at": "2026-01-10T09:00:00Z",
+      "meta": {
+        "ref": "src/worker/pool.go:134"
+      }
+    },
+    {
+      "id": "ndwq-zhsl-lfjh-qyks",
+      "type": "decision",
+      "content": "Add context cancellation propagation to all worker goroutines so they exit cleanly on pool shutdown.",
+      "tags": [
+        "worker",
+        "context",
+        "fix"
+      ],
+      "added_at": "2026-01-10T10:00:00Z"
+    },
+    {
+      "id": "mbdj-ssss-thdc-jgyz",
+      "type": "finding",
+      "content": "ctx.Done() is already checked in the worker loop \u2014 goroutines do exit on cancellation. Leak is elsewhere.",
+      "tags": [
+        "memleak",
+        "goroutine",
+        "worker"
+      ],
+      "added_at": "2026-01-10T11:00:00Z",
+      "meta": {
+        "ref": "src/worker/pool.go:156"
+      }
+    },
+    {
+      "id": "yzqt-bhrj-lkzp-qhny",
+      "type": "finding",
+      "content": "CORRECTION of finding 0: root cause is NOT goroutine leak in worker pool. Actual cause: HTTP client not closing response bodies \u2014 deferred resp.Body.Close() missing in error return paths.",
+      "tags": [
+        "memleak",
+        "http",
+        "correction"
+      ],
+      "added_at": "2026-01-10T13:00:00Z",
+      "meta": {
+        "ref": "src/http/client.go:89"
+      }
+    },
+    {
+      "id": "xdjp-ddbd-xwty-hxqt",
+      "type": "finding",
+      "content": "resp.Body.Close() missing on early return in error path of doRequest(). Body accumulates in memory until GC collects unreachable transport connections.",
+      "tags": [
+        "memleak",
+        "http"
+      ],
+      "added_at": "2026-01-10T14:00:00Z",
+      "meta": {
+        "ref": "src/http/client.go:89"
+      }
+    },
+    {
+      "id": "hjxj-zvfw-rvcf-gbhs",
+      "type": "decision",
+      "content": "Always defer resp.Body.Close() immediately after nil error check \u2014 before any further processing. Applied to all call sites in src/http/.",
+      "tags": [
+        "http",
+        "fix",
+        "decision"
+      ],
+      "added_at": "2026-01-10T15:00:00Z",
+      "meta": {
+        "ref": "src/http/client.go:92"
+      }
+    },
+    {
+      "id": "mzyb-ksnn-wxdc-xffn",
+      "type": "note",
+      "content": "Fix applied. Goroutine count stable at ~120 under sustained load for 2 hours. Heap growth flat. pprof heap profile shows no accumulation.",
+      "tags": [
+        "verification",
+        "memleak"
+      ],
+      "added_at": "2026-01-10T17:00:00Z"
+    },
+    {
+      "id": "hxqq-zppl-cvsx-bssl",
+      "type": "snippet",
+      "content": "func TestDoRequest_ClosesBodyOnError(t *testing.T) {\n    srv := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n        w.WriteHeader(http.StatusInternalServerError)\n        w.Write([]byte(`{\"error\":\"internal\"}`))\n    }))\n    defer srv.Close()\n    _, err := doRequest(context.Background(), srv.URL)\n    require.Error(t, err)\n    // goroutine leak detector asserts all goroutines exit\n}",
+      "tags": [
+        "test",
+        "http",
+        "snippet"
+      ],
+      "added_at": "2026-01-11T09:00:00Z",
+      "meta": {
+        "ref": "src/http/client_test.go:44"
+      }
+    },
+    {
+      "id": "qywf-cwrm-zqbz-ryjt",
+      "type": "note",
+      "content": "PR #401 merged to main. CI green. No regressions in 48h canary deployment.",
+      "tags": [
+        "pr",
+        "merged"
+      ],
+      "added_at": "2026-01-11T14:00:00Z"
+    },
+    {
+      "id": "tzpg-crjc-cyll-fzxc",
+      "type": "decision",
+      "content": "Cherry-pick fix commit to release/2.4 \u2014 customers on stable channel affected. Patch release 2.4.1 planned.",
+      "tags": [
+        "release",
+        "cherry-pick",
+        "decision"
+      ],
+      "added_at": "2026-01-11T15:00:00Z"
+    }
+  ]
+}

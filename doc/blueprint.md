@@ -1,7 +1,7 @@
 # Blueprint: foray — Persistent Journals via MCP
 
 ## TL;DR
-A **Rust MCP server + CLI** that gives any AI assistant persistent investigation journals. Fully stateless server — every tool takes an explicit journal name. Pluggable journal store (ships with `JsonFileStore` at `~/.foray/journals/*.json`). CLI resolves journal via `--journal` flag > `FORAY_JOURNAL` env > `.forayrc` walk-up; store via `--store` flag > `FORAY_STORE` env > `.forayrc current-store` > registry default.
+A **Rust MCP server + CLI** that gives any AI assistant persistent investigation journals. Fully stateless server — every tool takes an explicit journal name. Pluggable journal store (ships with `JsonFileStore` at `~/.foray/journals/*.json`; override base dir with `FORAY_HOME`). CLI resolves journal via `--journal` flag > `FORAY_JOURNAL` env > `.forayrc` walk-up; store via `--store` flag > `FORAY_STORE` env > `.forayrc current-store` > registry default.
 
 **Tagline:** *"Start with a foray. Keep the trail."*
 
@@ -88,7 +88,7 @@ root = true
 The default store implementation uses flat JSON files:
 
 ```
-~/.foray/journals/
+~/.foray/journals/            ← default; override with FORAY_HOME
   ├── auth-investigation.json
   ├── perf-deep-dive.json
   ├── main-cleanup.json
@@ -97,6 +97,8 @@ The default store implementation uses flat JSON files:
 ```
 
 No `.active` file. No project subdirectories. One JSON file per journal. Archived journals are moved to `archive/` subdirectory.
+
+**`FORAY_HOME`**: when set to a non-empty string, overrides `~/.foray/` as the foray base directory. `JsonFileStore::default_dir()` resolves to `$FORAY_HOME/journals/`; `config_path()` resolves to `$FORAY_HOME/config.toml`. Takes precedence over `home::home_dir()`. Useful for testing (point at a fixture tree), CI isolation, and non-standard home setups. Does not affect `.forayrc` walk-up, which is always cwd-relative.
 
 ### Journal file format
 ```json
@@ -339,8 +341,9 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
    - File locking via `fs2::lock_exclusive` on `{name}.lock` sidecar file for concurrent access safety
    - Custom `StoreError` enum: `NotFound`, `AlreadyExists`, `Archived`, `SchemaTooNew`, `ProtocolTooNew`, `Unsupported` (for operations not available on remote stores, e.g. `delete`), `Io`, `Json`
 3. `config.rs` — `StoreRegistry` and config parsing:
-   - Parses `~/.foray/config.toml` with `[stores.<name>]` sections; two backends: `type = "json_file"` (`path`, `description`) and `type = "foray_stdio"` (`command`, `args`, `description`, `store?`). `StdioStore` always appends `serve` to the configured command, so `args` contains only transport arguments — e.g. for SSH: `command = "ssh"`, `args = ["user@host", "--", "foray"]` → spawns `ssh user@host -- foray serve`
-   - Falls back to implicit `local` `JsonFileStore` at `~/.foray/journals/` when config is absent or has no stores; returns `InvalidData` error if the default journal path is not valid UTF-8 (incompatible with TOML-based config regardless)
+   - `config_path()` checks `FORAY_HOME` (non-empty) before `home::home_dir()` — returns `$FORAY_HOME/config.toml` when set
+   - Parses `~/.foray/config.toml` (or `$FORAY_HOME/config.toml`) with `[stores.<name>]` sections; two backends: `type = "json_file"` (`path`, `description`) and `type = "foray_stdio"` (`command`, `args`, `description`, `store?`). `StdioStore` always appends `serve` to the configured command, so `args` contains only transport arguments — e.g. for SSH: `command = "ssh"`, `args = ["user@host", "--", "foray"]` → spawns `ssh user@host -- foray serve`
+   - Falls back to implicit `local` `JsonFileStore` at `$FORAY_HOME/journals/` (or `~/.foray/journals/`) when config is absent or has no stores; returns `InvalidData` error if the default journal path is not valid UTF-8 (incompatible with TOML-based config regardless)
    - `StoreRegistry` holds a `Vec<StoreEntry>` (name, description, `Arc<dyn Store>`) and a `nuance: String`
    - `nuance` is a FNV-1a hash of the full parsed config serialized to JSON (capturing all fields of all stores automatically) plus `"schema=N"` and `"protocol=N"` — deterministic, stable across restarts, changes when any config field, schema, or protocol version changes. The implicit local store is represented as a synthetic single-entry `RawConfig` through the same code path. `RawConfig` and `RawStoreConfig` derive both `Deserialize` and `Serialize`.
    - `StoreRegistry::get(name)` — look up by name; `default_store()` — first entry; `names_hint()` — comma-joined names for error messages
@@ -366,7 +369,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 3. `resolve_store<'a>(registry, cli_flag) -> Result<&'a dyn Store>` — `--store` > `FORAY_STORE` > `.forayrc current-store` > registry default (single-store) or error.
 4. `find_forayrc(start_dir) -> Option<String>` — walk up from cwd looking for `.forayrc`, parse TOML, return `current-journal` value. Stop at `root = true` or filesystem root.
 5. `find_store_in_forayrc(start_dir) -> Option<String>` — same walk, returns `current-store` value.
-6. `main.rs` — parse CLI, load `StoreRegistry`, call `resolve_store()`, route subcommands. `serve` → MCP server. Everything else → resolve journal + store via chains, call store, format output.
+6. `main.rs` — parse CLI, load `StoreRegistry`, call `resolve_store()`, route subcommands. `serve` → MCP server (prints startup banner to stderr: `foray <version> (<git-describe>)[ FORAY_HOME=<path>]`; git describe is baked in at compile time via `build.rs`). Everything else → resolve journal + store via chains, call store, format output.
 7. `create` handler: create journal, return success.
 
 ### Phase 5: Setup Guide + Companion Skill + README + Config
@@ -409,7 +412,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
     - Skill includes its own `update-url` — LLM can fetch the latest, diff against local copy, summarize what changed, and offer to update
 
 3. `README.md` — challenge template, competitive positioning, multi-client config
-4. `.vscode/mcp.json`, config examples for Claude Desktop + Cursor
+4. `.vscode/mcp.json` (VS Code), `.cursor/mcp.json` (Cursor), `.mcp.json` (Claude Code)
 5. Repo-level AI instructions — same rule in each IDE's format: after any code change, review `doc/blueprint.md` and update it to reflect the current state. Covers: tool signatures, response formats, CLI flags, type definitions, storage layout, behavioral rules. The blueprint is the living spec — code and doc must stay in sync.
     - `.github/copilot-instructions.md` (VS Code Copilot)
     - `.cursor/rules/blueprint.mdc` (Cursor)
@@ -478,3 +481,70 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
 - **CLI output**: plain text by default, `--json` flag on read commands.
 - **MCP responses**: JSON-serialized structs. LLM formats for the user.
 - **`rmcp` pattern**: `#[derive(Clone)]` server, `StoreRegistry` (not a bare `Arc<dyn Store>`), `Parameters<T>` for tool args, `CallToolResult::success(Content::text(...))` for returns. `serve_server()` returns a `RunningService` — must call `.waiting()` to keep the process alive. `use rmcp::schemars;` is required at module level for `#[derive(JsonSchema)]` to resolve.
+
+## Test Fixtures
+
+Static journal files under `tests/fixtures/journals/` for use in integration and model eval tests. Never mutated in-place — tests that need a writable copy set `FORAY_HOME` to a temporary directory containing a copy of the tree.
+
+```
+tests/fixtures/journals/
+  ├── stats-empty.json                     — 0 items; list_journals must omit avg/std
+  ├── stats-single.json                    — 1 item; avg_item_size present, std_item_size absent
+  ├── stats-uniform.json                   — 100 identical items; std ≈ 0
+  ├── stats-high-variance.json             — 100 items alternating ~50 B / ~2 KB; large std
+  ├── stats-realistic.json                 — 200 items; 5-template × 8-service real-world mix
+  ├── schema-v0.json                       — 5 items; no 'schema' field; top-level 'ref' on items (pre-v1)
+  ├── correction-trail.json                — 10 items; memory leak investigation with correction
+  ├── cross-reference.json                 — 10 items; foray: cross-journal refs in meta.ref
+  └── archive/
+      └── stats-high-variance-archived.json — same content as stats-high-variance; archived location
+```
+
+| File | Purpose |
+|------|---------|
+| `stats-empty.json` | Validates `n==0` branch: both `avg_item_size` and `std_item_size` absent from `list_journals` response |
+| `stats-single.json` | Validates `n==1` branch: `avg_item_size` present, `std_item_size` absent |
+| `stats-uniform.json` | Zero variance — page size ≈ `floor(budget/avg)` without std inflation |
+| `stats-high-variance.json` | Large std — model must use conservative page size (≤ 4 at 10 KB budget) |
+| `stats-realistic.json` | Real-world distribution across 8 services; full multi-page pagination |
+| `schema-v0.json` | Pre-v1 format; migration moves top-level `ref` → `meta.ref` transparently |
+| `correction-trail.json` | Append-only correction trail; model must not delete or edit existing items |
+| `cross-reference.json` | `foray:` refs in `meta.ref`; model must open and read referenced journals |
+| `archive/stats-high-variance-archived.json` | Archived journal; `sync_journal` calls must pass `archived: true` |
+
+## Model Eval Harness
+
+Scenario files under `tests/eval/scenarios/` for evaluating model behaviour when using foray's MCP tools. Each scenario exercises a specific part of the companion skill's protocol.
+
+```
+tests/eval/
+  README.md            — isolation setup, scenario format, scoring
+  scenarios/
+    pagination-uniform.toml
+    pagination-high-variance.toml
+    pagination-realistic.toml
+    archived-read.toml
+    cross-reference.toml
+    schema-migration.toml
+    empty-journal.toml
+    single-item.toml
+```
+
+**Isolation**: before running a scenario, set `FORAY_HOME` to a temporary copy of `tests/fixtures/` so the eval does not mutate committed fixtures. The workspace `.vscode/mcp.json`, `.cursor/mcp.json`, and `.mcp.json` (Claude Code) all ship a ready-made `foray-eval` server entry that does this automatically.
+
+**Scenario format** (TOML):
+- `journal` — fixture journal name (must exist under `tests/fixtures/journals/`)
+- `archived` — whether the journal is archived (`sync_journal` calls must pass `archived = true`)
+- `prompt` — prompt given to the model
+- `[[expected_behaviors]]` — list of plain-English observable behaviours; each entry is marked pass/fail against the model's tool-call trace; all must pass for the scenario to pass
+
+| Scenario | Journal | Tests |
+|----------|---------|-------|
+| `pagination-uniform` | `stats-uniform` | size from formula (std≈0 → effectively avg-only) |
+| `pagination-high-variance` | `stats-high-variance` | size uses both avg+std, many small pages |
+| `pagination-realistic` | `stats-realistic` | 200-item offset tracking across pages |
+| `archived-read` | `stats-high-variance-archived` | `archived: true` on all sync calls |
+| `cross-reference` | `cross-reference` | follow `foray:` refs, open referenced journals |
+| `schema-migration` | `schema-v0` | pre-v1 journal readable, migration transparent |
+| `empty-journal` | `stats-empty` | absent stats → safe default size (5) |
+| `single-item` | `stats-single` | absent `std_item_size` → `size: 5`, not avg-only |
