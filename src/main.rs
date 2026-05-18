@@ -1,6 +1,7 @@
 mod cli;
 mod config;
 mod migrate;
+mod paths;
 mod server;
 mod store;
 mod store_json;

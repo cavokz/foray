@@ -98,7 +98,7 @@ The default store implementation uses flat JSON files:
 
 No `.active` file. No project subdirectories. One JSON file per journal. Archived journals are moved to `archive/` subdirectory.
 
-**`FORAY_HOME`**: when set to a non-empty string, overrides `~/.foray/` as the foray base directory. `JsonFileStore::default_dir()` resolves to `$FORAY_HOME/journals/`; `config_path()` resolves to `$FORAY_HOME/config.toml`. Takes precedence over `home::home_dir()`. Useful for testing (point at a fixture tree), CI isolation, and non-standard home setups. Does not affect `.forayrc` walk-up, which is always cwd-relative.
+**`FORAY_HOME`**: when set to a non-empty string, overrides `~/.foray/` as the foray base directory. `JsonFileStore::default_dir()` resolves to `$FORAY_HOME/journals/`; `config_path()` resolves to `$FORAY_HOME/config.toml`. Takes precedence over `home::home_dir()`. A leading `~` or `~/…` (or `~\…` on Windows) is expanded to the current user's home directory before use — same for `path` in `config.toml` `[stores.*]` entries. `~otheruser/…` is not expanded. Useful for testing (point at a fixture tree), CI isolation, and MCP configs that substitute `~` for the workspace path. Does not affect `.forayrc` walk-up, which is always cwd-relative.
 
 ### Journal file format
 ```json
