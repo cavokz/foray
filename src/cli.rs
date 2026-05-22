@@ -12,7 +12,7 @@ use clap_complete::engine::{ArgValueCompleter, CompletionCandidate};
 use std::collections::HashMap;
 #[cfg(feature = "dynamic-completion")]
 use std::ffi::OsStr;
-use std::io::Read;
+use std::io::{Read, Write};
 use std::path::PathBuf;
 
 #[derive(Parser)]
@@ -101,6 +101,9 @@ pub(crate) enum Commands {
         /// Delete an archived journal
         #[arg(long)]
         archived: bool,
+        /// Skip confirmation prompt
+        #[arg(long)]
+        force: bool,
     },
     /// Archive a journal
     Archive {
@@ -592,7 +595,42 @@ pub(crate) async fn run(cli: &Cli, store: &dyn Store) -> anyhow::Result<()> {
                 }
             }
         }
-        Commands::Delete { name, archived } => {
+        Commands::Delete {
+            name,
+            archived,
+            force,
+        } => {
+            validate_name(name).map_err(|e| anyhow::anyhow!(e))?;
+            let (summaries, _) = store.list().await?;
+            let exists_here = summaries
+                .iter()
+                .any(|s| s.name == *name && s.archived == *archived);
+            if !exists_here {
+                let exists_elsewhere = summaries
+                    .iter()
+                    .any(|s| s.name == *name && s.archived != *archived);
+                return Err(if exists_elsewhere && *archived {
+                    anyhow::anyhow!(
+                        "journal '{name}' not found in archived location; it may be active (omit --archived)"
+                    )
+                } else if exists_elsewhere {
+                    anyhow::anyhow!(
+                        "journal '{name}' not found; it may be archived (use --archived)"
+                    )
+                } else {
+                    anyhow::anyhow!("journal '{name}' not found")
+                });
+            }
+            if !*force {
+                eprint!("Delete journal '{name}'? [y/N] ");
+                std::io::stderr().flush()?;
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input)?;
+                if input.trim().to_lowercase() != "y" {
+                    println!("Aborted.");
+                    return Ok(());
+                }
+            }
             store.delete(name, *archived).await?;
             println!("Deleted: {name}");
         }
