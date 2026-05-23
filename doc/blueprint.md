@@ -281,7 +281,7 @@ foray show [name] [--json] [--archived]  # Full journal with items. --archived s
 foray add <content> [--type TYPE] [--ref REF] [--tags CSV] [--meta KEY=VALUE]...
 foray create <name> --title "..." [--meta KEY=VALUE]...  # Always creates; --title required.
 foray list [--json] [--archived] [--completion]  # List journals. --archived shows archived. --json outputs {"total": N, "journals": [...]}. --completion outputs bare names (for shell scripts).
-foray delete <name> [--archived]        # Permanently delete a journal. --archived deletes from archived location; without it, deletes from active location.
+foray delete <name> [--archived] [--force]  # Permanently delete a journal. --archived deletes from archived location; without it, deletes from active location. Prompts for confirmation unless --force is given.
 foray archive <name>                   # Archive a journal
 foray unarchive <name>                 # Unarchive a journal
 foray export <name> [--file PATH] [--archived]  # Export journal JSON to stdout (or file). Without --archived: only exports active journals. With --archived: only exports archived journals. Errors with "not found" if the journal is not in the expected location.
