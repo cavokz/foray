@@ -85,7 +85,7 @@ Add items as you discover things. Use the right type:
 
 **Sync as decisions are made, not just after implementation.** If a planning discussion produces a design choice, record it immediately as a `decision` item. Don't wait for code to exist.
 
-Always set `ref` when the finding relates to a specific file, URL, or ticket:
+Always set `meta.ref` when the finding relates to a specific file, URL, or ticket:
 
 ```
 sync_journal(
@@ -95,7 +95,7 @@ sync_journal(
   items: [{
     content: "Race condition: two goroutines access session cache without lock",
     item_type: "finding",
-    ref: "src/auth/session.go:142",
+    meta: { "ref": "src/auth/session.go:142" },
     tags: ["race-condition", "auth"]
   }]
 )
@@ -103,7 +103,7 @@ sync_journal(
 
 ### Anchoring to Version Control
 
-When working in a version-controlled checkout, set VCS metadata on items so `ref` paths can be resolved to exact codebase states:
+When working in a version-controlled checkout, set VCS metadata on items so `meta.ref` paths can be resolved to exact codebase states:
 
 ```
 sync_journal(
@@ -113,8 +113,8 @@ sync_journal(
   items: [{
     content: "Lock added around cache access",
     item_type: "decision",
-    ref: "src/auth/session.go:142",
     meta: {
+      "ref": "src/auth/session.go:142",
       "vcs-repo": "https://github.com/org/repo",
       "vcs-branch": "main",
       "vcs-revision": "abc123def"
@@ -213,7 +213,7 @@ For large journals, synthesize each page as you receive it rather than waiting f
 
 ## Cross-Referencing Journals
 
-To reference another journal's finding, use the `ref` field with foray's cross-reference format:
+To reference another journal's finding, use the `meta.ref` field with foray's cross-reference format:
 
 ```
 sync_journal(
@@ -223,7 +223,7 @@ sync_journal(
   items: [{
     content: "This contradicts the earlier finding about cache timing",
     item_type: "note",
-    ref: "foray:auth-cache-race#tshj-lkbw-rmvn-dpcf"
+    meta: { "ref": "foray:auth-cache-race#tshj-lkbw-rmvn-dpcf" }
   }]
 )
 ```
@@ -259,7 +259,7 @@ sync_journal(
   items: [{
     content: "CORRECTION: session.go:142 is thread-safe — the race is in cache.go:89 instead",
     item_type: "finding",
-    ref: "src/auth/cache.go:89"
+    meta: { "ref": "src/auth/cache.go:89" }
   }]
 )
 ```
@@ -270,7 +270,7 @@ sync_journal(
 - Always call `list_journals` before creating a new journal
 - Always provide `title` when calling `create_journal`
 - Use descriptive, lowercase, hyphenated journal names
-- Set `ref` for file paths, URLs, ticket links, PR links
+- Set `meta.ref` for file paths, URLs, ticket links, PR links
 - Don't use foray for simple one-shot Q&A with no follow-up work
 - Track `from` per journal: save the value returned by each `sync_journal` call; use incremental sync (pass last `from`) to pick up only new items, or complete sync (start from `from: 0`) to reload everything
 - Route tangential items to the most appropriate journal, not always the current one
