@@ -72,7 +72,8 @@ pub(crate) struct JournalSummary {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) avg_item_size: Option<usize>,
     /// Standard deviation of serialized item sizes.
-    /// `None` for journals with 0 or 1 items, or if the server does not report it.
+    /// `None` for empty journals, old servers (protocol 0), or unreadable journals (`error` set).
+    /// `Some(0)` for single-item journals.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) std_item_size: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -115,8 +116,9 @@ impl From<&JournalFile> for JournalSummary {
                 m2 += delta * (x - mean);
             }
             let avg = mean.ceil() as usize;
+            // For n==1 the population std dev is 0 by definition (no variance in a single sample).
             let std = if n < 2 {
-                None
+                Some(0)
             } else {
                 Some((m2 / n as f64).sqrt().ceil() as usize)
             };
@@ -321,7 +323,7 @@ mod tests {
         assert_eq!(s.avg_item_size, None);
         assert_eq!(s.std_item_size, None);
 
-        // 1 item — avg is Some, std is None (need at least 2 for std)
+        // 1 item — avg is Some, std is Some(0) (population std dev of one element is 0)
         let mut j = JournalFile::new("one", "One".into(), None);
         j.items.push(JournalItem {
             id: item_id(),
@@ -333,7 +335,7 @@ mod tests {
         });
         let s = JournalSummary::from(&j);
         assert!(s.avg_item_size.is_some());
-        assert_eq!(s.std_item_size, None);
+        assert_eq!(s.std_item_size, Some(0));
 
         // 2+ items — both Some; avg matches manual calculation
         let mut j = JournalFile::new("two", "Two".into(), None);

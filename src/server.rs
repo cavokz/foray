@@ -627,7 +627,7 @@ impl ForayServer {
 
     #[tool(
         name = "list_journals",
-        description = "List journals. Returns all journals in one call — both active and archived. Each entry includes `archived` (bool), `avg_item_size` (average serialized JSON byte size of all items) and `std_item_size` (standard deviation) — use these to compute a safe sync_journal size: floor(output_budget / (avg_item_size + 2 * std_item_size)). `avg_item_size` is absent for empty journals or old servers; `std_item_size` is also absent for single-item journals. When absent, use size: 5 as a safe default."
+        description = "List journals. Returns all journals in one call — both active and archived. Each entry includes `archived` (bool), `avg_item_size` (average serialized JSON byte size of all items) and `std_item_size` (standard deviation) — use these to compute a safe sync_journal size: floor(output_budget / (avg_item_size + 2 * std_item_size)). Both fields are absent for empty journals, old servers (protocol 0), or entries with an `error` field (unreadable journal — do not call sync_journal on these). When absent, use size: 5 as a safe default."
     )]
     async fn list_journals(
         &self,
@@ -715,11 +715,9 @@ impl ForayServer {
         Ok(GetPromptResult::new(vec![PromptMessage::new_text(
             PromptMessageRole::User,
             format!(
-                "I want to resume work on a journal. \
-                First call `hello` to get the nuance token. \
-                Then load journal \"{}\" with `sync_journal` (pass nuance) and summarize \
-                what has been recorded so far. \
-                Then continue, recording new items with `sync_journal` (always pass nuance).",
+                "I want to resume work on the foray journal \"{}\". \
+                Load its history, summarize where things stand, then continue \
+                recording new findings and decisions.",
                 args.name
             ),
         )])
@@ -737,10 +735,9 @@ impl ForayServer {
         Ok(GetPromptResult::new(vec![PromptMessage::new_text(
             PromptMessageRole::User,
             format!(
-                "First call `hello` to get the nuance token. \
-                Then read all items from journal \"{}\" using `sync_journal` (pass nuance) \
-                and produce a synthesis. Group findings by theme, highlight key decisions, \
-                note any open questions, and identify potential next steps.",
+                "Summarize the foray journal \"{}\". \
+                Read all items and synthesize: group by theme, highlight key decisions, \
+                note open questions and potential next steps.",
                 args.name
             ),
         )])
