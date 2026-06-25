@@ -715,14 +715,9 @@ impl ForayServer {
         Ok(GetPromptResult::new(vec![PromptMessage::new_text(
             PromptMessageRole::User,
             format!(
-                "I want to resume work on a journal. \
-                First call `hello` to get the nuance token. \
-                Then call `list_journals` (pass nuance and store) to obtain `archived` and size stats for \"{}\". \
-                Then load the journal with `sync_journal` (pass nuance, store, archived from list_journals, \
-                and a safe computed size: floor(20000 / (avg_item_size + 2 * std_item_size)); \
-                use size: 5 when stats are absent (empty journal or old server)) \
-                and summarize what has been recorded so far. \
-                Then continue, recording new items with `sync_journal` (always pass nuance, store, and archived).",
+                "I want to resume work on the foray journal \"{}\". \
+                Load its history, summarize where things stand, then continue \
+                recording new findings and decisions.",
                 args.name
             ),
         )])
@@ -740,13 +735,9 @@ impl ForayServer {
         Ok(GetPromptResult::new(vec![PromptMessage::new_text(
             PromptMessageRole::User,
             format!(
-                "First call `hello` to get the nuance token. \
-                Then call `list_journals` (pass nuance and store) to obtain `archived` and size stats for \"{}\". \
-                Then read all items from the journal using `sync_journal` (pass nuance, store, archived from list_journals, \
-                and a safe computed size: floor(20000 / (avg_item_size + 2 * std_item_size)); \
-                use size: 5 when stats are absent (empty journal or old server)) \
-                and produce a synthesis. Group findings by theme, highlight key decisions, \
-                note any open questions, and identify potential next steps.",
+                "Summarize the foray journal \"{}\". \
+                Read all items and synthesize: group by theme, highlight key decisions, \
+                note open questions and potential next steps.",
                 args.name
             ),
         )])

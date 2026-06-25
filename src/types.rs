@@ -72,7 +72,8 @@ pub(crate) struct JournalSummary {
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) avg_item_size: Option<usize>,
     /// Standard deviation of serialized item sizes.
-    /// `None` for empty journals or old servers (protocol 0). `Some(0)` for single-item journals.
+    /// `None` for empty journals, old servers (protocol 0), or unreadable journals (`error` set).
+    /// `Some(0)` for single-item journals.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub(crate) std_item_size: Option<usize>,
     #[serde(skip_serializing_if = "Option::is_none")]
@@ -115,7 +116,7 @@ impl From<&JournalFile> for JournalSummary {
                 m2 += delta * (x - mean);
             }
             let avg = mean.ceil() as usize;
-            // Population std dev requires ≥2 samples; for n==1 it is 0 by definition.
+            // For n==1 the population std dev is 0 by definition (no variance in a single sample).
             let std = if n < 2 {
                 Some(0)
             } else {
