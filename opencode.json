@@ -1,0 +1,16 @@
+{
+	"$schema": "https://opencode.ai/config.json",
+	"mcp": {
+		"foray-dev": {
+			"type": "local",
+			"command": ["cargo", "run", "--", "serve"]
+		},
+		"foray-eval": {
+			"type": "local",
+			"command": ["cargo", "run", "--", "serve"],
+			"environment": {
+				"FORAY_HOME": "tests/fixtures"
+			}
+		}
+	}
+}

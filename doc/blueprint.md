@@ -414,7 +414,7 @@ Global options: `--journal <name>` and `--store <name>` on all commands (overrid
     - Skill includes its own `update-url` — LLM can fetch the latest, diff against local copy, summarize what changed, and offer to update
 
 3. `README.md` — challenge template, competitive positioning, multi-client config
-4. `.vscode/mcp.json` (VS Code), `.cursor/mcp.json` (Cursor), `.mcp.json` (Claude Code)
+4. `.vscode/mcp.json` (VS Code), `.cursor/mcp.json` (Cursor), `.mcp.json` (Claude Code), `opencode.json` (OpenCode)
 5. Repo-level AI instructions — same rule in each IDE's format: after any code change, review `doc/blueprint.md` and update it to reflect the current state. Covers: tool signatures, response formats, CLI flags, type definitions, storage layout, behavioral rules. The blueprint is the living spec — code and doc must stay in sync.
     - `.github/copilot-instructions.md` (VS Code Copilot)
     - `.cursor/rules/blueprint.mdc` (Cursor)
@@ -532,7 +532,7 @@ tests/eval/
     single-item.toml
 ```
 
-**Isolation**: before running a scenario, set `FORAY_HOME` to a temporary copy of `tests/fixtures/` so the eval does not mutate committed fixtures. The workspace `.vscode/mcp.json`, `.cursor/mcp.json`, and `.mcp.json` (Claude Code) all ship a ready-made `foray-eval` server entry that does this automatically.
+**Isolation**: before running a scenario, set `FORAY_HOME` to a temporary copy of `tests/fixtures/` so the eval does not mutate committed fixtures. The workspace `.vscode/mcp.json`, `.cursor/mcp.json`, `.mcp.json` (Claude Code), and `opencode.json` (OpenCode) all ship a ready-made `foray-eval` server entry that does this automatically.
 
 **Scenario format** (TOML):
 - `journal` — fixture journal name (must exist under `tests/fixtures/journals/`)
