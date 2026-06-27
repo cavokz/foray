@@ -69,4 +69,4 @@ pass.
 | `cross-reference.toml` | `cross-reference` | Follow `foray:` refs, open referenced journals |
 | `schema-migration.toml` | `schema-v0` | Read pre-v1 journal, migration transparent |
 | `empty-journal.toml` | `stats-empty` | Absent stats → safe default size |
-| `single-item.toml` | `stats-single` | Absent std\_item\_size → graceful handling |
+| `single-item.toml` | `stats-single` | `std_item_size` `Some(0)` → formula reduces to `floor(budget/avg)` |
