@@ -491,7 +491,7 @@ Static journal files under `tests/fixtures/journals/` for use in integration and
 ```
 tests/fixtures/journals/
   ├── stats-empty.json                     — 0 items; list_journals must omit avg/std
-  ├── stats-single.json                    — 1 item; avg_item_size present, std_item_size absent
+  ├── stats-single.json                    — 1 item; avg_item_size present, std_item_size Some(0)
   ├── stats-uniform.json                   — 100 identical items; std ≈ 0
   ├── stats-high-variance.json             — 100 items alternating ~50 B / ~2 KB; large std
   ├── stats-realistic.json                 — 200 items; 5-template × 8-service real-world mix
@@ -505,7 +505,7 @@ tests/fixtures/journals/
 | File | Purpose |
 |------|---------|
 | `stats-empty.json` | Validates `n==0` branch: both `avg_item_size` and `std_item_size` absent from `list_journals` response |
-| `stats-single.json` | Validates `n==1` branch: `avg_item_size` present, `std_item_size` absent |
+| `stats-single.json` | Validates `n==1` branch: `avg_item_size` present, `std_item_size` `Some(0)` |
 | `stats-uniform.json` | Zero variance — page size ≈ `floor(budget/avg)` without std inflation |
 | `stats-high-variance.json` | Large std — model must use conservative page size (≤ 4 at 10 KB budget) |
 | `stats-realistic.json` | Real-world distribution across 8 services; full multi-page pagination |

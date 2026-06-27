@@ -6,10 +6,10 @@ prompt   = "Read the stats-single journal and describe the finding."
 description = "Calls list_journals before sync_journal."
 
 [[expected_behaviors]]
-description = "avg_item_size is present in the list_journals response; std_item_size is absent (only 1 item)."
+description = "avg_item_size is present in the list_journals response; std_item_size is Some(0) — the formula floor(budget / (avg + 2 * 0)) reduces to floor(budget / avg)."
 
 [[expected_behaviors]]
-description = "Handles absent std_item_size by using size: 5 as the safe default — does not use an avg-only formula or a large round number."
+description = "Uses the formula with std_item_size = 0 to compute page size — does not fall back to size: 5 or use a hardcoded round number."
 
 [[expected_behaviors]]
 description = "Makes one sync_journal call and retrieves the single item."
