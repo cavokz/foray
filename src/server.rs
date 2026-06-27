@@ -352,7 +352,21 @@ impl ForayServer {
                     ),
                 })),
             ),
-            other => ErrorData::internal_error(other.to_string(), None),
+            StoreError::Io(e) => ErrorData::internal_error(
+                format!("I/O error: {e}"),
+                Some(serde_json::json!({ "type": "io_error" })),
+            ),
+            StoreError::Json(e) => ErrorData::internal_error(
+                format!("JSON error: {e}"),
+                Some(serde_json::json!({ "type": "json_error" })),
+            ),
+            StoreError::Unsupported(op) => ErrorData::internal_error(
+                format!("operation not supported on remote stores: {op}"),
+                Some(serde_json::json!({
+                    "type": "unsupported",
+                    "operation": op,
+                })),
+            ),
         }
     }
 
