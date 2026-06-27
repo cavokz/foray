@@ -569,6 +569,28 @@ fn classify_mcp_error(e: &ErrorData) -> StoreError {
                     .unwrap_or(0);
                 return StoreError::ProtocolTooNew { found, max };
             }
+            "io_error" => {
+                // Strip the "I/O error: " prefix the server adds — io_err wraps
+                // the message in StoreError::Io whose Display adds it back.
+                let msg = e.message.to_string();
+                let detail = msg.strip_prefix("I/O error: ").unwrap_or(&msg);
+                return io_err(detail);
+            }
+            "json_error" => {
+                use serde::ser::Error as _;
+                let msg = e.message.to_string();
+                let detail = msg.strip_prefix("JSON error: ").unwrap_or(&msg);
+                return StoreError::Json(serde_json::Error::custom(detail));
+            }
+            "unsupported" => {
+                let op = e
+                    .data
+                    .as_ref()
+                    .and_then(|d| d["operation"].as_str())
+                    .unwrap_or("")
+                    .to_string();
+                return StoreError::Unsupported(op);
+            }
             _ => {}
         }
     }
@@ -906,6 +928,78 @@ mod tests {
                     ..
                 }
             ),
+            "unexpected: {err:?}"
+        );
+    }
+
+    fn make_msg_error(type_val: &str, msg: &str) -> ErrorData {
+        ErrorData::internal_error(
+            msg.to_string(),
+            Some(serde_json::json!({ "type": type_val })),
+        )
+    }
+
+    #[test]
+    fn classify_io_error_structured() {
+        let e = make_msg_error("io_error", "I/O error: disk full");
+        let err = classify_mcp_error(&e);
+        assert!(matches!(err, StoreError::Io(ref e) if e.to_string() == "disk full"));
+    }
+
+    #[test]
+    fn classify_io_error_structured_strips_prefix() {
+        let e = make_msg_error("io_error", "I/O error: permission denied");
+        let err = classify_mcp_error(&e);
+        // io_err wraps in StoreError::Io whose Display re-adds "I/O error: "
+        assert_eq!(err.to_string(), "I/O error: permission denied");
+    }
+
+    #[test]
+    fn classify_io_error_structured_no_prefix_fallback() {
+        let e = make_msg_error("io_error", "raw error without prefix");
+        let err = classify_mcp_error(&e);
+        assert_eq!(err.to_string(), "I/O error: raw error without prefix");
+    }
+
+    #[test]
+    fn classify_json_error_structured() {
+        let e = make_msg_error("json_error", "JSON error: invalid syntax at line 1");
+        let err = classify_mcp_error(&e);
+        assert!(matches!(err, StoreError::Json(_)));
+        assert_eq!(err.to_string(), "JSON error: invalid syntax at line 1");
+    }
+
+    #[test]
+    fn classify_json_error_structured_no_prefix_fallback() {
+        let e = make_msg_error("json_error", "parse error");
+        let err = classify_mcp_error(&e);
+        assert!(matches!(err, StoreError::Json(_)));
+        assert_eq!(err.to_string(), "JSON error: parse error");
+    }
+
+    #[test]
+    fn classify_unsupported_structured() {
+        let e = ErrorData::internal_error(
+            "operation not supported on remote stores: delete",
+            Some(serde_json::json!({
+                "type": "unsupported",
+                "operation": "delete",
+            })),
+        );
+        let err = classify_mcp_error(&e);
+        assert!(
+            matches!(err, StoreError::Unsupported(ref op) if op == "delete"),
+            "unexpected: {err:?}"
+        );
+    }
+
+    #[test]
+    fn classify_unsupported_structured_missing_operation() {
+        let e =
+            ErrorData::internal_error("test", Some(serde_json::json!({ "type": "unsupported" })));
+        let err = classify_mcp_error(&e);
+        assert!(
+            matches!(err, StoreError::Unsupported(ref op) if op.is_empty()),
             "unexpected: {err:?}"
         );
     }

@@ -248,7 +248,9 @@ Errors include a structured `data` object with machine-readable fields for progr
 | Protocol too new (wire) | `internal_error` | `"protocol_too_new"` | `found`, `max` | `"upgrade_foray"` | Upgrade the connected foray MCP server |
 | `store` missing | `invalid_params` | *(none)* | — | — | Store names hint |
 | Unknown store name | `invalid_params` | *(none)* | — | — | Available stores hint |
-| Other store errors | `internal_error` | *(none)* | — | — | *(none)* |
+| I/O error (filesystem) | `internal_error` | `"io_error"` | — | — | *(none)* |
+| JSON error (parse/serialize) | `internal_error` | `"json_error"` | — | — | *(none)* |
+| Unsupported operation (remote store) | `internal_error` | `"unsupported"` | `operation` | — | *(none)* |
 
 **AI assistant guidance**: inspect `data.type` for programmatic dispatch; surface `data.hint` verbatim to the user; if `data.remedy` is present, act on it (e.g. `"upgrade_foray"` → tell the user to upgrade the foray binary they are using as the MCP server). Old servers (pre-structured-errors) omit `data.type`; `classify_mcp_error` falls back to message-prefix matching.
 
