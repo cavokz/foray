@@ -2,6 +2,12 @@ journal  = "stats-uniform"
 archived = false
 prompt   = "Read the full stats-uniform journal and list all unique tags found across all items."
 
+[checks]
+all_syncs_use_journal = true
+min_sync_calls        = 2
+from_tracking         = true
+size_not_fallback     = true
+
 [[expected_behaviors]]
 description = "Calls list_journals before any sync_journal call."
 

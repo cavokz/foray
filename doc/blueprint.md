@@ -520,7 +520,9 @@ Scenario files under `tests/eval/scenarios/` for evaluating model behaviour when
 
 ```
 tests/eval/
-  README.md            — isolation setup, scenario format, scoring
+  run-eval.py          — eval runner (invokes opencode run --format json)
+  checker.py           — mechanical tool-call trace verifier
+  README.md            — layout, scenario format, scoring
   scenarios/
     pagination-uniform.toml
     pagination-high-variance.toml
@@ -532,13 +534,14 @@ tests/eval/
     single-item.toml
 ```
 
-**Isolation**: before running a scenario, set `FORAY_HOME` to a temporary copy of `tests/fixtures/` so the eval does not mutate committed fixtures. The workspace `.vscode/mcp.json`, `.cursor/mcp.json`, `.mcp.json` (Claude Code), and `opencode.json` (OpenCode) all ship a ready-made `foray-eval` server entry that does this automatically.
+**Isolation**: the runner sets `OPENCODE_CONFIG_CONTENT` to activate only the `foray-eval` MCP server (which points at `tests/fixtures`) and disable all other foray servers, preventing tool-name collisions.
 
 **Scenario format** (TOML):
 - `journal` — fixture journal name (must exist under `tests/fixtures/journals/`)
 - `archived` — whether the journal is archived (`sync_journal` calls must pass `archived = true`)
 - `prompt` — prompt given to the model
-- `[[expected_behaviors]]` — list of plain-English observable behaviours; each entry is marked pass/fail against the model's tool-call trace; all must pass for the scenario to pass
+- `[checks]` — mechanical checks declared per scenario (bool enables, int sets a threshold); universal checks (`tool_errors`, `default` call order, `archived` flag) always run
+- `[[expected_behaviors]]` — plain-English observable behaviours for manual / semantic review
 
 | Scenario | Journal | Tests |
 |----------|---------|-------|

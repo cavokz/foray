@@ -22,5 +22,8 @@ target
 
 .forayrc
 
+eval-results-*.txt
+tests/fixtures/journals/*.lock
+
 .claude/settings.local.json
 .vscode/settings.json

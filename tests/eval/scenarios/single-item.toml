@@ -2,6 +2,12 @@ journal  = "stats-single"
 archived = false
 prompt   = "Read the stats-single journal and describe the finding."
 
+[checks]
+all_syncs_use_journal = true
+max_sync_calls        = 1
+exact_item_count      = 1
+size_not_fallback     = true
+
 [[expected_behaviors]]
 description = "Calls list_journals before sync_journal."
 

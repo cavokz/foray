@@ -2,14 +2,18 @@ journal  = "stats-empty"
 archived = false
 prompt   = "Read the stats-empty journal and report how many items it contains."
 
+[checks]
+all_syncs_use_journal = true
+exact_item_count      = 0
+
 [[expected_behaviors]]
 description = "Calls list_journals before sync_journal."
 
 [[expected_behaviors]]
-description = "avg_item_size is absent in the list_journals response — uses size: 5 as the safe default (not a larger round number)."
+description = "avg_item_size is absent in the list_journals response — recognizes empty journal from list_journals alone (item_count: 0)."
 
 [[expected_behaviors]]
-description = "Makes at most one sync_journal call (zero items means no further pages needed)."
+description = "Does not call sync_journal when item_count is already known to be 0 from list_journals (correct optimization — no data to sync)."
 
 [[expected_behaviors]]
 description = "Correctly reports 0 items."
