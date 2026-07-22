@@ -2,6 +2,12 @@ journal  = "stats-high-variance"
 archived = false
 prompt   = "Read the full stats-high-variance journal and summarize all findings."
 
+[checks]
+all_syncs_use_journal = true
+min_sync_calls        = 8
+from_tracking         = true
+size_not_fallback     = true
+
 [[expected_behaviors]]
 description = "Calls list_journals before any sync_journal call."
 

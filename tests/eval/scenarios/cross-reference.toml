@@ -2,6 +2,10 @@ journal  = "cross-reference"
 archived = false
 prompt   = "Summarize the auth investigation in the cross-reference journal, including relevant context from any journals it references."
 
+[checks]
+first_sync_uses_journal = true
+min_journals_read       = 2
+
 [[expected_behaviors]]
 description = "Reads the cross-reference journal (calls list_journals then sync_journal)."
 

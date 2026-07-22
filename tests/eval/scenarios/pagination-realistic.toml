@@ -2,6 +2,12 @@ journal  = "stats-realistic"
 archived = false
 prompt   = "Read the full stats-realistic journal and summarize all decisions made."
 
+[checks]
+all_syncs_use_journal = true
+min_sync_calls        = 2
+from_tracking         = true
+size_not_fallback     = true
+
 [[expected_behaviors]]
 description = "Calls list_journals before any sync_journal call."
 

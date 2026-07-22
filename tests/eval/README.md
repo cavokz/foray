@@ -9,27 +9,46 @@ migration, and the append-only correction rule.
 
 ```
 tests/eval/
+  run-eval.py          — eval runner script
+  checker.py           — mechanical tool-call trace verifier
   README.md            — this file
   scenarios/           — one TOML file per scenario
     *.toml
 ```
 
-Fixture journals live in `tests/fixtures/journals/`. The eval must not mutate
-them, so the server is started with `FORAY_HOME` pointing at a copy.
+Fixture journals live in `tests/fixtures/journals/`. The eval runner uses
+`OPENCODE_CONFIG_CONTENT` to activate only the `foray-eval` MCP server (which
+points at `tests/fixtures`) and disable all other foray servers, preventing
+tool-name collisions.
 
-### VS Code
+### Running
 
-The workspace ships a `.vscode/mcp.json` with a ready-made `foray-eval` server
-entry. It runs `cargo run -- serve` with `FORAY_HOME` set to `tests/fixtures`,
-so no manual setup is needed — just activate the `foray-eval` server from the
-MCP panel and open a Copilot Chat session.
-
-### Manual
+Requires Python 3.9+. Install dependencies:
 
 ```sh
-TMP=$(mktemp -d)
-cp -r tests/fixtures/journals "$TMP/journals"
-FORAY_HOME="$TMP" foray serve
+pip install -r requirements.txt
+```
+
+Run:
+
+```sh
+python3 tests/eval/run-eval.py github-copilot/claude-sonnet-4.6
+python3 tests/eval/run-eval.py github-copilot/claude-sonnet-4.6 github-copilot/claude-haiku-4.5
+```
+
+Results are written to `eval-results-{timestamp}-{model-slug}.txt` in the
+current directory.
+
+### Manual with the foray-eval MCP server
+
+The workspace `opencode.json` defines a `foray-eval` MCP server. To use it
+manually in an opencode session, set `"enabled": true` on the `foray-eval`
+entry in `opencode.json` and ensure any other foray servers are disabled.
+
+Or start a standalone server:
+
+```sh
+FORAY_HOME=tests/fixtures cargo run -- serve
 ```
 
 ## Scenario Format
@@ -46,17 +65,46 @@ archived = false
 # Prompt given to the model.
 prompt = "..."
 
-# List of observable behaviours that the model's tool-call trace must exhibit.
+# Mechanical checks — boolean true enables, integer sets a threshold.
+[checks]
+all_syncs_use_journal = true
+min_sync_calls        = 2
+from_tracking         = true
+size_not_fallback     = true
+
+# Observable behaviours for manual / semantic review.
 [[expected_behaviors]]
 description = "..."
 ```
 
+### Automated Checks
+
+`checker.py` parses the JSON event stream from `opencode run --format json` and
+runs checks declared in the scenario's `[checks]` TOML section. Universal
+checks (`tool_errors`, `default` call order, `archived` flag derived from the
+scenario's `archived` field) always run — no need to declare them.
+
+Available `[checks]` keys:
+
+| Key | Value | What it checks |
+|-----|-------|----------------|
+| `all_syncs_use_journal` | bool | Every `sync_journal` targets the scenario's journal |
+| `first_sync_uses_journal` | bool | First `sync_journal` targets the scenario's journal |
+| `from_tracking` | bool | `from` offsets advance by items-returned per page |
+| `size_not_fallback` | bool | Size is not the fallback 5 when `avg_item_size` is available |
+| `no_writes` | bool | No `create_journal` or `sync_journal` with items |
+| `min_sync_calls` | int | At least N `sync_journal` calls |
+| `max_sync_calls` | int | At most N `sync_journal` calls |
+| `exact_item_count` | int | Total items retrieved matches N |
+| `min_journals_read` | int | At least N distinct journal names read |
+
+Semantic checks (e.g. "synthesizes findings from referenced journals") remain
+manual — the checker reports only mechanical failures.
+
 ### Scoring
 
-Evaluate the model's tool-call trace against each `expected_behaviors` entry.
-Each entry is a plain-English description of an observable behaviour; a human or
-automated scorer marks it pass/fail. All entries must pass for the scenario to
-pass.
+All checks must pass for the scenario to pass. Results are printed per scenario
+and aggregated per model.
 
 ## Scenarios
 

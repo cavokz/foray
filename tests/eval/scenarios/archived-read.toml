@@ -2,6 +2,12 @@ journal  = "stats-high-variance-archived"
 archived = true
 prompt   = "Read the full stats-high-variance-archived journal and count how many findings it contains."
 
+[checks]
+all_syncs_use_journal = true
+min_sync_calls        = 2
+no_writes             = true
+size_not_fallback     = true
+
 [[expected_behaviors]]
 description = "Calls list_journals and identifies the journal as archived (archived = true)."
 

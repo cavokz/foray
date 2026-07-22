@@ -2,6 +2,10 @@ journal  = "schema-v0"
 archived = false
 prompt   = "Read the schema-v0 journal and list all findings."
 
+[checks]
+all_syncs_use_journal = true
+exact_item_count      = 5
+
 [[expected_behaviors]]
 description = "Reads the journal without error despite the missing 'schema' field at the journal root."
 
