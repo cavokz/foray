@@ -45,8 +45,8 @@ Then direct your AI assistant to fetch the [Setup Guide](https://raw.githubuserc
 | Prompt | Description |
 |--------|-------------|
 | `start_journal` | Create a journal and begin recording |
-| `resume_journal` | Load a journal and continue |
-| `summarize` | Read all items and produce a synthesis |
+| `resume_journal` | Inspect recent journal context and continue |
+| `summarize` | Produce a bounded summary, or an exhaustive synthesis when requested |
 
 ## CLI Usage
 

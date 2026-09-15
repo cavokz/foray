@@ -1,0 +1,23 @@
+journal  = "stats-realistic"
+archived = false
+prompt   = "Give me a brief current-state summary of the stats-realistic journal. Read only the 12 most recent items, starting at offset 188; do not read every historical item."
+
+# The fixture has 200 items. A bounded tail read should start at item 188 and
+# retrieve no more than the 12-item probe requested by this scenario.
+initial_from = 188
+
+[checks]
+all_syncs_use_journal = true
+from_tracking         = true
+initial_from          = 188
+max_retrieved_items   = 12
+size_not_fallback     = true
+
+[[expected_behaviors]]
+description = "Calls list_journals before sync_journal."
+
+[[expected_behaviors]]
+description = "Uses a bounded tail read instead of complete pagination."
+
+[[expected_behaviors]]
+description = "States the scope or limitations of the brief summary."

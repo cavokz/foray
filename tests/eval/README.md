@@ -91,11 +91,13 @@ Available `[checks]` keys:
 | `all_syncs_use_journal` | bool | Every `sync_journal` targets the scenario's journal |
 | `first_sync_uses_journal` | bool | First `sync_journal` targets the scenario's journal |
 | `from_tracking` | bool | `from` offsets advance by items-returned per page |
+| `initial_from` | int | First `sync_journal` starts at the declared offset; useful for selective tail reads |
 | `size_not_fallback` | bool | Size is not the fallback 5 when `avg_item_size` is available |
 | `no_writes` | bool | No `create_journal` or `sync_journal` with items |
 | `min_sync_calls` | int | At least N `sync_journal` calls |
 | `max_sync_calls` | int | At most N `sync_journal` calls |
 | `exact_item_count` | int | Total items retrieved matches N |
+| `max_retrieved_items` | int | Total items retrieved does not exceed N |
 | `min_journals_read` | int | At least N distinct journal names read |
 
 Semantic checks (e.g. "synthesizes findings from referenced journals") remain
@@ -113,6 +115,8 @@ and aggregated per model.
 | `pagination-uniform.toml` | `stats-uniform` | Multi-page pagination with zero variance (size ≈ budget/avg) |
 | `pagination-high-variance.toml` | `stats-high-variance` | Conservative paging when std is large |
 | `pagination-realistic.toml` | `stats-realistic` | Full 200-item pagination, offset tracking |
+| `resume-tail.toml` | `stats-realistic` | Bounded tail read for resuming work |
+| `brief-summary.toml` | `stats-realistic` | Bounded tail read for an ordinary summary |
 | `archived-read.toml` | `stats-high-variance-archived` | `archived: true` in all sync calls |
 | `cross-reference.toml` | `cross-reference` | Follow `foray:` refs, open referenced journals |
 | `schema-migration.toml` | `schema-v0` | Read pre-v1 journal, migration transparent |
