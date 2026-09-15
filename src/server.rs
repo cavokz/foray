@@ -720,7 +720,7 @@ impl ForayServer {
 
     #[prompt(
         name = "resume_journal",
-        description = "Load the journal, summarize recent items, continue where you left off."
+        description = "Inspect recent journal context, summarize current state, and continue where you left off."
     )]
     async fn resume_journal(
         &self,
@@ -730,8 +730,10 @@ impl ForayServer {
             PromptMessageRole::User,
             format!(
                 "I want to resume work on the foray journal \"{}\". \
-                Load its history, summarize where things stand, then continue \
-                recording new findings and decisions.",
+                First call `hello`, then `list_journals`. Read a bounded page from the \
+                journal tail and summarize the current state. Expand to earlier pages only \
+                if the recent context is insufficient; do not load the full history unless \
+                needed. Then continue recording new findings and decisions.",
                 args.name
             ),
         )])
@@ -740,7 +742,7 @@ impl ForayServer {
 
     #[prompt(
         name = "summarize",
-        description = "Read all items in the journal and produce a synthesis."
+        description = "Produce a bounded journal summary, or an exhaustive synthesis when requested."
     )]
     async fn summarize(
         &self,
@@ -750,8 +752,11 @@ impl ForayServer {
             PromptMessageRole::User,
             format!(
                 "Summarize the foray journal \"{}\". \
-                Read all items and synthesize: group by theme, highlight key decisions, \
-                note open questions and potential next steps.",
+                First call `hello`, then `list_journals`, and read a bounded representative \
+                page, normally from the journal tail. Synthesize what you read: group by theme, \
+                highlight key decisions, and note open questions and potential next steps. \
+                Read all pages only when the request requires every item, full history, an audit, \
+                or otherwise exhaustive coverage; state the coverage of a bounded summary.",
                 args.name
             ),
         )])

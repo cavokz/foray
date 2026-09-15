@@ -163,19 +163,52 @@ def check_archived_flag(calls: list[dict], expected: bool) -> list[str]:
 
 
 def check_from_tracking(calls: list[dict], scenario: dict, value: object) -> list[str]:
-    """Verify from offsets advance by the number of items returned each page."""
+    """Verify from offsets advance by the number of items returned each page.
+
+    Exhaustive scans must start at zero. Selective scenarios may declare a
+    nonzero initial offset and still require contiguous tracking afterwards.
+    """
     if not value:
         return []
     journal = scenario["journal"]
     fails = []
     syncs = _sync_calls(calls, journal)
-    expected = 0
+    expected = int(scenario.get("initial_from", 0))
     for i, s in enumerate(syncs):
         actual = s["input"].get("from", -1)
         if actual != expected:
             fails.append(f"sync_journal[{i}] from={actual}, expected {expected}")
         expected += len(s["output"].get("items", []))
     return fails
+
+
+def check_initial_from(calls: list[dict], scenario: dict, value: object) -> list[str]:
+    """Verify the first journal read starts at the scenario's expected offset."""
+    if value is None:
+        return []
+    journal = scenario["journal"]
+    syncs = _sync_calls(calls, journal)
+    if not syncs:
+        return [f"No sync_journal calls for '{journal}'"]
+    expected = int(value)
+    actual = syncs[0]["input"].get("from", -1)
+    if actual != expected:
+        return [f"first sync_journal from={actual}, expected {expected}"]
+    return []
+
+
+def check_max_retrieved_items(calls: list[dict], scenario: dict, value: object) -> list[str]:
+    """Verify a selective read stays within its retrieval budget."""
+    if value is None:
+        return []
+    if isinstance(value, bool):
+        return ["Expected integer for max_retrieved_items, got boolean"]
+    journal = scenario["journal"]
+    maximum = int(value)
+    total = sum(len(s["output"].get("items", [])) for s in _sync_calls(calls, journal))
+    if total > maximum:
+        return [f"Retrieved {total} items, expected at most {maximum}"]
+    return []
 
 
 def check_size_not_fallback(calls: list[dict], scenario: dict, value: object) -> list[str]:
@@ -266,11 +299,13 @@ _CHECKS: dict[str, tuple[str, callable]] = {
         check_first_sync_uses_journal,
     ),
     "from_tracking": ("from offset tracking", check_from_tracking),
+    "initial_from": ("initial from offset", check_initial_from),
     "size_not_fallback": ("size not fallback", check_size_not_fallback),
     "no_writes": ("no writes", check_no_writes),
     "min_sync_calls": ("min sync calls", check_min_sync_calls),
     "max_sync_calls": ("max sync calls", check_max_sync_calls),
     "exact_item_count": ("exact item count", check_exact_item_count),
+    "max_retrieved_items": ("max retrieved items", check_max_retrieved_items),
     "min_journals_read": ("min journals read", check_multiple_journals_read),
 }
 

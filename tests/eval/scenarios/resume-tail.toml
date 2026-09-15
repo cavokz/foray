@@ -1,0 +1,26 @@
+journal  = "stats-realistic"
+archived = false
+prompt   = "Resume the stats-realistic journal. Determine the current state from the 12 most recent items only; start at offset 188 and do not read the full history."
+
+# The fixture has 200 items. A bounded tail read should start at item 188 and
+# retrieve no more than the 12-item probe requested by this scenario.
+initial_from = 188
+
+[checks]
+all_syncs_use_journal = true
+from_tracking         = true
+initial_from          = 188
+max_retrieved_items   = 12
+size_not_fallback     = true
+
+[[expected_behaviors]]
+description = "Calls list_journals before sync_journal and uses the journal metadata to locate the tail."
+
+[[expected_behaviors]]
+description = "Starts with a nonzero from offset near the end of the 200-item journal rather than scanning from zero."
+
+[[expected_behaviors]]
+description = "Keeps the read bounded and does not retrieve the full journal."
+
+[[expected_behaviors]]
+description = "Reports that the resume summary is based on recent context rather than claiming complete historical coverage."
